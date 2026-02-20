@@ -1,82 +1,78 @@
 import { NextResponse } from 'next/server';
-import { loginCapitalCom } from '@/lib/capital';
-import { encrypt } from '@/lib/crypto';
-import db from '@/lib/db';
-import { SignJWT } from 'jose';
-import { v4 as uuidv4 } from 'uuid';
-
-const JWT_SECRET = new TextEncoder().encode(
-    process.env.JWT_SECRET || 'default-jwt-secret-key-change-me'
-);
+import { db } from '@/lib/db';
+import { users, refreshTokens, auditLogs } from '@/lib/db/schema';
+import { comparePassword } from '@/lib/crypto';
+import { signAccessToken, generateRefreshToken, setAuthCookies } from '@/lib/auth';
+import { eq } from 'drizzle-orm';
 
 export async function POST(request: Request) {
     try {
         const { email, password } = await request.json();
 
         if (!email || !password) {
-            return NextResponse.json(
-                { message: 'Email and password are required' },
-                { status: 400 }
-            );
+            return NextResponse.json({ message: 'Email and password are required' }, { status: 400 });
         }
 
-        // 1. Authenticate with Capital.com
-        const capitalData = await loginCapitalCom(email, password);
+        // 1. Find User
+        const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
 
-        const { cst, xSecurityToken, clientId } = capitalData;
-
-        if (!cst || !xSecurityToken) {
-            return NextResponse.json(
-                { message: 'Failed to retrieve session tokens from Capital.com' },
-                { status: 401 }
-            );
+        if (!user) {
+            return NextResponse.json({ message: 'Invalid credentials' }, { status: 401 });
         }
 
-        // 2. Encrypt tokens
-        const encryptedTokens = encrypt(`${cst}:${xSecurityToken}`);
+        // 2. Verify Password
+        const isValid = await comparePassword(password, user.password_hash);
 
-        // 3. Store/Update user in DB
-        // We use the email/clientId as unique identifier
-        const userId = clientId || uuidv4();
-        const stmt = db.prepare(`
-      INSERT INTO users (id, capital_user_id, name, email, encrypted_tokens, updated_at)
-      VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-      ON CONFLICT(email) DO UPDATE SET
-        encrypted_tokens = excluded.encrypted_tokens,
-        updated_at = excluded.updated_at
-    `);
+        if (!isValid) {
+            // Audit Log: Failed Login
+            await db.insert(auditLogs).values({
+                action: 'LOGIN_FAILED',
+                ip_address: request.headers.get('x-forwarded-for') || 'unknown',
+            });
+            return NextResponse.json({ message: 'Invalid credentials' }, { status: 401 });
+        }
 
-        stmt.run(uuidv4(), userId, email, email, encryptedTokens); // Using email as name for now if not provided
+        // 3. Issue Tokens
+        const accessToken = await signAccessToken({
+            userId: user.id,
+            email: user.email,
+            role: user.role || 'user',
+            tokenVersion: user.token_version || 0,
+        });
 
-        // 4. Create JWT Session
-        const token = await new SignJWT({ email, userId })
-            .setProtectedHeader({ alg: 'HS256' })
-            .setExpirationTime('2h')
-            .sign(JWT_SECRET);
+        const refreshToken = generateRefreshToken();
 
-        // 5. Return success with cookie
-        const response = NextResponse.json({
+        // 4. Store Refresh Token
+        await db.insert(refreshTokens).values({
+            user_id: user.id,
+            token_hash: refreshToken,
+            expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+        });
+
+        // 5. Update Last Login
+        await db.update(users).set({ last_login_at: new Date() }).where(eq(users.id, user.id));
+
+        // 6. Set Cookies
+        await setAuthCookies(accessToken, refreshToken);
+
+        // 7. Audit Log: Success
+        await db.insert(auditLogs).values({
+            user_id: user.id,
+            action: 'LOGIN',
+            ip_address: request.headers.get('x-forwarded-for') || 'unknown',
+        });
+
+        return NextResponse.json({
             message: 'Login successful',
             user: {
-                email,
-                name: email, // Capital.com might return name, but typically it returns account details.
+                id: user.id,
+                email: user.email,
+                name: user.full_name,
             }
         });
 
-        response.cookies.set('token', token, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            maxAge: 7200, // 2 hours
-            path: '/',
-        });
-
-        return response;
-
     } catch (error: any) {
-        console.error('Login error:', error);
-        return NextResponse.json(
-            { message: error.message || 'Internal server error' },
-            { status: 500 }
-        );
+        console.error('Login Error:', error);
+        return NextResponse.json({ message: 'Internal Server Error' }, { status: 500 });
     }
 }

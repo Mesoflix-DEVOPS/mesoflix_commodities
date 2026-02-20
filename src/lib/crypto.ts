@@ -1,3 +1,4 @@
+import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 
 const ALGORITHM = 'aes-256-gcm';
@@ -5,39 +6,61 @@ const IV_LENGTH = 16;
 const SALT_LENGTH = 64;
 const TAG_LENGTH = 16;
 
-// Secret key should be 32 bytes for aes-256
-// We'll derive it from a master secret in env
-const SECRET = process.env.ENCRYPTION_KEY || 'default-insecure-secret-key-change-me-please!!';
+// Validate Encryption Key
+if (!process.env.CAPITAL_ENCRYPTION_KEY || process.env.CAPITAL_ENCRYPTION_KEY.length < 32) {
+    console.warn("WARNING: CAPITAL_ENCRYPTION_KEY is missing or too short. Using a default unsafe key for dev.");
+}
+const ENCRYPTION_KEY = crypto.scryptSync(process.env.CAPITAL_ENCRYPTION_KEY || 'default-unsafe-key', 'salt', 32);
 
-export const encrypt = (text: string): string => {
+/**
+ * Hash a password using bcrypt
+ */
+export async function hashPassword(password: string): Promise<string> {
+    const salt = await bcrypt.genSalt(10);
+    return bcrypt.hash(password, salt);
+}
+
+/**
+ * Compare a plain password with a hash
+ */
+export async function comparePassword(password: string, hash: string): Promise<boolean> {
+    return bcrypt.compare(password, hash);
+}
+
+/**
+ * Encrypt a string using AES-256-GCM
+ */
+export function encrypt(text: string): string {
     const iv = crypto.randomBytes(IV_LENGTH);
-    const salt = crypto.randomBytes(SALT_LENGTH);
+    const cipher = crypto.createCipheriv(ALGORITHM, ENCRYPTION_KEY, iv);
 
-    // Derive key using scrypt
-    const key = crypto.scryptSync(SECRET, salt, 32);
+    let encrypted = cipher.update(text, 'utf8', 'hex');
+    encrypted += cipher.final('hex');
 
-    const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
-
-    const encrypted = Buffer.concat([cipher.update(text, 'utf8'), cipher.final()]);
     const tag = cipher.getAuthTag();
 
-    // Return as salt:iv:tag:encrypted
-    return `${salt.toString('hex')}:${iv.toString('hex')}:${tag.toString('hex')}:${encrypted.toString('hex')}`;
-};
+    // Format: iv:authTag:encryptedData
+    return `${iv.toString('hex')}:${tag.toString('hex')}:${encrypted}`;
+}
 
-export const decrypt = (text: string): string => {
-    const parts = text.split(':');
-    if (parts.length !== 4) throw new Error('Invalid encrypted string format');
+/**
+ * Decrypt a string using AES-256-GCM
+ */
+export function decrypt(text: string): string {
+    const [ivHex, tagHex, encryptedHex] = text.split(':');
 
-    const salt = Buffer.from(parts[0], 'hex');
-    const iv = Buffer.from(parts[1], 'hex');
-    const tag = Buffer.from(parts[2], 'hex');
-    const encrypted = Buffer.from(parts[3], 'hex');
+    if (!ivHex || !tagHex || !encryptedHex) {
+        throw new Error('Invalid encrypted text format');
+    }
 
-    const key = crypto.scryptSync(SECRET, salt, 32);
+    const iv = Buffer.from(ivHex, 'hex');
+    const tag = Buffer.from(tagHex, 'hex');
+    const decipher = crypto.createDecipheriv(ALGORITHM, ENCRYPTION_KEY, iv);
 
-    const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
     decipher.setAuthTag(tag);
 
-    return decipher.update(encrypted) + decipher.final('utf8');
-};
+    let decrypted = decipher.update(encryptedHex, 'hex', 'utf8');
+    decrypted += decipher.final('utf8');
+
+    return decrypted;
+}
