@@ -55,31 +55,24 @@ export async function GET(request: Request) {
         }
 
         if (!credentials) {
-            return NextResponse.json({ message: 'No Capital.com account connected service-wide.' }, { status: 404 });
+            return NextResponse.json({ message: 'No Capital.com account connected.' }, { status: 404 });
         }
 
-        const { login, password, apiKey } = credentials;
+        // Stored credentials format: { cst, xSecurityToken, apiKey }
+        const { cst, xSecurityToken, apiKey } = credentials;
 
-        if (!login || !password || !apiKey) {
-            return NextResponse.json({ message: 'Incomplete credentials configuration.' }, { status: 400 });
+        if (!cst || !xSecurityToken) {
+            return NextResponse.json({ message: 'Session tokens missing. Please log in again.' }, { status: 400 });
         }
 
-        // 3. Create Session (Fresh session for every request - safest for now)
-        let session;
+        // Use stored session tokens directly
         try {
-            session = await createSession(login, password, apiKey);
-        } catch (err: any) {
-            console.error("Session Creation Failed:", err);
-            return NextResponse.json({ message: 'Failed to authenticate with Capital.com' }, { status: 401 });
-        }
-
-        // 4. Fetch Data
-        try {
-            const accountsData = await getAccounts(session.cst, session.xSecurityToken);
+            const accountsData = await getAccounts(cst, xSecurityToken);
             return NextResponse.json(accountsData);
         } catch (err: any) {
             console.error("Fetch Accounts Failed:", err);
-            return NextResponse.json({ message: `Failed to fetch accounts: ${err.message}` }, { status: 500 });
+            // If session expired, tell client to re-authenticate
+            return NextResponse.json({ message: `Session expired. Please log in again.` }, { status: 401 });
         }
 
     } catch (error: any) {
