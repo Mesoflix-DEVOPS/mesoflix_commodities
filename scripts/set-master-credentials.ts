@@ -16,7 +16,8 @@ const IV_LENGTH = 16;
 if (!process.env.CAPITAL_ENCRYPTION_KEY || process.env.CAPITAL_ENCRYPTION_KEY.length < 32) {
     console.warn("WARNING: CAPITAL_ENCRYPTION_KEY is missing or too short. Using a default unsafe key for dev.");
 }
-const ENCRYPTION_KEY = crypto.scryptSync(process.env.CAPITAL_ENCRYPTION_KEY || 'default-unsafe-key', 'salt', 32);
+const RAW_KEY = process.env.CAPITAL_ENCRYPTION_KEY || 'default-unsafe-key';
+const ENCRYPTION_KEY = crypto.scryptSync(RAW_KEY, 'salt', 32);
 
 function encrypt(text: string): string {
     const iv = crypto.randomBytes(IV_LENGTH);

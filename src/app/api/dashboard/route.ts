@@ -3,19 +3,28 @@ import { db } from '@/lib/db';
 import { capitalAccounts, systemSettings } from '@/lib/db/schema';
 import { decrypt } from '@/lib/crypto';
 import { createSession, getAccounts } from '@/lib/capital';
+import { verifyAccessToken } from '@/lib/auth';
 import { eq } from 'drizzle-orm';
+import { cookies } from 'next/headers';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
     try {
-        const userId = request.headers.get('x-user-id');
+        // Verify JWT directly in Node runtime (more reliable than Edge middleware)
+        const cookieStore = await cookies();
+        const accessToken = cookieStore.get('access_token')?.value;
 
-        // Note: We might want allow public access if it's a "general" dashboard, 
-        // but for now we keep it authenticated via middleware
-        if (!userId) {
+        if (!accessToken) {
             return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
         }
+
+        const tokenPayload = await verifyAccessToken(accessToken);
+        if (!tokenPayload) {
+            return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+        }
+
+        const userId = tokenPayload.userId;
 
         let credentials;
 

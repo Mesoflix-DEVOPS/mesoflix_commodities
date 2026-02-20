@@ -1,9 +1,11 @@
 import { SignJWT, jwtVerify } from 'jose';
 import { cookies } from 'next/headers';
 
-const JWT_SECRET = new TextEncoder().encode(
-    process.env.JWT_SECRET || 'default-jwt-secret-key-change-me'
-);
+function getJwtSecret() {
+    return new TextEncoder().encode(
+        process.env.JWT_SECRET || 'default-jwt-secret-key-change-me'
+    );
+}
 
 export interface JWTPayload {
     userId: string;
@@ -20,7 +22,7 @@ export async function signAccessToken(payload: JWTPayload) {
         .setProtectedHeader({ alg: 'HS256' })
         .setIssuedAt()
         .setExpirationTime('15m') // 15 minutes
-        .sign(JWT_SECRET);
+        .sign(getJwtSecret());
 }
 
 /**
@@ -28,7 +30,7 @@ export async function signAccessToken(payload: JWTPayload) {
  */
 export async function verifyAccessToken(token: string) {
     try {
-        const { payload } = await jwtVerify(token, JWT_SECRET);
+        const { payload } = await jwtVerify(token, getJwtSecret());
         return payload as unknown as JWTPayload;
     } catch (error) {
         return null; // Invalid or expired

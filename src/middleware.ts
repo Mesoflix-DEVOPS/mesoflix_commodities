@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { verifyAccessToken } from '@/lib/auth';
 
-const PROTECTED_ROUTES = ['/dashboard', '/api/user', '/api/dashboard', '/api/capital'];
+// Only protect page routes here. API routes handle their own auth in Node runtime.
+const PROTECTED_ROUTES = ['/dashboard'];
 const PUBLIC_ROUTES = ['/login', '/register', '/api/auth/login', '/api/auth/register', '/api/auth/refresh'];
 
 export async function middleware(request: NextRequest) {
@@ -38,6 +39,7 @@ export async function middleware(request: NextRequest) {
         const loginUrl = new URL('/login', request.url);
         loginUrl.searchParams.set('from', pathname);
         loginUrl.searchParams.set('debug', 'invalid_token');
+        loginUrl.searchParams.set('hint', accessToken?.substring(0, 10) || 'no_token');
         return NextResponse.redirect(loginUrl);
     }
 
