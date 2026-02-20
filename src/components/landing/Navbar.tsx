@@ -32,8 +32,8 @@ const Navbar = () => {
     return (
         <nav
             className={`fixed w-full top-0 z-50 transition-all duration-300 ${isScrolled
-                    ? "glass-dark py-3 shadow-lg"
-                    : "bg-transparent py-5"
+                ? "glass-dark py-3 shadow-lg"
+                : "bg-transparent py-5"
                 }`}
         >
             <div className="max-w-7xl mx-auto px-6 md:px-12 flex justify-between items-center">
@@ -50,9 +50,9 @@ const Navbar = () => {
 
                 {/* Desktop Menu */}
                 <div className="hidden md:flex space-x-8 items-center font-medium">
-                    <NavLink href="#">Home</NavLink>
-                    <NavLink href="#features">Features</NavLink>
-                    <NavLink href="#about">About</NavLink>
+                    <NavLink href="/">Home</NavLink>
+                    <NavLink href="/#features">Features</NavLink>
+                    <NavLink href="/#about">About</NavLink>
 
                     {/* Theme Toggle */}
                     {mounted && (
@@ -96,9 +96,9 @@ const Navbar = () => {
                     className={`fixed inset-0 bg-dark-blue/95 backdrop-blur-xl z-40 flex flex-col items-center justify-center space-y-8 transition-all duration-300 ${isMenuOpen ? "opacity-100 visible" : "opacity-0 invisible pointer-events-none"
                         }`}
                 >
-                    <MobileNavLink href="#" onClick={() => setIsMenuOpen(false)}>Home</MobileNavLink>
-                    <MobileNavLink href="#features" onClick={() => setIsMenuOpen(false)}>Features</MobileNavLink>
-                    <MobileNavLink href="#about" onClick={() => setIsMenuOpen(false)}>About</MobileNavLink>
+                    <MobileNavLink href="/" onClick={() => setIsMenuOpen(false)}>Home</MobileNavLink>
+                    <MobileNavLink href="/#features" onClick={() => setIsMenuOpen(false)}>Features</MobileNavLink>
+                    <MobileNavLink href="/#about" onClick={() => setIsMenuOpen(false)}>About</MobileNavLink>
                     <Link
                         href="/login"
                         onClick={() => setIsMenuOpen(false)}
