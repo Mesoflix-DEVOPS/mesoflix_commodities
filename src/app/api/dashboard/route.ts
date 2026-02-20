@@ -70,7 +70,7 @@ export async function GET(request: Request) {
             return NextResponse.json(accountsData);
         } catch (err: any) {
             console.error("Fetch Accounts Failed:", err);
-            return NextResponse.json({ message: 'Failed to fetch accounts' }, { status: 500 });
+            return NextResponse.json({ message: `Failed to fetch accounts: ${err.message}` }, { status: 500 });
         }
 
     } catch (error: any) {

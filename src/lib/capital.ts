@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-const API_URL = 'https://api-capital.backend-capital.com/api/v1';
+const API_URL = 'https://api-capital.capital.com/api/v1';
 
 interface SessionResponse {
     cst: string;
