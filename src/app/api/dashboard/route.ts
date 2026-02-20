@@ -1,43 +1,76 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { capitalAccounts } from '@/lib/db/schema';
+import { capitalAccounts, systemSettings } from '@/lib/db/schema';
 import { decrypt } from '@/lib/crypto';
-import { getAccounts } from '@/lib/capital';
+import { createSession, getAccounts } from '@/lib/capital';
 import { eq } from 'drizzle-orm';
+
+export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
     try {
         const userId = request.headers.get('x-user-id');
 
+        // Note: We might want allow public access if it's a "general" dashboard, 
+        // but for now we keep it authenticated via middleware
         if (!userId) {
             return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
         }
 
-        // 1. Get Encrypted Access Info
-        const [account] = await db.select().from(capitalAccounts).where(eq(capitalAccounts.user_id, userId)).limit(1);
+        let credentials;
 
-        if (!account) {
-            return NextResponse.json({ message: 'Capital.com account not connected' }, { status: 404 });
+        // 1. Try to get User Specific Account
+        const [userAccount] = await db.select().from(capitalAccounts).where(eq(capitalAccounts.user_id, userId)).limit(1);
+
+        if (userAccount) {
+            try {
+                const decrypted = decrypt(userAccount.encrypted_api_key);
+                credentials = JSON.parse(decrypted);
+            } catch (e) {
+                console.error("Failed to decrypt user credentials", e);
+            }
         }
 
-        // 2. Decrypt Session Tokens (Assumes we stored CST:XST in encrypted_api_key for now)
-        // If we switch to full automated login later, we'd store login/pass here and re-login.
-        const decrypted = decrypt(account.encrypted_api_key);
-        const [cst, xSecurityToken] = decrypted.split(':');
+        // 2. Fallback to System Master Credentials
+        if (!credentials) {
+            const [systemCreds] = await db.select().from(systemSettings).where(eq(systemSettings.key, 'capital_master_credentials')).limit(1);
 
-        if (!cst || !xSecurityToken) {
-            return NextResponse.json({ message: 'Invalid stored credentials' }, { status: 400 });
+            if (systemCreds) {
+                try {
+                    const decrypted = decrypt(systemCreds.value);
+                    credentials = JSON.parse(decrypted);
+                } catch (e) {
+                    console.error("Failed to decrypt master credentials", e);
+                }
+            }
         }
 
-        // 3. Fetch Data
+        if (!credentials) {
+            return NextResponse.json({ message: 'No Capital.com account connected service-wide.' }, { status: 404 });
+        }
+
+        const { login, password, apiKey } = credentials;
+
+        if (!login || !password || !apiKey) {
+            return NextResponse.json({ message: 'Incomplete credentials configuration.' }, { status: 400 });
+        }
+
+        // 3. Create Session (Fresh session for every request - safest for now)
+        let session;
         try {
-            const accountsData = await getAccounts(cst, xSecurityToken);
+            session = await createSession(login, password, apiKey);
+        } catch (err: any) {
+            console.error("Session Creation Failed:", err);
+            return NextResponse.json({ message: 'Failed to authenticate with Capital.com' }, { status: 401 });
+        }
+
+        // 4. Fetch Data
+        try {
+            const accountsData = await getAccounts(session.cst, session.xSecurityToken);
             return NextResponse.json(accountsData);
         } catch (err: any) {
-            if (err.message === "Session Expired") {
-                return NextResponse.json({ message: 'Capital.com Session Expired' }, { status: 401 });
-            }
-            throw err;
+            console.error("Fetch Accounts Failed:", err);
+            return NextResponse.json({ message: 'Failed to fetch accounts' }, { status: 500 });
         }
 
     } catch (error: any) {

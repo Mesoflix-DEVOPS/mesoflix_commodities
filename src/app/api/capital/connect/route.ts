@@ -12,37 +12,37 @@ export async function POST(request: Request) {
             return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
         }
 
-        const { apiKey, accountId, type } = await request.json();
+        const { login, password, apiKey } = await request.json();
 
-        if (!apiKey) {
-            return NextResponse.json({ message: 'API Key is required' }, { status: 400 });
+        if (!login || !password || !apiKey) {
+            return NextResponse.json({ message: 'Login, Password, and API Key are required' }, { status: 400 });
         }
 
-        const encryptedKey = encrypt(apiKey);
+        // Store as JSON string in encrypted field
+        const credentials = JSON.stringify({ login, password, apiKey });
+        const encryptedKey = encrypt(credentials);
 
         // Check if exists
         const [existing] = await db.select().from(capitalAccounts).where(eq(capitalAccounts.user_id, userId)).limit(1);
 
         if (existing) {
             await db.update(capitalAccounts).set({
-                encrypted_api_key: encryptedKey,
-                capital_account_id: accountId,
-                account_type: type || 'demo',
+                encrypted_api_key: encryptedKey, // reusing this field to store full data blob
+                account_type: 'live', // assuming live if key provided, or add toggle
                 updated_at: new Date(),
             }).where(eq(capitalAccounts.id, existing.id));
         } else {
             await db.insert(capitalAccounts).values({
                 user_id: userId,
                 encrypted_api_key: encryptedKey,
-                capital_account_id: accountId,
-                account_type: type || 'demo',
+                account_type: 'live',
             });
         }
 
         // Audit Log
         await db.insert(auditLogs).values({
             user_id: userId,
-            action: 'UPDATE_CAPITAL_KEY',
+            action: 'UPDATE_CAPITAL_CREDENTIALS',
             ip_address: request.headers.get('x-forwarded-for') || 'unknown',
         });
 

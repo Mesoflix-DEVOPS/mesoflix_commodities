@@ -11,8 +11,6 @@
   "dependencies": {
     "@neondatabase/serverless": "^1.0.2",
     "bcryptjs": "^3.0.3",
-    "better-sqlite3": "^11.8.1",
-    "dotenv": "^17.3.1",
     "drizzle-orm": "^0.45.1",
     "jose": "^5.9.6",
     "lucide-react": "^0.575.0",
@@ -27,13 +25,15 @@
     "@tailwindcss/postcss": "^4",
     "@tailwindcss/typography": "^0.5.19",
     "@types/better-sqlite3": "^7.6.12",
-    "@types/node": "^20",
+    "@types/node": "^20.19.33",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/uuid": "^10.0.0",
+    "dotenv": "^17.3.1",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "tailwindcss": "^4",
+    "tsx": "^4.21.0",
     "typescript": "^5"
   }
 }

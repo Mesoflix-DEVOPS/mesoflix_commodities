@@ -47,3 +47,10 @@ export const auditLogs = pgTable('audit_logs', {
     user_agent: text('user_agent'),
     timestamp: timestamp('timestamp').defaultNow(),
 });
+
+// System Settings Table (Global Config & Master Credentials)
+export const systemSettings = pgTable('system_settings', {
+    key: text('key').primaryKey(),
+    value: text('value').notNull(),
+    updated_at: timestamp('updated_at').defaultNow(),
+});
