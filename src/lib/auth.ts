@@ -1,6 +1,5 @@
 import { SignJWT, jwtVerify } from 'jose';
 import { cookies } from 'next/headers';
-import crypto from 'crypto';
 
 const JWT_SECRET = new TextEncoder().encode(
     process.env.JWT_SECRET || 'default-jwt-secret-key-change-me'
@@ -37,10 +36,12 @@ export async function verifyAccessToken(token: string) {
 }
 
 /**
- * Generate a random Refresh Token
+ * Generate a random Refresh Token (Edge Compatible)
  */
 export function generateRefreshToken() {
-    return crypto.randomBytes(32).toString('hex');
+    const array = new Uint8Array(32);
+    crypto.getRandomValues(array);
+    return Array.from(array, (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
 /**
