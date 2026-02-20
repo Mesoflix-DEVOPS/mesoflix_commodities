@@ -22,6 +22,7 @@ export async function middleware(request: NextRequest) {
         // Build login URL with return path
         const loginUrl = new URL('/login', request.url);
         loginUrl.searchParams.set('from', pathname);
+        loginUrl.searchParams.set('debug', 'missing_cookie');
         return NextResponse.redirect(loginUrl);
     }
 
@@ -30,13 +31,13 @@ export async function middleware(request: NextRequest) {
 
     if (!payload) {
         // Token invalid/expired - Redirect to login
-        // In a SPA, we might want to return 401 for API routes so frontend can try refresh
         if (pathname.startsWith('/api/')) {
             return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
         }
 
         const loginUrl = new URL('/login', request.url);
         loginUrl.searchParams.set('from', pathname);
+        loginUrl.searchParams.set('debug', 'invalid_token');
         return NextResponse.redirect(loginUrl);
     }
 
