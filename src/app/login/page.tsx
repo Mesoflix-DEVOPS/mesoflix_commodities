@@ -109,6 +109,7 @@ export default function LoginPage() {
 
                 <div className="mt-8 text-center text-sm text-gray-500">
                     <p>Protected by Mesoflix Security</p>
+                    <p className="mt-4">Don't have an account? <Link href="/register" className="text-teal hover:underline font-bold">Sign Up</Link></p>
                 </div>
             </div >
         </div >
