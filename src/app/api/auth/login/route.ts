@@ -8,35 +8,13 @@ import { eq } from 'drizzle-orm';
 
 export async function POST(request: Request) {
     try {
-        const { email, password } = await request.json();
+        const { email, password, apiKey } = await request.json();
 
-        if (!email || !password) {
-            return NextResponse.json({ message: 'Email and password are required' }, { status: 400 });
+        if (!email || !password || !apiKey) {
+            return NextResponse.json({ message: 'Email, password, and API Key are required' }, { status: 400 });
         }
 
-        // 1. Get Master API Key
-        const [masterSettings] = await db.select().from(systemSettings).where(eq(systemSettings.key, 'capital_master_credentials')).limit(1);
-
-        if (!masterSettings) {
-            return NextResponse.json({ message: 'System not configured (Missing Master Credentials)' }, { status: 503 });
-        }
-
-        // Decrypt Master Credentials to get API Key
-        let apiKey = "";
-        try {
-            // masterSettings.value is encrypted JSON { login, password, apiKey }
-            // For now we assume we need the API Key from here.
-            // But wait, the previous script stored it as encrypted JSON. 
-            // We need to import decrypt.
-            const { decrypt } = await import('@/lib/crypto');
-            const creds = JSON.parse(decrypt(masterSettings.value));
-            apiKey = creds.apiKey;
-        } catch (e) {
-            console.error("Failed to decrypt master credentials", e);
-            return NextResponse.json({ message: 'System configuration error' }, { status: 500 });
-        }
-
-        // 2. Authenticate with Capital.com
+        // 1. Authenticate with Capital.com using Provided Credentials
         let session;
         try {
             session = await createSession(email, password, apiKey);
@@ -50,7 +28,7 @@ export async function POST(request: Request) {
             return NextResponse.json({ message: `Capital.com Login Failed: ${err.message}` }, { status: 401 });
         }
 
-        // 3. Find or Create User
+        // 2. Find or Create User
         let [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
 
         if (!user) {
@@ -65,9 +43,22 @@ export async function POST(request: Request) {
             await db.update(users).set({ last_login_at: new Date() }).where(eq(users.id, user.id));
         }
 
-        // 4. Store Capital Session (Encrypted)
-        const sessionData = JSON.stringify({ cst: session.cst, xSecurityToken: session.xSecurityToken });
+        // 3. Store Capital Session AND API Key (Encrypted)
         const { encrypt } = await import('@/lib/crypto');
+        // We store the CST/XST session tokens primarily, but for "Option A", the user might expect us to reuse the API Key for future sessions if the token expires.
+        // However, standard practice with Capital.com is CST/XST.
+        // Let's store the API Key as well in the encrypted blob if we want to support auto-relogin, OR just stick to session tokens.
+        // Given the requirement "users enter their api keys", we should PROBABLY store the API Key so we don't ask for it every time if session invalidates?
+        // Actually, let's just store the session tokens for now. If they expire, user logs in again.
+        // Wait, if we want to enable "Trading" later, we might need the API Key again?
+        // Capital.com API usually needs CST/XST for subsequent requests. API Key is for session creation.
+        // Let's store the API Key in the encrypted blob too, just in case.
+
+        const sessionData = JSON.stringify({
+            cst: session.cst,
+            xSecurityToken: session.xSecurityToken,
+            apiKey: apiKey // Storing API Key to allow potential re-authentication or specific endpoints if needed
+        });
         const encryptedSession = encrypt(sessionData);
 
         // Check if account entry exists
@@ -75,14 +66,14 @@ export async function POST(request: Request) {
 
         if (existingAccount) {
             await db.update(capitalAccounts).set({
-                encrypted_api_key: encryptedSession, // Reusing field for session tokens
+                encrypted_api_key: encryptedSession, // Reusing field
                 updated_at: new Date()
             }).where(eq(capitalAccounts.id, existingAccount.id));
         } else {
             await db.insert(capitalAccounts).values({
                 user_id: user.id,
                 encrypted_api_key: encryptedSession,
-                account_type: 'live', // derived from session?
+                account_type: 'live',
             });
         }
 
