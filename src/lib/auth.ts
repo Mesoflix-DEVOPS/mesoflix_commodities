@@ -54,7 +54,7 @@ export async function setAuthCookies(accessToken: string, refreshToken: string) 
     cookieStore.set('access_token', accessToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
+        sameSite: 'lax',
         maxAge: 15 * 60, // 15 minutes
         path: '/',
     });
@@ -63,7 +63,7 @@ export async function setAuthCookies(accessToken: string, refreshToken: string) 
     cookieStore.set('refresh_token', refreshToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
+        sameSite: 'lax',
         maxAge: 7 * 24 * 60 * 60, // 7 days
         path: '/api/auth/refresh', // Scope to refresh endpoint only
     });
