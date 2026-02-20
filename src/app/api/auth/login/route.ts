@@ -47,7 +47,7 @@ export async function POST(request: Request) {
                 action: 'LOGIN_FAILED',
                 ip_address: request.headers.get('x-forwarded-for') || 'unknown',
             });
-            return NextResponse.json({ message: 'Invalid Capital.com credentials' }, { status: 401 });
+            return NextResponse.json({ message: `Capital.com Login Failed: ${err.message}` }, { status: 401 });
         }
 
         // 3. Find or Create User
