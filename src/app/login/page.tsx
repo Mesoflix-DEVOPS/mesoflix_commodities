@@ -49,7 +49,7 @@ export default function LoginPage() {
                         <span className="text-dark-blue">Mesoflix_</span>
                         <span className="text-teal">Commodities</span>
                     </Link>
-                    <h2 className="text-gray-600 mt-2">Sign in to your account</h2>
+                    <h2 className="text-gray-600 mt-2">Sign in with Capital.com</h2>
                 </div>
 
                 {error && (
@@ -61,7 +61,7 @@ export default function LoginPage() {
 
                 <form onSubmit={handleSubmit} className="space-y-6">
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Capital.com Email</label>
                         <div className="relative">
                             <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
                             <input
@@ -76,7 +76,7 @@ export default function LoginPage() {
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Capital.com Password</label>
                         <div className="relative">
                             <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
                             <input
@@ -102,14 +102,13 @@ export default function LoginPage() {
                         disabled={loading}
                         className="w-full bg-dark-blue text-gold font-bold py-3 rounded-lg hover:bg-teal hover:text-white transition-all duration-300 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                        {loading ? "Signing in..." : "Sign In"}
+                        {loading ? "Connecting..." : "Connect Account"}
                         {!loading && <ArrowRight size={20} />}
                     </button>
                 </form>
 
                 <div className="mt-8 text-center text-sm text-gray-500">
                     <p>Protected by Mesoflix Security</p>
-                    <p className="mt-4">Don't have an account? <Link href="/register" className="text-teal hover:underline font-bold">Sign Up</Link></p>
                 </div>
             </div >
         </div >
