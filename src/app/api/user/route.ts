@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import { getAccounts } from '@/lib/capital';
 import { decrypt } from '@/lib/crypto';
 import db from '@/lib/db';
-import { useSearchParams } from 'next/navigation';
 import { jwtVerify } from 'jose';
 
 const JWT_SECRET = new TextEncoder().encode(
