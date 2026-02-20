@@ -43,30 +43,7 @@ export default function DashboardPage() {
         fetchData();
     }, [router]);
 
-    const handleConnect = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setConnectLoading(true);
-        setConnectError("");
 
-        try {
-            const res = await fetch("/api/capital/connect", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ login, password, apiKey }),
-            });
-
-            if (!res.ok) {
-                throw new Error("Failed to connect");
-            }
-
-            // Refresh data
-            fetchData();
-        } catch (err: any) {
-            setConnectError(err.message);
-        } finally {
-            setConnectLoading(false);
-        }
-    };
 
     const handleLogout = async () => {
         await fetch("/api/auth/logout", { method: "POST" });
