@@ -11,7 +11,7 @@ import {
     Zap,
     Scale,
     Activity,
-    Maximized2
+    Maximize2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
