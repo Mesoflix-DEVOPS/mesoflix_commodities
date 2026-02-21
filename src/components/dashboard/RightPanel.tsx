@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
     ChevronLeft,
     ChevronRight,
@@ -15,6 +15,37 @@ import { cn } from "@/lib/utils";
 
 export default function RightPanel() {
     const [isOpen, setIsOpen] = useState(true);
+    const [marketData, setMarketData] = useState<any>(null);
+
+    const fetchMarkets = async () => {
+        try {
+            const res = await fetch('/api/markets');
+            if (res.ok) {
+                const data = await res.json();
+                setMarketData(data);
+            }
+        } catch (err) {
+            console.error('Failed to fetch markets:', err);
+        }
+    };
+
+    useEffect(() => {
+        fetchMarkets();
+        const interval = setInterval(fetchMarkets, 15000);
+        return () => clearInterval(interval);
+    }, []);
+
+    const getPriceData = (symbol: string) => {
+        const item = marketData?.marketdetails?.find((m: any) => m.instrumentName.includes(symbol.split('/')[0]));
+        if (!item) return { price: '--.--', change: '0.00%', isUp: true };
+
+        const change = ((item.snapshot.bid - item.snapshot.decimalPlacesFactor) / 100).toFixed(2); // Mock change calculation
+        return {
+            price: item.snapshot.bid.toLocaleString(),
+            change: item.snapshot.netChange > 0 ? `+${item.snapshot.netChange}%` : `${item.snapshot.netChange}%`,
+            isUp: item.snapshot.netChange >= 0
+        };
+    };
 
     return (
         <aside
@@ -49,10 +80,10 @@ export default function RightPanel() {
                             <span className="text-[8px] text-teal font-black uppercase tracking-widest bg-teal/5 px-2 py-0.5 rounded border border-teal/10">Streaming</span>
                         </div>
                         <div className="space-y-4">
-                            <TickerItem symbol="XAU/USD" price="1,942.20" change="+0.42%" isUp={true} />
-                            <TickerItem symbol="WTI/OIL" price="75.42" change="-1.24%" isUp={false} />
-                            <TickerItem symbol="EUR/USD" price="1.0842" change="+0.08%" isUp={true} />
-                            <TickerItem symbol="BTC/USD" price="52,492" change="+2.15%" isUp={true} />
+                            <TickerItem symbol="GOLD" {...getPriceData("GOLD")} />
+                            <TickerItem symbol="OIL" {...getPriceData("OIL")} />
+                            <TickerItem symbol="EUR/USD" {...getPriceData("EUR/USD")} />
+                            <TickerItem symbol="BTC/USD" {...getPriceData("BTC/USD")} />
                         </div>
                     </div>
 

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import {
     BarChart3,
     Cpu,
@@ -16,7 +17,74 @@ import {
 import { cn } from "@/lib/utils";
 
 export default function TradingPage() {
+    const searchParams = useSearchParams();
+    const mode = searchParams.get("mode") || "demo";
     const [activeTab, setActiveTab] = useState("manual");
+    const [loading, setLoading] = useState(true);
+    const [data, setData] = useState<any>(null);
+    const [executing, setExecuting] = useState(false);
+    const [size, setSize] = useState(0.50);
+
+    const fetchData = (isSilent = false) => {
+        if (!isSilent) setLoading(true);
+        fetch("/api/dashboard")
+            .then(async (res) => {
+                if (res.status === 200) {
+                    const jsonData = await res.json();
+                    setData(jsonData);
+                }
+            })
+            .catch((err) => console.error(err))
+            .finally(() => {
+                if (!isSilent) setLoading(false);
+            });
+    };
+
+    useEffect(() => {
+        fetchData();
+        const interval = setInterval(() => fetchData(true), 10000);
+        return () => clearInterval(interval);
+    }, []);
+
+    const handleTrade = async (direction: 'BUY' | 'SELL') => {
+        setExecuting(true);
+        try {
+            const res = await fetch("/api/trade", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    epic: "IX.D.GOLD.IFM.IP", // Hardcoded Gold for now as per mockup
+                    direction,
+                    size
+                })
+            });
+
+            if (res.ok) {
+                fetchData(true);
+                alert(`${direction} Execution Successful`);
+            } else {
+                const err = await res.json();
+                alert(`Execution Failed: ${err.error || 'Unknown error'}`);
+            }
+        } catch (err) {
+            console.error(err);
+            alert("Network Error during execution");
+        } finally {
+            setExecuting(false);
+        }
+    };
+
+    // Filter account based on mode
+    const activeAccount = data?.accounts?.find((acc: any) =>
+        mode === "real" ? acc.accountType === "LIVE" : acc.accountType === "DEMO"
+    ) || data?.accounts?.[0] || {
+        balance: { balance: 0, currency: "USD", available: 0 },
+        accountId: ""
+    };
+
+    const activePositions = data?.positions?.filter((pos: any) =>
+        pos.accountId === activeAccount.accountId
+    ) || [];
 
     return (
         <div className="space-y-8 animate-in fade-in duration-700">
@@ -36,7 +104,7 @@ export default function TradingPage() {
             </div>
 
             {/* Trading Layout Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 h-fit lg:h-[700px]">
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 h-fit lg:min-h-[700px]">
                 {/* Left: Chart Area */}
                 <div className="lg:col-span-3 bg-[#0E1B2A] rounded-[2.5rem] border border-white/5 p-8 flex flex-col shadow-2xl relative overflow-hidden">
                     <div className="flex justify-between items-center mb-6">
@@ -46,23 +114,16 @@ export default function TradingPage() {
                                 <ChevronDown size={14} className="text-gray-500" />
                             </div>
                             <div className="flex flex-col">
-                                <span className="text-lg font-black text-white font-mono">1,942.20</span>
+                                <span className="text-lg font-black text-white font-mono">{activePositions[0]?.level || '1,942.20'}</span>
                                 <span className="text-[10px] text-green-500 font-bold uppercase tracking-widest flex items-center gap-1">
-                                    <TrendingUp size={10} /> +0.42%
+                                    <TrendingUp size={10} /> Live Market
                                 </span>
                             </div>
                         </div>
-                        <div className="flex gap-2">
-                            {["M1", "M5", "M15", "H1", "D1"].map(t => (
-                                <button key={t} className={cn("px-3 py-1.5 text-[9px] font-black rounded-lg transition-all", t === "M15" ? "bg-teal/20 text-teal" : "text-gray-500 hover:text-white")}>
-                                    {t}
-                                </button>
-                            ))}
-                        </div>
                     </div>
 
-                    {/* Placeholder for Chart */}
-                    <div className="flex-1 rounded-2xl bg-black/20 border border-white/5 flex items-center justify-center relative group">
+                    {/* Chart Context */}
+                    <div className="flex-1 rounded-2xl bg-black/20 border border-white/5 flex items-center justify-center relative group min-h-[400px]">
                         <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-10 pointer-events-none" />
                         <div className="text-center">
                             <div className="w-20 h-20 bg-teal/5 rounded-2xl flex items-center justify-center mx-auto mb-6 border border-teal/10 animate-pulse">
@@ -70,7 +131,7 @@ export default function TradingPage() {
                             </div>
                             <p className="text-[10px] text-gray-500 font-black uppercase tracking-[0.3em] leading-loose">
                                 Rendering Real-time SVG Stream...<br />
-                                <span className="text-teal/40">WebSocket Latency: 12ms</span>
+                                <span className="text-teal/40">Market Bridge Active</span>
                             </p>
                         </div>
                     </div>
@@ -82,11 +143,19 @@ export default function TradingPage() {
                         <div>
                             <p className="text-[10px] text-gray-500 font-black uppercase tracking-[0.25em] mb-4">Select Direction</p>
                             <div className="grid grid-cols-2 gap-4">
-                                <button className="py-4 bg-green-500/10 hover:bg-green-500 text-green-500 hover:text-dark-blue font-black rounded-2xl border border-green-500/20 transition-all flex flex-col items-center gap-2">
+                                <button
+                                    onClick={() => handleTrade('BUY')}
+                                    disabled={executing}
+                                    className="py-4 bg-green-500/10 hover:bg-green-500 text-green-500 hover:text-dark-blue font-black rounded-2xl border border-green-500/20 transition-all flex flex-col items-center gap-2 disabled:opacity-50"
+                                >
                                     <TrendingUp size={24} />
                                     <span>BUY</span>
                                 </button>
-                                <button className="py-4 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-dark-blue font-black rounded-2xl border border-red-500/20 transition-all flex flex-col items-center gap-2">
+                                <button
+                                    onClick={() => handleTrade('SELL')}
+                                    disabled={executing}
+                                    className="py-4 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-dark-blue font-black rounded-2xl border border-red-500/20 transition-all flex flex-col items-center gap-2 disabled:opacity-50"
+                                >
                                     <TrendingDown size={24} />
                                     <span>SELL</span>
                                 </button>
@@ -99,19 +168,24 @@ export default function TradingPage() {
                             <div className="p-4 bg-black/20 rounded-2xl border border-white/5 space-y-4">
                                 <div className="flex justify-between items-center text-xs">
                                     <span className="text-gray-400 font-bold">Trade Size (Lots)</span>
-                                    <span className="text-white font-mono font-bold">0.50</span>
-                                </div>
-                                <div className="flex justify-between items-center text-xs">
-                                    <span className="text-gray-400 font-bold">Risk Weight</span>
-                                    <span className="text-teal font-bold">2.5%</span>
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        value={size}
+                                        onChange={(e) => setSize(parseFloat(e.target.value))}
+                                        className="bg-transparent text-right text-white font-mono font-bold w-20 outline-none"
+                                    />
                                 </div>
                             </div>
                         </div>
 
                         <div className="pt-4 space-y-4">
-                            <button className="w-full py-5 bg-teal text-dark-blue font-black rounded-3xl hover:shadow-[0_0_30px_rgba(0,191,166,0.4)] transition-all flex items-center justify-center gap-3 tracking-widest">
+                            <button
+                                disabled={executing}
+                                className="w-full py-5 bg-teal text-dark-blue font-black rounded-3xl hover:shadow-[0_0_30px_rgba(0,191,166,0.4)] transition-all flex items-center justify-center gap-3 tracking-widest disabled:opacity-50"
+                            >
                                 <Zap size={18} fill="currentColor" />
-                                EXECUTE TRADE
+                                {executing ? "EXECUTING..." : "EXECUTE TRADE"}
                             </button>
                             <p className="text-[9px] text-gray-600 text-center font-bold uppercase tracking-[0.1em]">Instant Market Execution Via Capital Bridge</p>
                         </div>
@@ -120,7 +194,9 @@ export default function TradingPage() {
                     <div className="mt-auto pt-8 border-t border-white/5">
                         <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest text-gray-500">
                             <span>Available Liquidity</span>
-                            <span className="text-white font-mono">$ --.--</span>
+                            <span className="text-white font-mono">
+                                {activeAccount.balance.currency} {activeAccount.balance.available.toLocaleString()}
+                            </span>
                         </div>
                     </div>
                 </div>
@@ -129,11 +205,8 @@ export default function TradingPage() {
             {/* Bottom: Orders & Positions Table */}
             <div className="bg-[#0E1B2A] rounded-[2.5rem] border border-white/5 overflow-hidden shadow-xl">
                 <div className="p-8 border-b border-white/5 flex items-center gap-8">
-                    <button className="text-sm font-black text-white border-b-2 border-teal pb-1 tracking-tight">Active Trades (2)</button>
+                    <button className="text-sm font-black text-white border-b-2 border-teal pb-1 tracking-tight">Active Trades ({activePositions.length})</button>
                     <button className="text-sm font-black text-gray-500 hover:text-white transition-colors pb-1 tracking-tight">Pending Orders</button>
-                    <button className="text-sm font-black text-gray-500 hover:text-white transition-colors pb-1 tracking-tight ml-auto flex items-center gap-2">
-                        <Scale size={14} /> Full Portfolio
-                    </button>
                 </div>
                 <div className="overflow-x-auto">
                     <table className="w-full text-left text-sm">
@@ -142,25 +215,34 @@ export default function TradingPage() {
                                 <th className="px-8 py-5 font-black">Trade Details</th>
                                 <th className="px-8 py-5 font-black">Contract</th>
                                 <th className="px-8 py-5 font-black">Entry</th>
-                                <th className="px-8 py-5 font-black">Current</th>
                                 <th className="px-8 py-5 font-black text-right">Net P/L</th>
                             </tr>
                         </thead>
                         <tbody>
-                            <tr className="border-b border-white/5 hover:bg-white/[0.03] transition-colors group">
-                                <td className="px-8 py-6">
-                                    <div className="flex flex-col">
-                                        <span className="text-white font-bold">BUY 0.50 LOT</span>
-                                        <span className="text-[9px] text-gray-600 font-bold uppercase mt-1">ID: #492810 • 14:22:15</span>
-                                    </div>
-                                </td>
-                                <td className="px-8 py-6 text-gray-400 font-bold uppercase tracking-tight">GOLD (XAUUSD)</td>
-                                <td className="px-8 py-6 font-mono text-gray-300">1,942.20</td>
-                                <td className="px-8 py-6 font-mono text-white">1,948.42</td>
-                                <td className="px-8 py-6 text-right">
-                                    <span className="text-green-500 font-black font-mono text-lg">+$42.10</span>
-                                </td>
-                            </tr>
+                            {activePositions.map((pos: any, idx: number) => (
+                                <tr key={idx} className="border-b border-white/5 hover:bg-white/[0.03] transition-colors group">
+                                    <td className="px-8 py-6">
+                                        <div className="flex flex-col">
+                                            <span className="text-white font-bold">{pos.direction} {pos.size} LOT</span>
+                                            <span className="text-[9px] text-gray-600 font-bold uppercase mt-1">ID: {pos.id}</span>
+                                        </div>
+                                    </td>
+                                    <td className="px-8 py-6 text-gray-400 font-bold uppercase tracking-tight">{pos.symbol}</td>
+                                    <td className="px-8 py-6 font-mono text-gray-300">{pos.level}</td>
+                                    <td className="px-8 py-6 text-right">
+                                        <span className={cn("font-black font-mono text-lg", pos.upl >= 0 ? "text-green-500" : "text-red-500")}>
+                                            {pos.upl >= 0 ? "+" : ""}{pos.upl.toFixed(2)}
+                                        </span>
+                                    </td>
+                                </tr>
+                            ))}
+                            {activePositions.length === 0 && (
+                                <tr>
+                                    <td colSpan={4} className="px-8 py-12 text-center text-gray-600 text-[10px] font-black uppercase tracking-widest">
+                                        No active positions found in {mode} account
+                                    </td>
+                                </tr>
+                            )}
                         </tbody>
                     </table>
                 </div>

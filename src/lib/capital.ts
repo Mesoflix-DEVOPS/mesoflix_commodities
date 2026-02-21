@@ -90,3 +90,51 @@ export const getHistory = async (cst: string, xSecurityToken: string) => {
 
     return response.json();
 };
+
+export const getMarketTickers = async (cst: string, xSecurityToken: string, epics: string[]) => {
+    // Capital.com /markets endpoint for batch prices
+    const marketResponse = await fetch(`${API_URL}/markets?epics=${epics.join(',')}`, {
+        headers: {
+            'X-SECURITY-TOKEN': xSecurityToken,
+            'CST': cst
+        }
+    });
+
+    if (!marketResponse.ok) {
+        throw new Error(`Failed to fetch market details: ${marketResponse.status}`);
+    }
+
+    return marketResponse.json();
+};
+
+export const placeOrder = async (
+    cst: string,
+    xSecurityToken: string,
+    epic: string,
+    direction: 'BUY' | 'SELL',
+    size: number
+) => {
+    const response = await fetch(`${API_URL}/positions`, {
+        method: 'POST',
+        headers: {
+            'X-SECURITY-TOKEN': xSecurityToken,
+            'CST': cst,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            epic,
+            direction,
+            size,
+            orderType: 'MARKET',
+            guaranteedStop: false,
+            forceOpen: true
+        })
+    });
+
+    if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`Failed to place order: ${response.status} - ${text}`);
+    }
+
+    return response.json();
+};
