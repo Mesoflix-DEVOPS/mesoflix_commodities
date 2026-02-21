@@ -9,9 +9,17 @@ interface TopNavProps {
     userName: string;
     onMenuClick: () => void;
     isMobileOpen: boolean;
+    accountType: "demo" | "real";
+    onAccountTypeChange: (type: "demo" | "real") => void;
 }
 
-export default function TopNav({ userName, onMenuClick, isMobileOpen }: TopNavProps) {
+export default function TopNav({
+    userName,
+    onMenuClick,
+    isMobileOpen,
+    accountType,
+    onAccountTypeChange
+}: TopNavProps) {
     const [showProfile, setShowProfile] = useState(false);
 
     return (
@@ -24,9 +32,30 @@ export default function TopNav({ userName, onMenuClick, isMobileOpen }: TopNavPr
                     {isMobileOpen ? <X size={20} /> : <Menu size={20} />}
                 </button>
 
-                <div className="hidden lg:flex items-center gap-3 bg-white/5 border border-white/10 px-4 py-1.5 rounded-full">
-                    <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                    <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Capital Bridge Active</span>
+                {/* Account Mode Switcher */}
+                <div className="flex items-center bg-black/20 p-1 rounded-xl border border-white/5 ml-2">
+                    <button
+                        onClick={() => onAccountTypeChange("demo")}
+                        className={cn(
+                            "px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-tighter transition-all",
+                            accountType === "demo"
+                                ? "bg-teal text-dark-blue shadow-lg"
+                                : "text-gray-500 hover:text-gray-300"
+                        )}
+                    >
+                        Demo
+                    </button>
+                    <button
+                        onClick={() => onAccountTypeChange("real")}
+                        className={cn(
+                            "px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-tighter transition-all",
+                            accountType === "real"
+                                ? "bg-amber-500 text-dark-blue shadow-lg"
+                                : "text-gray-500 hover:text-gray-300"
+                        )}
+                    >
+                        Real
+                    </button>
                 </div>
             </div>
 

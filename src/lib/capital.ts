@@ -60,3 +60,33 @@ export const getAccounts = async (cst: string, xSecurityToken: string) => {
 
     return response.json();
 };
+
+export const getPositions = async (cst: string, xSecurityToken: string) => {
+    const response = await fetch(`${API_URL}/positions`, {
+        headers: {
+            'X-SECURITY-TOKEN': xSecurityToken,
+            'CST': cst
+        }
+    });
+
+    if (!response.ok) {
+        throw new Error(`Failed to fetch positions: ${response.status}`);
+    }
+
+    return response.json();
+};
+
+export const getHistory = async (cst: string, xSecurityToken: string) => {
+    const response = await fetch(`${API_URL}/history/activity`, {
+        headers: {
+            'X-SECURITY-TOKEN': xSecurityToken,
+            'CST': cst
+        }
+    });
+
+    if (!response.ok) {
+        throw new Error(`Failed to fetch history: ${response.status}`);
+    }
+
+    return response.json();
+};

@@ -33,29 +33,11 @@ import {
     Bar
 } from 'recharts';
 
-const performanceData = [
-    { name: '01:00', equity: 10000, balance: 10000 },
-    { name: '04:00', equity: 10150, balance: 10000 },
-    { name: '08:00', equity: 10080, balance: 10000 },
-    { name: '12:00', equity: 10320, balance: 10250 },
-    { name: '16:00', equity: 10290, balance: 10250 },
-    { name: '20:00', equity: 10540, balance: 10250 },
-    { name: '00:00', equity: 10480, balance: 10500 },
-];
-
-const riskByAsset = [
-    { name: 'Gold', value: 45, color: '#00BFA6' },
-    { name: 'Oil', value: 30, color: '#3b82f6' },
-    { name: 'Forex', value: 25, color: '#f59e0b' },
-];
-
-const riskByEngine = [
-    { name: 'Vortex', value: 65, color: '#00BFA6' },
-    { name: 'Scalper', value: 20, color: '#3b82f6' },
-    { name: 'Asian', value: 15, color: '#f59e0b' },
-];
+import { useSearchParams } from "next/navigation";
 
 export default function DashboardPage() {
+    const searchParams = useSearchParams();
+    const mode = searchParams.get("mode") || "demo";
     const [loading, setLoading] = useState(true);
     const [data, setData] = useState<any>(null);
 
@@ -80,9 +62,42 @@ export default function DashboardPage() {
         return () => clearInterval(interval);
     }, []);
 
-    const account = data?.accounts?.[0] || {
-        balance: { balance: 0, currency: "USD", profitLoss: 0, available: 0 }
+    // Filter account based on mode
+    const activeAccount = data?.accounts?.find((acc: any) =>
+        mode === "real" ? acc.accountType === "LIVE" : acc.accountType === "DEMO"
+    ) || data?.accounts?.[0] || {
+        balance: { balance: 0, currency: "USD", profitLoss: 0, available: 0 },
+        accountId: ""
     };
+
+    // Filter positions for the active account
+    const activePositions = data?.positions?.filter((pos: any) =>
+        pos.accountId === activeAccount.accountId
+    ) || [];
+
+    // Derive Chart Data from History
+    const performanceData = (data?.history || [])
+        .slice(0, 10) // Last 10 activities for now
+        .reverse()
+        .map((h: any, i: number) => ({
+            name: new Date(h.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            equity: activeAccount.balance.balance + (h.amount || 0), // Simplistic simulation of growth
+            balance: activeAccount.balance.balance
+        }));
+
+    // Derive Risk Data from Positions
+    const assetExposure: Record<string, number> = {};
+    activePositions.forEach((p: any) => {
+        assetExposure[p.symbol] = (assetExposure[p.symbol] || 0) + Math.abs(p.upl || 0);
+    });
+
+    const riskByAsset = Object.keys(assetExposure).length > 0
+        ? Object.entries(assetExposure).map(([name, value], i) => ({
+            name,
+            value,
+            color: ['#00BFA6', '#3b82f6', '#f59e0b', '#ef4444'][i % 4]
+        }))
+        : [{ name: 'No Exposure', value: 1, color: '#1f2937' }];
 
     if (loading && !data) {
         return (
@@ -108,7 +123,7 @@ export default function DashboardPage() {
                 <div className="flex items-center gap-3">
                     <div className="flex flex-col items-end text-right px-4 border-r border-white/10 hidden sm:flex">
                         <span className="text-[9px] text-gray-500 font-bold uppercase tracking-widest">Active Market</span>
-                        <span className="text-xs font-bold text-white uppercase">Commodities / Spot</span>
+                        <span className="text-xs font-bold text-white uppercase">{mode === 'real' ? 'Live Capital' : 'Demo Sandbox'}</span>
                     </div>
                     <button className="bg-teal text-dark-blue px-6 py-2.5 rounded-xl font-bold text-sm hover:shadow-[0_0_20px_rgba(0,191,166,0.4)] transition-all flex items-center gap-2">
                         <Zap size={16} fill="currentColor" />
@@ -121,33 +136,33 @@ export default function DashboardPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                 <SummaryCard
                     label="Portfolio Balance"
-                    value={account.balance.balance}
-                    currency={account.balance.currency}
-                    trend={+2.4}
+                    value={activeAccount.balance.balance}
+                    currency={activeAccount.balance.currency}
+                    trend={0}
                     icon={Wallet}
                     color="teal"
                 />
                 <SummaryCard
                     label="Account Equity"
-                    value={account.balance.balance + account.balance.profitLoss}
-                    currency={account.balance.currency}
-                    trend={-0.8}
+                    value={activeAccount.balance.balance + activeAccount.balance.profitLoss}
+                    currency={activeAccount.balance.currency}
+                    trend={0}
                     icon={TrendingUp}
                     color="blue"
                 />
                 <SummaryCard
                     label="Margin Occupied"
-                    value={0.00}
-                    currency={account.balance.currency}
+                    value={activeAccount.balance.deposit || 0}
+                    currency={activeAccount.balance.currency}
                     trend={0}
                     icon={Shield}
                     color="amber"
                 />
                 <SummaryCard
                     label="Liquidity Available"
-                    value={account.balance.available}
-                    currency={account.balance.currency}
-                    trend={+1.2}
+                    value={activeAccount.balance.available}
+                    currency={activeAccount.balance.currency}
+                    trend={0}
                     icon={Zap}
                     color="green"
                 />
@@ -162,14 +177,7 @@ export default function DashboardPage() {
                     <div className="flex justify-between items-start mb-10 relative z-10">
                         <div>
                             <h3 className="text-xl font-bold text-white tracking-tight">Aggregate Performance</h3>
-                            <p className="text-xs text-gray-400 mt-1">Relative equity growth across all active engines</p>
-                        </div>
-                        <div className="flex bg-white/5 p-1.5 rounded-2xl border border-white/5">
-                            {["1D", "1W", "1M", "1Y", "ALL"].map(t => (
-                                <button key={t} className={cn("px-4 py-1.5 text-[10px] font-black rounded-xl transition-all tracking-widest", t === "1M" ? "bg-teal text-dark-blue shadow-[0_0_15px_rgba(0,191,166,0.3)]" : "text-gray-500 hover:text-white hover:bg-white/5")}>
-                                    {t}
-                                </button>
-                            ))}
+                            <p className="text-xs text-gray-400 mt-1">Relative equity growth for {activeAccount.accountName || 'Primary Account'}</p>
                         </div>
                     </div>
 
@@ -192,7 +200,6 @@ export default function DashboardPage() {
                                 />
                                 <YAxis
                                     hide={true}
-                                    domain={['dataMin - 100', 'dataMax + 100']}
                                 />
                                 <Tooltip
                                     contentStyle={{ backgroundColor: '#0A1622', border: '1px solid #ffffff10', borderRadius: '12px' }}
@@ -208,15 +215,6 @@ export default function DashboardPage() {
                                     fill="url(#colorEquity)"
                                     animationDuration={2000}
                                 />
-                                <Area
-                                    type="monotone"
-                                    dataKey="balance"
-                                    stroke="#3b82f6"
-                                    strokeWidth={2}
-                                    strokeDasharray="5 5"
-                                    fill="transparent"
-                                    animationDuration={2000}
-                                />
                             </AreaChart>
                         </ResponsiveContainer>
                     </div>
@@ -229,12 +227,10 @@ export default function DashboardPage() {
                             <Activity size={14} className="animate-pulse" />
                             Engine Control
                         </h3>
-                        <button className="text-[10px] text-gray-500 font-bold uppercase hover:text-white transition-colors">Manage All</button>
                     </div>
 
                     <EngineCard name="Commodity Vortex" status="Active" pnl={+142.40} risk="Low" />
                     <EngineCard name="Volatility Scalper" status="Paused" pnl={-12.20} risk="Medium" />
-                    <EngineCard name="Asian Session Brain" status="Idle" pnl={0.00} risk="High" />
 
                     <button className="mt-auto w-full py-5 bg-white/5 hover:bg-white/[0.08] border border-white/5 rounded-3xl transition-all flex flex-col items-center justify-center gap-2 group">
                         <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-gray-500 group-hover:text-teal transition-colors">
@@ -245,53 +241,51 @@ export default function DashboardPage() {
                 </div>
             </div>
 
-            {/* Section D, E, F: Detailed Performance */}
+            {/* Section D, E: Detailed Performance */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 pt-4">
                 {/* Section D: Open Positions */}
                 <div className="bg-[#0E1B2A] rounded-[2.5rem] border border-white/5 overflow-hidden shadow-xl lg:col-span-2">
                     <div className="p-8 border-b border-white/5 flex justify-between items-center">
                         <h3 className="text-lg font-bold text-white tracking-tight">Active Execution</h3>
-                        <button className="flex items-center gap-2 text-[10px] text-teal font-black uppercase tracking-widest hover:text-gold transition-colors group">
-                            Full Portfolio <ChevronRight size={14} className="group-hover:translate-x-1 transition-transform" />
-                        </button>
+                        <span className="text-[10px] text-gray-500 font-black uppercase tracking-widest">
+                            {activePositions.length} Positions Open
+                        </span>
                     </div>
                     <div className="overflow-x-auto">
                         <table className="w-full text-left text-sm border-collapse">
                             <thead>
                                 <tr className="text-[10px] text-gray-600 uppercase tracking-widest bg-black/10">
-                                    <th className="px-8 py-5 font-black">Contract / Asset</th>
-                                    <th className="px-8 py-5 font-black">Trade Size</th>
-                                    <th className="px-8 py-5 font-black">Entry Spot</th>
-                                    <th className="px-8 py-5 font-black text-right">P/L (Net)</th>
+                                    <th className="px-8 py-5 font-black">Asset</th>
+                                    <th className="px-8 py-5 font-black">Size</th>
+                                    <th className="px-8 py-5 font-black">Entry</th>
+                                    <th className="px-8 py-5 font-black text-right">P/L</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr className="border-b border-white/5 hover:bg-white/[0.03] transition-colors group">
-                                    <td className="px-8 py-6">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-2 h-2 bg-teal rounded-full"></div>
-                                            <span className="font-bold text-white uppercase tracking-tight">GOLD (XAUUSD)</span>
-                                        </div>
-                                    </td>
-                                    <td className="px-8 py-6 text-gray-400 font-medium">0.50 Standard</td>
-                                    <td className="px-8 py-6 font-mono text-gray-300">1,942.20</td>
-                                    <td className="px-8 py-6 text-right">
-                                        <span className="text-green-500 font-bold font-mono text-base">+$42.10</span>
-                                    </td>
-                                </tr>
-                                <tr className="hover:bg-white/[0.03] transition-colors group">
-                                    <td className="px-8 py-6">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                                            <span className="font-bold text-white uppercase tracking-tight">OIL (CRUDEWTI)</span>
-                                        </div>
-                                    </td>
-                                    <td className="px-8 py-6 text-gray-400 font-medium">1.00 Mini</td>
-                                    <td className="px-8 py-6 font-mono text-gray-300">75.40</td>
-                                    <td className="px-8 py-6 text-right">
-                                        <span className="text-red-500 font-bold font-mono text-base">-$12.80</span>
-                                    </td>
-                                </tr>
+                                {activePositions.map((pos: any, idx: number) => (
+                                    <tr key={idx} className="border-b border-white/5 hover:bg-white/[0.03] transition-colors group">
+                                        <td className="px-8 py-6">
+                                            <div className="flex items-center gap-3">
+                                                <div className={cn("w-2 h-2 rounded-full", pos.direction === 'BUY' ? 'bg-teal' : 'bg-red-500')}></div>
+                                                <span className="font-bold text-white uppercase tracking-tight">{pos.symbol}</span>
+                                            </div>
+                                        </td>
+                                        <td className="px-8 py-6 text-gray-400 font-medium">{pos.size} {pos.direction}</td>
+                                        <td className="px-8 py-6 font-mono text-gray-300">{pos.level}</td>
+                                        <td className="px-8 py-6 text-right">
+                                            <span className={cn("font-bold font-mono text-base", pos.upl >= 0 ? "text-green-500" : "text-red-500")}>
+                                                {pos.upl >= 0 ? "+" : ""}{pos.upl.toFixed(2)}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                ))}
+                                {activePositions.length === 0 && (
+                                    <tr>
+                                        <td colSpan={4} className="px-8 py-12 text-center text-gray-600 text-[10px] font-black uppercase tracking-widest">
+                                            No active positions found for {mode} account
+                                        </td>
+                                    </tr>
+                                )}
                             </tbody>
                         </table>
                     </div>
@@ -303,60 +297,26 @@ export default function DashboardPage() {
                         <Shield size={14} /> Risk Analysis
                     </h3>
 
-                    <div className="flex-1 grid grid-rows-2 gap-8">
-                        <div className="flex flex-col items-center justify-center p-4 bg-white/5 rounded-3xl relative">
-                            <ResponsiveContainer width="100%" height={120}>
-                                <RePieChart>
-                                    <Pie
-                                        data={riskByAsset}
-                                        innerRadius={40}
-                                        outerRadius={55}
-                                        paddingAngle={5}
-                                        dataKey="value"
-                                    >
-                                        {riskByAsset.map((entry, index) => (
-                                            <Cell key={`cell-${index}`} fill={entry.color} />
-                                        ))}
-                                    </Pie>
-                                </RePieChart>
-                            </ResponsiveContainer>
-                            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none mt-4">
-                                <span className="text-[10px] text-gray-500 font-black uppercase tracking-widest">Assets</span>
-                            </div>
-                        </div>
-
-                        <div className="flex flex-col justify-center p-6 bg-white/5 rounded-3xl">
-                            <div className="flex justify-between items-center mb-4 px-2">
-                                <span className="text-[9px] text-gray-500 font-black uppercase tracking-widest">Engine Exposure</span>
-                                <span className="text-[9px] text-teal font-black uppercase tracking-widest">Real-time</span>
-                            </div>
-                            <ResponsiveContainer width="100%" height={80}>
-                                <ReBarChart data={riskByEngine} layout="vertical">
-                                    <XAxis type="number" hide />
-                                    <YAxis dataKey="name" type="category" hide />
-                                    <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={8}>
-                                        {riskByEngine.map((entry, index) => (
-                                            <Cell key={`cell-${index}`} fill={entry.color} />
-                                        ))}
-                                    </Bar>
-                                </ReBarChart>
-                            </ResponsiveContainer>
+                    <div className="flex-1 flex flex-col items-center justify-center p-4 bg-white/5 rounded-3xl relative min-h-[200px]">
+                        <ResponsiveContainer width="100%" height={150}>
+                            <RePieChart>
+                                <Pie
+                                    data={riskByAsset}
+                                    innerRadius={45}
+                                    outerRadius={65}
+                                    paddingAngle={5}
+                                    dataKey="value"
+                                >
+                                    {riskByAsset.map((entry, index) => (
+                                        <Cell key={`cell-${index}`} fill={entry.color} />
+                                    ))}
+                                </Pie>
+                            </RePieChart>
+                        </ResponsiveContainer>
+                        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none mt-4">
+                            <span className="text-[10px] text-gray-500 font-black uppercase tracking-widest">Exposure</span>
                         </div>
                     </div>
-                </div>
-            </div>
-
-            {/* Section F: Activity Feed */}
-            <div className="bg-[#0E1B2A] rounded-[2.5rem] border border-white/5 p-10 shadow-xl">
-                <div className="flex items-center justify-between mb-8">
-                    <h3 className="text-lg font-bold text-white tracking-tight">Operation Logs</h3>
-                    <Activity size={18} className="text-gray-700" />
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-                    <ActivityItem icon={Zap} text="Engine 'Vortex' executed BUY execution on XAU/USD" time="2m ago" />
-                    <ActivityItem icon={Shield} text="Risk Safeguard triggered: Adjusted stop-loss limits" time="15m ago" />
-                    <ActivityItem icon={Clock} text="Asia Session Brain scheduled deployment" time="1h ago" />
-                    <ActivityItem icon={User} text="System established primary bridge with Capital.com" time="2h ago" />
                 </div>
             </div>
         </div>

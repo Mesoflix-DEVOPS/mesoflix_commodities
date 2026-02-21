@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { capitalAccounts, systemSettings, users } from '@/lib/db/schema';
 import { decrypt } from '@/lib/crypto';
-import { createSession, getAccounts } from '@/lib/capital';
+import { createSession, getAccounts, getPositions, getHistory } from '@/lib/capital';
 import { verifyAccessToken } from '@/lib/auth';
 import { eq } from 'drizzle-orm';
 import { cookies } from 'next/headers';
@@ -51,11 +51,17 @@ export async function GET(request: Request) {
             // 2. Establish fresh session
             const session = await createSession(user.email, apiPassword, apiKey);
 
-            // 3. Get Accounts with fresh session tokens
-            const accountsData = await getAccounts(session.cst, session.xSecurityToken);
+            // 3. Get Data with fresh session tokens
+            const [accountsData, positionsData, historyData] = await Promise.all([
+                getAccounts(session.cst, session.xSecurityToken),
+                getPositions(session.cst, session.xSecurityToken),
+                getHistory(session.cst, session.xSecurityToken)
+            ]);
 
             return NextResponse.json({
                 ...accountsData,
+                positions: positionsData.positions || [],
+                history: historyData.activities || [],
                 user: {
                     fullName: user.full_name || 'Trader',
                 }

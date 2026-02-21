@@ -5,11 +5,23 @@ import Sidebar from "@/components/dashboard/Sidebar";
 import TopNav from "@/components/dashboard/TopNav";
 import RightPanel from "@/components/dashboard/RightPanel";
 import { cn } from "@/lib/utils";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
     const [isCollapsed, setCollapsed] = useState(false);
     const [isMobileOpen, setMobileOpen] = useState(false);
     const [userData, setUserData] = useState<any>(null);
+
+    const router = useRouter();
+    const pathname = usePathname();
+    const searchParams = useSearchParams();
+    const mode = searchParams.get("mode") || "demo";
+
+    const handleAccountTypeChange = (type: "demo" | "real") => {
+        const params = new URLSearchParams(searchParams.toString());
+        params.set("mode", type);
+        router.push(`${pathname}?${params.toString()}`);
+    };
 
     useEffect(() => {
         // Shared but lightweight user fetch for the shell
@@ -37,6 +49,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     userName={userData?.fullName || "Trader"}
                     onMenuClick={() => setMobileOpen(!isMobileOpen)}
                     isMobileOpen={isMobileOpen}
+                    accountType={mode as "demo" | "real"}
+                    onAccountTypeChange={handleAccountTypeChange}
                 />
 
                 <div className="flex relative">
@@ -52,21 +66,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     </div>
                 </div>
 
-                <footer className="py-6 px-12 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-4 text-gray-500 text-[10px] font-bold uppercase tracking-widest">
-                    <div className="flex items-center gap-4">
-                        <span>© 2026 Mesoflix Commodities</span>
-                        <div className="w-1.5 h-1.5 bg-gray-700 rounded-full" />
-                        <span className="text-teal">Institutional Trading Environment</span>
-                    </div>
-                    <div className="flex items-center gap-6">
-                        <div className="flex items-center gap-2">
-                            <span className="w-1.5 h-1.5 bg-green-500 rounded-full shadow-[0_0_8px_#22c55e]" />
-                            <span>System Operational</span>
-                        </div>
-                        <div className="hidden md:block">
-                            <span>Latency: 42ms</span>
-                        </div>
-                    </div>
+                <footer className="py-6 px-12 border-t border-white/5 flex justify-center items-center text-gray-500 text-[10px] font-black uppercase tracking-widest">
+                    <span>© 2026 Mesoflix Commodities</span>
                 </footer>
             </div>
 
