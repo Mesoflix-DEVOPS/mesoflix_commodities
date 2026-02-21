@@ -14,14 +14,50 @@ import {
     BarChart2,
     Activity,
     ChevronRight,
-    Search
+    Search,
+    User
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+    AreaChart,
+    Area,
+    XAxis,
+    YAxis,
+    CartesianGrid,
+    Tooltip,
+    ResponsiveContainer,
+    PieChart as RePieChart,
+    Pie,
+    Cell,
+    BarChart as ReBarChart,
+    Bar
+} from 'recharts';
+
+const performanceData = [
+    { name: '01:00', equity: 10000, balance: 10000 },
+    { name: '04:00', equity: 10150, balance: 10000 },
+    { name: '08:00', equity: 10080, balance: 10000 },
+    { name: '12:00', equity: 10320, balance: 10250 },
+    { name: '16:00', equity: 10290, balance: 10250 },
+    { name: '20:00', equity: 10540, balance: 10250 },
+    { name: '00:00', equity: 10480, balance: 10500 },
+];
+
+const riskByAsset = [
+    { name: 'Gold', value: 45, color: '#00BFA6' },
+    { name: 'Oil', value: 30, color: '#3b82f6' },
+    { name: 'Forex', value: 25, color: '#f59e0b' },
+];
+
+const riskByEngine = [
+    { name: 'Vortex', value: 65, color: '#00BFA6' },
+    { name: 'Scalper', value: 20, color: '#3b82f6' },
+    { name: 'Asian', value: 15, color: '#f59e0b' },
+];
 
 export default function DashboardPage() {
     const [loading, setLoading] = useState(true);
     const [data, setData] = useState<any>(null);
-    const [greeting, setGreeting] = useState("");
 
     const fetchData = (isSilent = false) => {
         if (!isSilent) setLoading(true);
@@ -41,12 +77,6 @@ export default function DashboardPage() {
     useEffect(() => {
         fetchData();
         const interval = setInterval(() => fetchData(true), 10000);
-
-        const hour = new Date().getHours();
-        if (hour < 12) setGreeting("Good Morning");
-        else if (hour < 18) setGreeting("Good Afternoon");
-        else setGreeting("Good Evening");
-
         return () => clearInterval(interval);
     }, []);
 
@@ -143,16 +173,52 @@ export default function DashboardPage() {
                         </div>
                     </div>
 
-                    <div className="flex-1 flex flex-col items-center justify-center border-t border-white/5 mt-auto relative z-10">
-                        <div className="text-center">
-                            <div className="w-16 h-16 bg-teal/5 rounded-2xl flex items-center justify-center mx-auto mb-6 border border-teal/10">
-                                <BarChart2 size={32} className="text-teal/40" />
-                            </div>
-                            <p className="text-[10px] text-gray-500 font-black uppercase tracking-[0.25em] leading-loose">
-                                System Bridge Interfacing<br />
-                                <span className="text-teal/40">Synthesizing Historical Data...</span>
-                            </p>
-                        </div>
+                    <div className="flex-1 w-full relative z-10">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <AreaChart data={performanceData}>
+                                <defs>
+                                    <linearGradient id="colorEquity" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#00BFA6" stopOpacity={0.3} />
+                                        <stop offset="95%" stopColor="#00BFA6" stopOpacity={0} />
+                                    </linearGradient>
+                                </defs>
+                                <CartesianGrid strokeDasharray="3 3" stroke="#ffffff05" vertical={false} />
+                                <XAxis
+                                    dataKey="name"
+                                    axisLine={false}
+                                    tickLine={false}
+                                    tick={{ fill: '#4b5563', fontSize: 10, fontWeight: 'bold' }}
+                                    dy={10}
+                                />
+                                <YAxis
+                                    hide={true}
+                                    domain={['dataMin - 100', 'dataMax + 100']}
+                                />
+                                <Tooltip
+                                    contentStyle={{ backgroundColor: '#0A1622', border: '1px solid #ffffff10', borderRadius: '12px' }}
+                                    itemStyle={{ fontSize: '12px', fontWeight: 'bold' }}
+                                    labelStyle={{ color: '#9ca3af', marginBottom: '4px', fontSize: '10px' }}
+                                />
+                                <Area
+                                    type="monotone"
+                                    dataKey="equity"
+                                    stroke="#00BFA6"
+                                    strokeWidth={3}
+                                    fillOpacity={1}
+                                    fill="url(#colorEquity)"
+                                    animationDuration={2000}
+                                />
+                                <Area
+                                    type="monotone"
+                                    dataKey="balance"
+                                    stroke="#3b82f6"
+                                    strokeWidth={2}
+                                    strokeDasharray="5 5"
+                                    fill="transparent"
+                                    animationDuration={2000}
+                                />
+                            </AreaChart>
+                        </ResponsiveContainer>
                     </div>
                 </div>
 
@@ -179,10 +245,10 @@ export default function DashboardPage() {
                 </div>
             </div>
 
-            {/* Section D & E: Secondary Panels */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 pt-4">
+            {/* Section D, E, F: Detailed Performance */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 pt-4">
                 {/* Section D: Open Positions */}
-                <div className="bg-[#0E1B2A] rounded-[2.5rem] border border-white/5 overflow-hidden shadow-xl">
+                <div className="bg-[#0E1B2A] rounded-[2.5rem] border border-white/5 overflow-hidden shadow-xl lg:col-span-2">
                     <div className="p-8 border-b border-white/5 flex justify-between items-center">
                         <h3 className="text-lg font-bold text-white tracking-tight">Active Execution</h3>
                         <button className="flex items-center gap-2 text-[10px] text-teal font-black uppercase tracking-widest hover:text-gold transition-colors group">
@@ -231,18 +297,66 @@ export default function DashboardPage() {
                     </div>
                 </div>
 
-                {/* Section F: Activity Feed */}
-                <div className="bg-[#0E1B2A] rounded-[2.5rem] border border-white/5 p-10 h-full shadow-xl">
-                    <div className="flex items-center justify-between mb-8">
-                        <h3 className="text-lg font-bold text-white tracking-tight">Operation Logs</h3>
-                        <Activity size={18} className="text-gray-700" />
+                {/* Section E: Risk Overview */}
+                <div className="bg-[#0E1B2A] rounded-[2.5rem] border border-white/5 p-8 shadow-xl flex flex-col">
+                    <h3 className="text-sm font-black text-teal uppercase tracking-[0.2em] mb-8 flex items-center gap-2 px-2">
+                        <Shield size={14} /> Risk Analysis
+                    </h3>
+
+                    <div className="flex-1 grid grid-rows-2 gap-8">
+                        <div className="flex flex-col items-center justify-center p-4 bg-white/5 rounded-3xl relative">
+                            <ResponsiveContainer width="100%" height={120}>
+                                <RePieChart>
+                                    <Pie
+                                        data={riskByAsset}
+                                        innerRadius={40}
+                                        outerRadius={55}
+                                        paddingAngle={5}
+                                        dataKey="value"
+                                    >
+                                        {riskByAsset.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={entry.color} />
+                                        ))}
+                                    </Pie>
+                                </RePieChart>
+                            </ResponsiveContainer>
+                            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none mt-4">
+                                <span className="text-[10px] text-gray-500 font-black uppercase tracking-widest">Assets</span>
+                            </div>
+                        </div>
+
+                        <div className="flex flex-col justify-center p-6 bg-white/5 rounded-3xl">
+                            <div className="flex justify-between items-center mb-4 px-2">
+                                <span className="text-[9px] text-gray-500 font-black uppercase tracking-widest">Engine Exposure</span>
+                                <span className="text-[9px] text-teal font-black uppercase tracking-widest">Real-time</span>
+                            </div>
+                            <ResponsiveContainer width="100%" height={80}>
+                                <ReBarChart data={riskByEngine} layout="vertical">
+                                    <XAxis type="number" hide />
+                                    <YAxis dataKey="name" type="category" hide />
+                                    <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={8}>
+                                        {riskByEngine.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={entry.color} />
+                                        ))}
+                                    </Bar>
+                                </ReBarChart>
+                            </ResponsiveContainer>
+                        </div>
                     </div>
-                    <div className="space-y-8">
-                        <ActivityItem icon={Zap} text="Engine 'Commodity Vortex' executed BUY execution on XAU/USD" time="2m ago" />
-                        <ActivityItem icon={Shield} text="Risk Safeguard triggered: Adjusted stop-loss limits for CRUDEWTI" time="15m ago" />
-                        <ActivityItem icon={Clock} text="Asia Session Brain scheduled deployment for 01:00 UTC" time="1h ago" />
-                        <ActivityItem icon={User} text="System established primary bridge with Capital.com" time="2h ago" />
-                    </div>
+                </div>
+            </div>
+
+            {/* Section F: Activity Feed */}
+            <div className="bg-[#0E1B2A] rounded-[2.5rem] border border-white/5 p-10 shadow-xl">
+                <div className="flex items-center justify-between mb-8">
+                    <h3 className="text-lg font-bold text-white tracking-tight">Operation Logs</h3>
+                    <Activity size={18} className="text-gray-700" />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                    <ActivityItem icon={Zap} text="Engine 'Vortex' executed BUY execution on XAU/USD" time="2m ago" />
+                    <ActivityItem icon={Shield} text="Risk Safeguard triggered: Adjusted stop-loss limits" time="15m ago" />
+                    <ActivityItem icon={Clock} text="Asia Session Brain scheduled deployment" time="1h ago" />
+                    <ActivityItem icon={User} text="System established primary bridge with Capital.com" time="2h ago" />
                 </div>
             </div>
         </div>
@@ -253,7 +367,6 @@ function SummaryCard({ label, value, currency, trend, icon: Icon, color }: any) 
     const isPositive = trend >= 0;
     return (
         <div className="group bg-[#0E1B2A] p-8 rounded-[2.5rem] border border-white/5 transition-all duration-700 hover:border-teal/30 hover:bg-[#112338] relative overflow-hidden shadow-xl">
-            {/* Ambient Background Gradient */}
             <div className={cn("absolute top-0 right-0 w-32 h-32 -mr-12 -mt-12 rounded-full opacity-[0.03] transition-all duration-700 group-hover:opacity-[0.08]",
                 color === 'teal' ? 'bg-teal' : color === 'blue' ? 'bg-blue-500' : color === 'amber' ? 'bg-amber-500' : 'bg-green-500'
             )} />
@@ -338,13 +451,4 @@ function ActivityItem({ icon: Icon, text, time }: any) {
             </div>
         </div>
     );
-}
-
-function User({ size, strokeWidth }: { size: number, strokeWidth: number }) {
-    return (
-        <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
-            <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
-            <circle cx="12" cy="7" r="4" />
-        </svg>
-    )
 }

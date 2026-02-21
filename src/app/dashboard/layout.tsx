@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Sidebar from "@/components/dashboard/Sidebar";
 import TopNav from "@/components/dashboard/TopNav";
+import RightPanel from "@/components/dashboard/RightPanel";
 import { cn } from "@/lib/utils";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -38,11 +39,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     isMobileOpen={isMobileOpen}
                 />
 
-                <main className="flex-1 p-6 md:p-12 animate-in fade-in duration-700">
-                    <div className="max-w-7xl mx-auto">
-                        {children}
+                <div className="flex relative">
+                    <main className="flex-1 p-6 md:p-12 animate-in fade-in duration-700">
+                        <div className="max-w-7xl mx-auto">
+                            {children}
+                        </div>
+                    </main>
+
+                    {/* Integrated Right Panel - Collapsible within the flex flow */}
+                    <div className="hidden xl:block">
+                        <RightPanel />
                     </div>
-                </main>
+                </div>
 
                 <footer className="py-6 px-12 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-4 text-gray-500 text-[10px] font-bold uppercase tracking-widest">
                     <div className="flex items-center gap-4">
