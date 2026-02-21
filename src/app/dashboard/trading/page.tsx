@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import {
     BarChart3,
@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export default function TradingPage() {
+function TradingPageInner() {
     const searchParams = useSearchParams();
     const mode = searchParams.get("mode") || "demo";
     const [activeTab, setActiveTab] = useState("manual");
@@ -410,6 +410,18 @@ function EngineCard({ id, name, description, config, onToggle }: any) {
                 </button>
             </div>
         </div>
+    );
+}
+
+export default function TradingPage() {
+    return (
+        <Suspense fallback={
+            <div className="flex items-center justify-center h-[60vh]">
+                <div className="w-12 h-12 border-4 border-teal/20 border-t-teal rounded-full animate-spin"></div>
+            </div>
+        }>
+            <TradingPageInner />
+        </Suspense>
     );
 }
 

@@ -6,8 +6,9 @@ import TopNav from "@/components/dashboard/TopNav";
 import RightPanel from "@/components/dashboard/RightPanel";
 import { cn } from "@/lib/utils";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
+import { Suspense } from "react";
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
     const [isCollapsed, setCollapsed] = useState(false);
     const [isMobileOpen, setMobileOpen] = useState(false);
     const [userData, setUserData] = useState<any>(null);
@@ -79,5 +80,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 />
             )}
         </div>
+    );
+}
+
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen bg-[#0D1B2A] flex items-center justify-center">
+                <div className="w-12 h-12 border-4 border-teal/20 border-t-teal rounded-full animate-spin"></div>
+            </div>
+        }>
+            <DashboardLayoutInner>{children}</DashboardLayoutInner>
+        </Suspense>
     );
 }

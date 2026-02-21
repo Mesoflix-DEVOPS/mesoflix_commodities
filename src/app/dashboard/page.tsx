@@ -34,8 +34,9 @@ import {
 } from 'recharts';
 
 import { useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 
-export default function DashboardPage() {
+function DashboardPageInner() {
     const searchParams = useSearchParams();
     const mode = searchParams.get("mode") || "demo";
     const [loading, setLoading] = useState(true);
@@ -320,6 +321,18 @@ export default function DashboardPage() {
                 </div>
             </div>
         </div>
+    );
+}
+
+export default function DashboardPage() {
+    return (
+        <Suspense fallback={
+            <div className="flex items-center justify-center h-[60vh]">
+                <div className="w-12 h-12 border-4 border-teal/20 border-t-teal rounded-full animate-spin"></div>
+            </div>
+        }>
+            <DashboardPageInner />
+        </Suspense>
     );
 }
 
