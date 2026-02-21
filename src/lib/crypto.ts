@@ -64,3 +64,9 @@ export function decrypt(text: string): string {
 
     return decrypted;
 }
+/**
+ * Hash an API key for uniqueness checks (SHA-256)
+ */
+export function hashApiKey(apiKey: string): string {
+    return crypto.createHash('sha256').update(apiKey).digest('hex');
+}

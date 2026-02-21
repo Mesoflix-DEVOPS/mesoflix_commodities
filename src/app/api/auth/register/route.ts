@@ -1,36 +1,60 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { users, refreshTokens, auditLogs } from '@/lib/db/schema';
-import { hashPassword } from '@/lib/crypto';
+import { users, refreshTokens, auditLogs, capitalAccounts } from '@/lib/db/schema';
+import { hashPassword, encrypt } from '@/lib/crypto';
 import { signAccessToken, generateRefreshToken, setAuthCookies } from '@/lib/auth';
-import { eq } from 'drizzle-orm';
-import { v4 as uuidv4 } from 'uuid';
+import { createSession } from '@/lib/capital';
+import { eq, or } from 'drizzle-orm';
 
 export async function POST(request: Request) {
     try {
-        const { email, password, fullName } = await request.json();
+        const { email, password, fullName, apiKey } = await request.json();
 
-        if (!email || !password) {
-            return NextResponse.json({ message: 'Email and password are required' }, { status: 400 });
+        if (!email || !password || !apiKey) {
+            return NextResponse.json({ message: 'Email, password, and API Key are required' }, { status: 400 });
         }
 
-        // 1. Check if user exists
+        // 1. Check if user already exists
         const existingUser = await db.select().from(users).where(eq(users.email, email)).limit(1);
         if (existingUser.length > 0) {
-            return NextResponse.json({ message: 'User already exists' }, { status: 409 });
+            return NextResponse.json({ message: 'A user with this email already exists' }, { status: 409 });
         }
 
-        // 2. Hash Password
+        // 2. Validate API Key by attempting to create a session
+        try {
+            await createSession(email, password, apiKey);
+        } catch (err: any) {
+            return NextResponse.json({ message: `Capital.com validation failed: ${err.message}` }, { status: 401 });
+        }
+
+        // 3. Hash API Key for Uniqueness Check
+        const { hashApiKey } = await import('@/lib/crypto');
+        const keyHash = hashApiKey(apiKey);
+        const existingAccountCount = await db.select().from(capitalAccounts).where(eq(capitalAccounts.api_key_hash, keyHash)).limit(1);
+        if (existingAccountCount.length > 0) {
+            return NextResponse.json({ message: 'This API key is already registered with another account' }, { status: 409 });
+        }
+
+        // 4. Hash Password
         const passwordHash = await hashPassword(password);
 
-        // 3. Create User
+        // 5. Create User
         const [newUser] = await db.insert(users).values({
             email,
             password_hash: passwordHash,
-            full_name: fullName,
+            full_name: fullName || 'Trading User',
         }).returning();
 
-        // 4. Issue Tokens
+        // 6. Store Encrypted API Key and Hash
+        const encryptedKey = encrypt(apiKey);
+        await db.insert(capitalAccounts).values({
+            user_id: newUser.id,
+            encrypted_api_key: encryptedKey,
+            api_key_hash: keyHash,
+            account_type: 'live',
+        });
+
+        // 6. Issue Tokens
         const accessToken = await signAccessToken({
             userId: newUser.id,
             email: newUser.email,
@@ -40,17 +64,17 @@ export async function POST(request: Request) {
 
         const refreshToken = generateRefreshToken();
 
-        // 5. Store Refresh Token
+        // 7. Store Refresh Token (3 days)
         await db.insert(refreshTokens).values({
             user_id: newUser.id,
-            token_hash: refreshToken, // ideally hash this too, but for simplicity storing plain random token
-            expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+            token_hash: refreshToken,
+            expires_at: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), // 3 days
         });
 
-        // 6. Set Cookies
+        // 8. Set Cookies
         await setAuthCookies(accessToken, refreshToken);
 
-        // 7. Audit Log
+        // 9. Audit Log
         await db.insert(auditLogs).values({
             user_id: newUser.id,
             action: 'REGISTER',

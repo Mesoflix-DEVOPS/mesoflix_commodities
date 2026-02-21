@@ -1,38 +1,50 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Lock, Mail, ArrowRight, AlertCircle, Eye, EyeOff, Key } from "lucide-react";
+import { Lock, Mail, ArrowRight, AlertCircle, Eye, EyeOff, Key, User, ArrowLeft } from "lucide-react";
 
-export default function LoginPage() {
+export default function AuthPage() {
     const router = useRouter();
+    const [isLogin, setIsLogin] = useState(true);
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [apiKey, setApiKey] = useState("");
+    const [fullName, setFullName] = useState("");
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
+
+    // Reset error when switching mode
+    useEffect(() => {
+        setError("");
+    }, [isLogin]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError("");
         setLoading(true);
 
+        const endpoint = isLogin ? "/api/auth/login" : "/api/auth/register";
+        const payload = isLogin
+            ? { email, password }
+            : { email, password, fullName, apiKey };
+
         try {
-            const res = await fetch("/api/auth/login", {
+            const res = await fetch(endpoint, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email, password, apiKey }),
+                body: JSON.stringify(payload),
             });
 
             const data = await res.json();
 
             if (!res.ok) {
-                throw new Error(data.message || "Login failed");
+                throw new Error(data.message || (isLogin ? "Login failed" : "Registration failed"));
             }
 
-            // Redirect to dashboard on success
+            // Success animation or message could go here
             router.push("/dashboard");
         } catch (err: any) {
             setError(err.message);
@@ -42,90 +54,169 @@ export default function LoginPage() {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-dark-blue px-4">
-            <div className="bg-white rounded-2xl shadow-2xl p-8 md:p-12 w-full max-w-md">
+        <div className="min-h-screen flex items-center justify-center bg-[#0D1B2A] px-4 relative overflow-hidden">
+            {/* Animated Background Elements */}
+            <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-teal/10 rounded-full blur-[120px] animate-pulse" />
+            <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-gold/5 rounded-full blur-[120px] animate-pulse delay-700" />
 
-                <div className="text-center mb-8">
-                    <Link href="/" className="text-2xl font-bold mb-2 inline-block">
-                        <span className="text-dark-blue">Mesoflix_</span>
-                        <span className="text-teal">Commodities</span>
+            <div className="relative z-10 w-full max-w-md">
+                {/* Logo Section */}
+                <div className="text-center mb-8 animate-fade-in-up">
+                    <Link href="/" className="inline-flex items-center gap-2 group">
+                        <div className="p-2 bg-gradient-to-br from-teal to-dark-blue rounded-lg shadow-lg group-hover:scale-110 transition-transform">
+                            <span className="text-gold font-bold text-xl">M</span>
+                        </div>
+                        <span className="text-2xl font-bold tracking-tight">
+                            <span className="text-white">Mesoflix_</span>
+                            <span className="text-teal">Commodities</span>
+                        </span>
                     </Link>
-                    <h2 className="text-gray-600 mt-2">Sign in with Capital.com</h2>
                 </div>
 
-                {error && (
-                    <div className="bg-red-50 text-red-600 p-3 rounded-lg flex items-center gap-2 mb-6 text-sm">
-                        <AlertCircle size={18} />
-                        {error}
-                    </div>
-                )}
+                {/* Main Card */}
+                <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl shadow-2xl p-8 md:p-10 transition-all duration-500 hover:border-white/20">
 
-                <form onSubmit={handleSubmit} className="space-y-6">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Capital.com Email</label>
-                        <div className="relative">
-                            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-                            <input
-                                type="email"
-                                required
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal focus:border-transparent outline-none transition-all"
-                                placeholder="name@example.com"
-                            />
+                    {/* Header */}
+                    <div className="mb-8">
+                        <h1 className="text-2xl font-bold text-white mb-2">
+                            {isLogin ? "Welcome Back" : "Create Account"}
+                        </h1>
+                        <p className="text-gray-400 text-sm">
+                            {isLogin
+                                ? "Enter your credentials to access your dashboard"
+                                : "Join the premium commodity trading platform"}
+                        </p>
+                    </div>
+
+                    {/* Form */}
+                    <form onSubmit={handleSubmit} className="space-y-5">
+                        {!isLogin && (
+                            <div className="animate-in fade-in slide-in-from-left-4 duration-300">
+                                <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Full Name</label>
+                                <div className="relative group">
+                                    <User className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-teal transition-colors" size={18} />
+                                    <input
+                                        type="text"
+                                        required={!isLogin}
+                                        value={fullName}
+                                        onChange={(e) => setFullName(e.target.value)}
+                                        className="w-full bg-white/5 border border-white/10 text-white pl-10 pr-4 py-3 rounded-xl focus:ring-2 focus:ring-teal focus:border-transparent outline-none transition-all placeholder:text-gray-600"
+                                        placeholder="John Doe"
+                                    />
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="animate-in fade-in duration-300">
+                            <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Capital.com Email</label>
+                            <div className="relative group">
+                                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-teal transition-colors" size={18} />
+                                <input
+                                    type="email"
+                                    required
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    className="w-full bg-white/5 border border-white/10 text-white pl-10 pr-4 py-3 rounded-xl focus:ring-2 focus:ring-teal focus:border-transparent outline-none transition-all placeholder:text-gray-600"
+                                    placeholder="name@example.com"
+                                />
+                            </div>
                         </div>
-                    </div>
 
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Capital.com Password</label>
-                        <div className="relative">
-                            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-                            <input
-                                type={showPassword ? "text" : "password"}
-                                required
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal focus:border-transparent outline-none transition-all"
-                                placeholder="••••••••"
-                            />
-                            <button
-                                type="button"
-                                onClick={() => setShowPassword(!showPassword)}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
-                            >
-                                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                            </button>
+                        <div className="animate-in fade-in duration-500">
+                            <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Capital.com Password</label>
+                            <div className="relative group">
+                                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-teal transition-colors" size={18} />
+                                <input
+                                    type={showPassword ? "text" : "password"}
+                                    required
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    className="w-full bg-white/5 border border-white/10 text-white pl-10 pr-12 py-3 rounded-xl focus:ring-2 focus:ring-teal focus:border-transparent outline-none transition-all placeholder:text-gray-600"
+                                    placeholder="••••••••"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors"
+                                >
+                                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                </button>
+                            </div>
                         </div>
+
+                        {!isLogin && (
+                            <div className="animate-in fade-in slide-in-from-right-4 duration-300">
+                                <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Capital.com API Key</label>
+                                <div className="relative group">
+                                    <Key className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-teal transition-colors" size={18} />
+                                    <input
+                                        type="text"
+                                        required={!isLogin}
+                                        value={apiKey}
+                                        onChange={(e) => setApiKey(e.target.value)}
+                                        className="w-full bg-white/5 border border-white/10 text-white pl-10 pr-4 py-3 rounded-xl focus:ring-2 focus:ring-teal focus:border-transparent outline-none transition-all placeholder:text-gray-600"
+                                        placeholder="Paste your API Key"
+                                    />
+                                </div>
+                                <p className="text-[10px] text-gray-500 mt-2 flex items-center gap-1">
+                                    <AlertCircle size={10} /> Found in Capital.com Settings &gt; API Integration
+                                </p>
+                            </div>
+                        )}
+
+                        {error && (
+                            <div className="bg-red-500/10 border border-red-500/20 text-red-500 p-3 rounded-xl flex items-center gap-2 text-sm animate-shake">
+                                <AlertCircle size={18} className="shrink-0" />
+                                <span>{error}</span>
+                            </div>
+                        )}
+
+                        <button
+                            type="submit"
+                            disabled={loading}
+                            className="w-full relative group overflow-hidden bg-gradient-to-r from-teal to-[#1B263B] text-gold font-bold py-3.5 rounded-xl transition-all duration-300 hover:shadow-[0_0_20px_rgba(0,191,166,0.3)] disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <span className="relative z-10 flex items-center justify-center gap-2">
+                                {loading ? (
+                                    <div className="w-5 h-5 border-2 border-gold/30 border-t-gold rounded-full animate-spin" />
+                                ) : (
+                                    <>
+                                        {isLogin ? "Sign In" : "Register Account"}
+                                        <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
+                                    </>
+                                )}
+                            </span>
+                        </button>
+                    </form>
+
+                    {/* Toggle */}
+                    <div className="mt-8 text-center">
+                        <button
+                            onClick={() => setIsLogin(!isLogin)}
+                            className="text-sm text-gray-400 hover:text-white transition-colors"
+                        >
+                            {isLogin
+                                ? "Don't have an account? "
+                                : "Already registered? "}
+                            <span className="text-teal font-semibold hover:underline decoration-gold">
+                                {isLogin ? "Create one now" : "Login here"}
+                            </span>
+                        </button>
                     </div>
 
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Capital.com API Key</label>
-                        <div className="relative">
-                            <Key className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-                            <input
-                                type="text"
-                                required
-                                value={apiKey}
-                                onChange={(e) => setApiKey(e.target.value)}
-                                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal focus:border-transparent outline-none transition-all"
-                                placeholder="Paste your API Key here"
-                            />
-                        </div>
-                        <p className="text-xs text-gray-500 mt-1">Found in Capital.com Settings &gt; API Integration</p>
+                    {/* Hint */}
+                    <div className="mt-10 pt-6 border-t border-white/5 text-center">
+                        <p className="text-[10px] text-gray-600 uppercase tracking-widest font-medium">
+                            Sessions persist for 3 days • Secured by End-to-End Encryption
+                        </p>
                     </div>
+                </div>
 
-                    <button
-                        type="submit"
-                        disabled={loading}
-                        className="w-full bg-dark-blue text-gold font-bold py-3 rounded-lg hover:bg-teal hover:text-white transition-all duration-300 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        {loading ? "Connecting..." : "Connect Account"}
-                        {!loading && <ArrowRight size={20} />}
-                    </button>
-                </form>
-
-                <div className="mt-8 text-center text-sm text-gray-500">
-                    <p>Protected by Mesoflix Security</p>
+                {/* Footer Links */}
+                <div className="mt-8 flex justify-center gap-6 text-xs text-gray-500">
+                    <Link href="/terms" className="hover:text-gray-300 transition-colors">Terms of Service</Link>
+                    <Link href="/privacy" className="hover:text-gray-300 transition-colors">Privacy Policy</Link>
+                    <Link href="/support" className="hover:text-gray-300 transition-colors">Help Center</Link>
                 </div>
             </div >
         </div >

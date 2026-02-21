@@ -57,7 +57,7 @@ export async function setAuthCookies(accessToken: string, refreshToken: string) 
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
-        maxAge: 15 * 60, // 15 minutes
+        maxAge: 15 * 60, // 15 minutes (short lived, but refreshable)
         path: '/',
     });
 
@@ -66,7 +66,7 @@ export async function setAuthCookies(accessToken: string, refreshToken: string) 
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
-        maxAge: 7 * 24 * 60 * 60, // 7 days
+        maxAge: 3 * 24 * 60 * 60, // 3 days
         path: '/api/auth/refresh', // Scope to refresh endpoint only
     });
 }
