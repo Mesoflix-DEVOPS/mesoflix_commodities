@@ -50,6 +50,18 @@ export const auditLogs = pgTable('audit_logs', {
     timestamp: timestamp('timestamp').defaultNow(),
 });
 
+// Engine Settings Table
+export const engineSettings = pgTable('engine_settings', {
+    id: uuid('id').defaultRandom().primaryKey(),
+    user_id: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+    engine_id: text('engine_id').notNull(), // 'vortex', 'scalper', etc.
+    is_active: boolean('is_active').default(false),
+    risk_level: text('risk_level').default('moderate'),
+    parameters: text('parameters'), // JSON string for engine-specific params
+    created_at: timestamp('created_at').defaultNow(),
+    updated_at: timestamp('updated_at').defaultNow(),
+});
+
 // System Settings Table (Global Config & Master Credentials)
 export const systemSettings = pgTable('system_settings', {
     key: text('key').primaryKey(),
