@@ -44,7 +44,7 @@ function DashboardPageInner() {
 
     const fetchData = (isSilent = false) => {
         if (!isSilent) setLoading(true);
-        fetch("/api/dashboard")
+        fetch(`/api/dashboard?mode=${mode}`)
             .then(async (res) => {
                 if (res.status === 200) {
                     const jsonData = await res.json();
@@ -77,14 +77,16 @@ function DashboardPageInner() {
     ) || [];
 
     // Derive Chart Data from History
-    const performanceData = (data?.history || [])
-        .slice(0, 10) // Last 10 activities for now
-        .reverse()
-        .map((h: any, i: number) => ({
+    const performanceData = (data?.history && data.history.length > 0)
+        ? data.history.slice(0, 10).reverse().map((h: any, i: number) => ({
             name: new Date(h.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            equity: activeAccount.balance.balance + (h.amount || 0), // Simplistic simulation of growth
+            equity: activeAccount.balance.balance + (h.amount || 0),
             balance: activeAccount.balance.balance
-        }));
+        }))
+        : [
+            { name: '00:00', equity: activeAccount.balance.balance, balance: activeAccount.balance.balance },
+            { name: 'NOW', equity: activeAccount.balance.balance, balance: activeAccount.balance.balance }
+        ];
 
     // Derive Risk Data from Positions
     const assetExposure: Record<string, number> = {};
@@ -182,8 +184,8 @@ function DashboardPageInner() {
                         </div>
                     </div>
 
-                    <div className="flex-1 w-full relative z-10">
-                        <ResponsiveContainer width="100%" height="100%">
+                    <div className="flex-1 w-full relative z-10 min-h-[300px]">
+                        <ResponsiveContainer width="100%" height="100%" minHeight={300}>
                             <AreaChart data={performanceData}>
                                 <defs>
                                     <linearGradient id="colorEquity" x1="0" y1="0" x2="0" y2="1">

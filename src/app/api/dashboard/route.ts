@@ -34,7 +34,18 @@ export async function GET(request: Request) {
         }
 
         // 1. Get User Account Credentials
-        const [account] = await db.select().from(capitalAccounts).where(eq(capitalAccounts.user_id, userId)).limit(1);
+        const { searchParams } = new URL(request.url);
+        const modeInput = searchParams.get('mode') || 'demo';
+
+        // Find account matching mode
+        let [account] = await db.select().from(capitalAccounts)
+            .where(eq(capitalAccounts.user_id, userId))
+            .limit(1);
+
+        // If user has multiple accounts, we should filter by account_type
+        // For now, we take the one they have, but if they have multiple, we find the best match
+        const allAccounts = await db.select().from(capitalAccounts).where(eq(capitalAccounts.user_id, userId));
+        account = allAccounts.find(a => a.account_type === modeInput) || allAccounts[0];
 
         if (!account) {
             return NextResponse.json({ message: 'No Capital.com account connected.' }, { status: 404 });

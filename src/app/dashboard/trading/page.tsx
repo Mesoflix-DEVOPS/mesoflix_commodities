@@ -31,7 +31,7 @@ function TradingPageInner() {
 
         // Parallel fetch for dashboard and engine settings
         Promise.all([
-            fetch("/api/dashboard").then(res => res.json()),
+            fetch(`/api/dashboard?mode=${mode}`).then(res => res.json()),
             fetch("/api/engines").then(res => res.json())
         ])
             .then(([dashData, engData]) => {
@@ -75,7 +75,8 @@ function TradingPageInner() {
                 body: JSON.stringify({
                     epic: "IX.D.GOLD.IFM.IP", // Hardcoded Gold for now as per mockup
                     direction,
-                    size
+                    size,
+                    mode
                 })
             });
 

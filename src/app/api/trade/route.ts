@@ -23,7 +23,7 @@ export async function POST(request: Request) {
 
         const userId = decoded.userId;
         const body = await request.json();
-        const { epic, direction, size } = body;
+        const { epic, direction, size, mode: requestMode = 'demo' } = body;
 
         if (!epic || !direction || !size) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -33,8 +33,9 @@ export async function POST(request: Request) {
         const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
         if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
 
-        // Get appropriate account for session
-        const [account] = await db.select().from(capitalAccounts).where(eq(capitalAccounts.user_id, userId)).limit(1);
+        // Get appropriate account for session        
+        const allAccounts = await db.select().from(capitalAccounts).where(eq(capitalAccounts.user_id, userId));
+        const account = allAccounts.find(a => a.account_type === requestMode) || allAccounts[0];
 
         if (!account) {
             return NextResponse.json({ error: 'Capital account not found' }, { status: 404 });

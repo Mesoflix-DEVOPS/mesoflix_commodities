@@ -33,7 +33,11 @@ export async function GET(request: Request) {
         const epics = epicsParam ? epicsParam.split(',') : ['IX.D.GOLD.IFM.IP', 'IX.D.WTI.IFM.IP', 'EU.D.EURUSD.CASH.IP', 'BT.D.BTCUSD.CASH.IP'];
 
         // Get appropriate account for session
-        const [account] = await db.select().from(capitalAccounts).where(eq(capitalAccounts.user_id, userId)).limit(1);
+        const { searchParams: queryParams } = new URL(request.url);
+        const requestMode = queryParams.get('mode') || 'demo';
+
+        const allAccounts = await db.select().from(capitalAccounts).where(eq(capitalAccounts.user_id, userId));
+        const account = allAccounts.find(a => a.account_type === requestMode) || allAccounts[0];
 
         if (!account) {
             return NextResponse.json({ error: 'Capital account not found' }, { status: 404 });
