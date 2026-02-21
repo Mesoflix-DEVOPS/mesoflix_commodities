@@ -12,6 +12,7 @@ export default function AuthPage() {
     const [password, setPassword] = useState(""); // This will now be the API password
     const [apiKey, setApiKey] = useState("");
     const [fullName, setFullName] = useState("");
+    const [accountType, setAccountType] = useState<"demo" | "live">("demo");
     const [showPassword, setShowPassword] = useState(false); // This will control the single password field
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
@@ -29,7 +30,7 @@ export default function AuthPage() {
         const endpoint = isLogin ? "/api/auth/login" : "/api/auth/register";
         const payload = isLogin
             ? { email, password }
-            : { email, fullName, apiKey, apiPassword: password }; // Use same password for both
+            : { email, fullName, apiKey, apiPassword: password, accountType }; // Use same password for both
 
         try {
             const res = await fetch(endpoint, {

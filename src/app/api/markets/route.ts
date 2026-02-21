@@ -45,9 +45,10 @@ export async function GET(request: Request) {
         if (!apiPassword) return NextResponse.json({ error: 'Password missing' }, { status: 400 });
 
         // Session creation
-        const session = await createSession(user.email, apiPassword, apiKey);
+        const isDemo = account.account_type === 'demo';
+        const session = await createSession(user.email, apiPassword, apiKey, isDemo);
 
-        const marketData = await getMarketTickers(session.cst, session.xSecurityToken, epics);
+        const marketData = await getMarketTickers(session.cst, session.xSecurityToken, epics, isDemo);
 
         return NextResponse.json(marketData);
 

@@ -8,8 +8,9 @@ import { eq, or } from 'drizzle-orm';
 
 export async function POST(request: Request) {
     try {
-        const { email, fullName, apiKey, apiPassword } = await request.json();
-        console.log(`[Register] Attempting simplified validation for: ${email}`);
+        const { email, fullName, apiKey, apiPassword, accountType } = await request.json();
+        const isDemo = accountType === 'demo';
+        console.log(`[Register] Attempting simplified validation for: ${email} (${accountType})`);
 
         if (!email || !apiKey || !apiPassword) {
             return NextResponse.json({ message: 'Email, API Key, and API Password are required' }, { status: 400 });
@@ -21,7 +22,7 @@ export async function POST(request: Request) {
 
         // 2. Validate API Keys by attempting to create a session
         try {
-            await createSession(email, apiPassword, apiKey);
+            await createSession(email, apiPassword, apiKey, isDemo);
         } catch (err: any) {
             console.error(`[Register] Capital.com Validation Failed for ${email}:`, err.message);
             return NextResponse.json({ message: `Capital.com validation failed: ${err.message}` }, { status: 401 });
@@ -70,6 +71,7 @@ export async function POST(request: Request) {
                 encrypted_api_key: encryptedKey,
                 encrypted_api_password: encryptedPass,
                 api_key_hash: keyHash,
+                account_type: accountType || 'demo',
                 updated_at: new Date(),
             }).where(eq(capitalAccounts.id, existingAccount.id));
         } else {
@@ -78,7 +80,7 @@ export async function POST(request: Request) {
                 encrypted_api_key: encryptedKey,
                 encrypted_api_password: encryptedPass,
                 api_key_hash: keyHash,
-                account_type: 'live',
+                account_type: accountType || 'demo',
             });
         }
 

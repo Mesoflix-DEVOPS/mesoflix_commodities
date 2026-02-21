@@ -46,9 +46,10 @@ export async function POST(request: Request) {
         if (!apiPassword) return NextResponse.json({ error: 'Password missing' }, { status: 400 });
 
         // Session creation
-        const session = await createSession(user.email, apiPassword, apiKey);
+        const isDemo = account.account_type === 'demo';
+        const session = await createSession(user.email, apiPassword, apiKey, isDemo);
 
-        const executionResult = await placeOrder(session.cst, session.xSecurityToken, epic, direction, size);
+        const executionResult = await placeOrder(session.cst, session.xSecurityToken, epic, direction, size, isDemo);
 
         return NextResponse.json(executionResult);
 

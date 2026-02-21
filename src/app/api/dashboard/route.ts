@@ -49,13 +49,14 @@ export async function GET(request: Request) {
             }
 
             // 2. Establish fresh session
-            const session = await createSession(user.email, apiPassword, apiKey);
+            const isDemo = account.account_type === 'demo';
+            const session = await createSession(user.email, apiPassword, apiKey, isDemo);
 
             // 3. Get Data with fresh session tokens
             const [accountsData, positionsData, historyData] = await Promise.all([
-                getAccounts(session.cst, session.xSecurityToken),
-                getPositions(session.cst, session.xSecurityToken),
-                getHistory(session.cst, session.xSecurityToken)
+                getAccounts(session.cst, session.xSecurityToken, isDemo),
+                getPositions(session.cst, session.xSecurityToken, isDemo),
+                getHistory(session.cst, session.xSecurityToken, isDemo)
             ]);
 
             return NextResponse.json({

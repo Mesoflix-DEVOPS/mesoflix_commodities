@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 
-const API_URL = 'https://api-capital.backend-capital.com/api/v1';
+const LIVE_API_URL = 'https://api-capital.backend-capital.com/api/v1';
+const DEMO_API_URL = 'https://demo-api-capital.backend-capital.com/api/v1';
+
+const getApiUrl = (isDemo: boolean) => isDemo ? DEMO_API_URL : LIVE_API_URL;
 
 interface SessionResponse {
     cst: string;
@@ -8,10 +11,8 @@ interface SessionResponse {
     [key: string]: any;
 }
 
-export const createSession = async (identifier: string, password: string, apiKey: string): Promise<SessionResponse> => {
-    // 1. Get Encryption Key (Optional but recommended, skipping for simplicity as per user request to "make it work")
-    // We will use standard login for now as per docs "Using API Key, Login, and Password"
-
+export const createSession = async (identifier: string, password: string, apiKey: string, isDemo: boolean = false): Promise<SessionResponse> => {
+    const API_URL = getApiUrl(isDemo);
     const response = await fetch(`${API_URL}/session`, {
         method: 'POST',
         headers: {
@@ -44,7 +45,8 @@ export const createSession = async (identifier: string, password: string, apiKey
     };
 };
 
-export const getAccounts = async (cst: string, xSecurityToken: string) => {
+export const getAccounts = async (cst: string, xSecurityToken: string, isDemo: boolean = false) => {
+    const API_URL = getApiUrl(isDemo);
     const response = await fetch(`${API_URL}/accounts`, {
         headers: {
             'X-SECURITY-TOKEN': xSecurityToken,
@@ -61,7 +63,8 @@ export const getAccounts = async (cst: string, xSecurityToken: string) => {
     return response.json();
 };
 
-export const getPositions = async (cst: string, xSecurityToken: string) => {
+export const getPositions = async (cst: string, xSecurityToken: string, isDemo: boolean = false) => {
+    const API_URL = getApiUrl(isDemo);
     const response = await fetch(`${API_URL}/positions`, {
         headers: {
             'X-SECURITY-TOKEN': xSecurityToken,
@@ -76,7 +79,8 @@ export const getPositions = async (cst: string, xSecurityToken: string) => {
     return response.json();
 };
 
-export const getHistory = async (cst: string, xSecurityToken: string) => {
+export const getHistory = async (cst: string, xSecurityToken: string, isDemo: boolean = false) => {
+    const API_URL = getApiUrl(isDemo);
     const response = await fetch(`${API_URL}/history/activity`, {
         headers: {
             'X-SECURITY-TOKEN': xSecurityToken,
@@ -91,8 +95,8 @@ export const getHistory = async (cst: string, xSecurityToken: string) => {
     return response.json();
 };
 
-export const getMarketTickers = async (cst: string, xSecurityToken: string, epics: string[]) => {
-    // Capital.com /markets endpoint for batch prices
+export const getMarketTickers = async (cst: string, xSecurityToken: string, epics: string[], isDemo: boolean = false) => {
+    const API_URL = getApiUrl(isDemo);
     const marketResponse = await fetch(`${API_URL}/markets?epics=${epics.join(',')}`, {
         headers: {
             'X-SECURITY-TOKEN': xSecurityToken,
@@ -112,8 +116,10 @@ export const placeOrder = async (
     xSecurityToken: string,
     epic: string,
     direction: 'BUY' | 'SELL',
-    size: number
+    size: number,
+    isDemo: boolean = false
 ) => {
+    const API_URL = getApiUrl(isDemo);
     const response = await fetch(`${API_URL}/positions`, {
         method: 'POST',
         headers: {
