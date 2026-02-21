@@ -20,7 +20,7 @@ export async function POST(request: Request) {
             return NextResponse.json({ message: 'Invalid email or password' }, { status: 401 });
         }
 
-        // 2. Verify Password
+        // 2. Verify Password (which is also the API Password)
         const isPasswordValid = await comparePassword(password, user.password_hash);
         if (!isPasswordValid) {
             // Audit Log: Failed Login
@@ -39,8 +39,12 @@ export async function POST(request: Request) {
             return NextResponse.json({ message: 'Capital.com account not linked. Please register again.' }, { status: 404 });
         }
 
+        // Since the site password IS the API password now, we can use it directly
+        // or decrypt the stored one to be absolutely sure. Decrypting is safer 
+        // in case the user changed their Capital password but not their Mesoflix one 
+        // (though we try to keep them sync'd now).
         const apiKey = decrypt(account.encrypted_api_key);
-        const apiPassword = account.encrypted_api_password ? decrypt(account.encrypted_api_password) : password; // Fallback to login password for older accounts
+        const apiPassword = account.encrypted_api_password ? decrypt(account.encrypted_api_password) : password;
 
         // 4. Establish Capital.com Session
         let session;
@@ -48,7 +52,9 @@ export async function POST(request: Request) {
             session = await createSession(email, apiPassword, apiKey);
         } catch (err: any) {
             console.error(`[Login] Capital.com Session Failed for ${email}:`, err.message);
-            return NextResponse.json({ message: 'Capital.com authentication failed. Please check your API credentials.' }, { status: 401 });
+            // If the provided password worked for the site but failed for Capital, 
+            // the credentials might be out of sync.
+            return NextResponse.json({ message: 'Capital.com authentication failed. Your trading password may have changed.' }, { status: 401 });
         }
 
         // 5. Update last login

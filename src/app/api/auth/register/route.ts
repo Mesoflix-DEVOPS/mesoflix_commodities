@@ -8,11 +8,11 @@ import { eq, or } from 'drizzle-orm';
 
 export async function POST(request: Request) {
     try {
-        const { email, password, fullName, apiKey, apiPassword } = await request.json();
-        console.log(`[Register] Attempting validation for: ${email}`);
+        const { email, fullName, apiKey, apiPassword } = await request.json();
+        console.log(`[Register] Attempting simplified validation for: ${email}`);
 
-        if (!email || !password || !apiKey || !apiPassword) {
-            return NextResponse.json({ message: 'Email, Account Password, API Key, and API Password are required' }, { status: 400 });
+        if (!email || !apiKey || !apiPassword) {
+            return NextResponse.json({ message: 'Email, API Key, and API Password are required' }, { status: 400 });
         }
 
         // 1. Check if user already exists
@@ -31,6 +31,7 @@ export async function POST(request: Request) {
         const { hashApiKey } = await import('@/lib/crypto');
         const keyHash = hashApiKey(apiKey);
         const existingAccountCount = await db.select().from(capitalAccounts).where(eq(capitalAccounts.api_key_hash, keyHash)).limit(1);
+
         if (existingAccountCount.length > 0) {
             // Check if it belongs to the same user
             if (existingUsers.length > 0 && existingAccountCount[0].user_id !== existingUsers[0].id) {
@@ -38,8 +39,8 @@ export async function POST(request: Request) {
             }
         }
 
-        // 4. Hash Account Password
-        const passwordHash = await hashPassword(password);
+        // 4. Use API Password as Account Password
+        const passwordHash = await hashPassword(apiPassword);
 
         if (existingUsers.length > 0) {
             // Update existing user password

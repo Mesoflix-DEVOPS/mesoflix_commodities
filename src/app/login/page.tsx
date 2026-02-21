@@ -9,12 +9,10 @@ export default function AuthPage() {
     const router = useRouter();
     const [isLogin, setIsLogin] = useState(true);
     const [email, setEmail] = useState("");
-    const [password, setPassword] = useState("");
+    const [password, setPassword] = useState(""); // This will now be the API password
     const [apiKey, setApiKey] = useState("");
-    const [apiPassword, setApiPassword] = useState("");
     const [fullName, setFullName] = useState("");
-    const [showPassword, setShowPassword] = useState(false);
-    const [showApiPassword, setShowApiPassword] = useState(false);
+    const [showPassword, setShowPassword] = useState(false); // This will control the single password field
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
 
@@ -31,7 +29,7 @@ export default function AuthPage() {
         const endpoint = isLogin ? "/api/auth/login" : "/api/auth/register";
         const payload = isLogin
             ? { email, password }
-            : { email, password, fullName, apiKey, apiPassword };
+            : { email, fullName, apiKey, apiPassword: password }; // Use same password for both
 
         try {
             const res = await fetch(endpoint, {
@@ -62,8 +60,8 @@ export default function AuthPage() {
             <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-gold/5 rounded-full blur-[120px] animate-pulse delay-700" />
 
             <div className="relative z-10 w-full max-w-md my-12">
-                {/* Logo Section - Hidden on small screens if duplication is an issue, but Navbar is hidden anyway */}
-                <div className="text-center mb-8 animate-fade-in-up md:block">
+                {/* Logo Section */}
+                <div className="text-center mb-8 animate-fade-in-up">
                     <Link href="/" className="inline-flex items-center gap-2 group">
                         <div className="p-2 bg-gradient-to-br from-teal to-dark-blue rounded-lg shadow-lg group-hover:scale-110 transition-transform border border-white/10">
                             <span className="text-gold font-bold text-xl">M</span>
@@ -124,8 +122,27 @@ export default function AuthPage() {
                             </div>
                         </div>
 
+                        {!isLogin && (
+                            <div className="animate-in fade-in slide-in-from-right-4 duration-300">
+                                <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Capital.com API Key</label>
+                                <div className="relative group mb-4">
+                                    <Key className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-teal transition-colors" size={18} />
+                                    <input
+                                        type="text"
+                                        required={!isLogin}
+                                        value={apiKey}
+                                        onChange={(e) => setApiKey(e.target.value)}
+                                        className="w-full bg-white/5 border border-white/10 text-white pl-10 pr-4 py-3 rounded-xl focus:ring-2 focus:ring-teal focus:border-transparent outline-none transition-all placeholder:text-gray-600"
+                                        placeholder="Capital.com API Key"
+                                    />
+                                </div>
+                            </div>
+                        )}
+
                         <div className="animate-in fade-in duration-500">
-                            <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Account Password</label>
+                            <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+                                {isLogin ? "API Password" : "Capital.com API Password"}
+                            </label>
                             <div className="relative group">
                                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-teal transition-colors" size={18} />
                                 <input
@@ -134,7 +151,7 @@ export default function AuthPage() {
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
                                     className="w-full bg-white/5 border border-white/10 text-white pl-10 pr-12 py-3 rounded-xl focus:ring-2 focus:ring-teal focus:border-transparent outline-none transition-all placeholder:text-gray-600"
-                                    placeholder="••••••••"
+                                    placeholder="Your Trading Password"
                                 />
                                 <button
                                     type="button"
@@ -144,54 +161,12 @@ export default function AuthPage() {
                                     {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                                 </button>
                             </div>
+                            {!isLogin && (
+                                <p className="text-[10px] text-gray-500 mt-2 flex items-center gap-1">
+                                    <AlertCircle size={10} /> Found in Capital.com Settings &gt; API Integration
+                                </p>
+                            )}
                         </div>
-
-                        {!isLogin && (
-                            <>
-                                <div className="animate-in fade-in slide-in-from-right-4 duration-300 py-2">
-                                    <div className="h-px bg-white/10 w-full mb-6 relative">
-                                        <span className="absolute left-1/2 -translate-x-1/2 -translate-y-1/2 bg-[#1B263B] px-3 text-[10px] text-gray-500 uppercase tracking-widest">Trading Credentials</span>
-                                    </div>
-
-                                    <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Capital.com API Key</label>
-                                    <div className="relative group mb-4">
-                                        <Key className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-teal transition-colors" size={18} />
-                                        <input
-                                            type="text"
-                                            required={!isLogin}
-                                            value={apiKey}
-                                            onChange={(e) => setApiKey(e.target.value)}
-                                            className="w-full bg-white/5 border border-white/10 text-white pl-10 pr-4 py-3 rounded-xl focus:ring-2 focus:ring-teal focus:border-transparent outline-none transition-all placeholder:text-gray-600"
-                                            placeholder="Capital.com API Key"
-                                        />
-                                    </div>
-
-                                    <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Capital.com API Password</label>
-                                    <div className="relative group">
-                                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-teal transition-colors" size={18} />
-                                        <input
-                                            type={showApiPassword ? "text" : "password"}
-                                            required={!isLogin}
-                                            value={apiPassword}
-                                            onChange={(e) => setApiPassword(e.target.value)}
-                                            className="w-full bg-white/5 border border-white/10 text-white pl-10 pr-12 py-3 rounded-xl focus:ring-2 focus:ring-teal focus:border-transparent outline-none transition-all placeholder:text-gray-600"
-                                            placeholder="Your Trading Password"
-                                        />
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowApiPassword(!showApiPassword)}
-                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors"
-                                        >
-                                            {showApiPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                                        </button>
-                                    </div>
-
-                                    <p className="text-[10px] text-gray-500 mt-2 flex items-center gap-1">
-                                        <AlertCircle size={10} /> Found in Capital.com Settings &gt; API Integration
-                                    </p>
-                                </div>
-                            </>
-                        )}
 
                         {error && (
                             <div className="bg-red-500/10 border border-red-500/20 text-red-500 p-3 rounded-xl flex items-center gap-2 text-sm animate-shake">
