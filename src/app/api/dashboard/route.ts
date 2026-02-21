@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { capitalAccounts, systemSettings } from '@/lib/db/schema';
+import { capitalAccounts, systemSettings, users } from '@/lib/db/schema';
 import { decrypt } from '@/lib/crypto';
 import { createSession, getAccounts } from '@/lib/capital';
 import { verifyAccessToken } from '@/lib/auth';
@@ -26,53 +26,44 @@ export async function GET(request: Request) {
 
         const userId = tokenPayload.userId;
 
-        let credentials;
+        // Fetch user from DB to get accurate name/email
+        const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
 
-        // 1. Try to get User Specific Account
-        const [userAccount] = await db.select().from(capitalAccounts).where(eq(capitalAccounts.user_id, userId)).limit(1);
-
-        if (userAccount) {
-            try {
-                const decrypted = decrypt(userAccount.encrypted_api_key);
-                credentials = JSON.parse(decrypted);
-            } catch (e) {
-                console.error("Failed to decrypt user credentials", e);
-            }
+        if (!user) {
+            return NextResponse.json({ message: 'User not found' }, { status: 404 });
         }
 
-        // 2. Fallback to System Master Credentials
-        if (!credentials) {
-            const [systemCreds] = await db.select().from(systemSettings).where(eq(systemSettings.key, 'capital_master_credentials')).limit(1);
+        // 1. Get User Account Credentials
+        const [account] = await db.select().from(capitalAccounts).where(eq(capitalAccounts.user_id, userId)).limit(1);
 
-            if (systemCreds) {
-                try {
-                    const decrypted = decrypt(systemCreds.value);
-                    credentials = JSON.parse(decrypted);
-                } catch (e) {
-                    console.error("Failed to decrypt master credentials", e);
-                }
-            }
-        }
-
-        if (!credentials) {
+        if (!account) {
             return NextResponse.json({ message: 'No Capital.com account connected.' }, { status: 404 });
         }
 
-        // Stored credentials format: { cst, xSecurityToken, apiKey }
-        const { cst, xSecurityToken, apiKey } = credentials;
-
-        if (!cst || !xSecurityToken) {
-            return NextResponse.json({ message: 'Session tokens missing. Please log in again.' }, { status: 400 });
-        }
-
-        // Use stored session tokens directly
         try {
-            const accountsData = await getAccounts(cst, xSecurityToken);
-            return NextResponse.json(accountsData);
+            const apiKey = decrypt(account.encrypted_api_key);
+            const apiPassword = account.encrypted_api_password ? decrypt(account.encrypted_api_password) : null;
+
+            if (!apiPassword) {
+                return NextResponse.json({ message: 'API Password missing. Please re-register.' }, { status: 400 });
+            }
+
+            // 2. Establish fresh session
+            const session = await createSession(user.email, apiPassword, apiKey);
+
+            // 3. Get Accounts with fresh session tokens
+            const accountsData = await getAccounts(session.cst, session.xSecurityToken);
+
+            return NextResponse.json({
+                ...accountsData,
+                user: {
+                    fullName: user.full_name || 'Trader',
+                }
+            });
+
         } catch (err: any) {
-            console.error("Fetch Accounts Failed:", err);
-            // If session expired, tell client to re-authenticate
-            return NextResponse.json({ message: `Session expired. Please log in again.` }, { status: 401 });
+            console.error("[Dashboard API] Capital.com Error:", err.message);
+            return NextResponse.json({ message: `Capital.com error: ${err.message}` }, { status: 401 });
         }
 
     } catch (error: any) {

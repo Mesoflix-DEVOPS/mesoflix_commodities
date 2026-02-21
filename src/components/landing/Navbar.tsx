@@ -100,32 +100,65 @@ const Navbar = () => {
 
                 {/* Mobile Drawer */}
                 <div
-                    className={`fixed inset-0 bg-dark-blue/60 backdrop-blur-sm z-40 md:hidden transition-all duration-500 ${isMenuOpen ? "opacity-100" : "opacity-0 pointer-events-none"
-                        }`}
-                    onClick={() => setIsMenuOpen(false)}
+                    className={`fixed inset-0 z-[100] md:hidden transition-all duration-700 ${isMenuOpen ? "visible" : "invisible"}`}
                 >
+                    {/* Backdrop */}
                     <div
-                        className={`absolute right-0 top-0 h-screen w-[280px] bg-dark-blue border-l border-white/10 p-8 pt-24 space-y-8 flex flex-col shadow-2xl transition-transform duration-500 ease-out ${isMenuOpen ? "translate-x-0" : "translate-x-full"
-                            }`}
-                        onClick={(e) => e.stopPropagation()}
+                        className={`absolute inset-0 bg-dark-blue/80 backdrop-blur-md transition-opacity duration-700 ${isMenuOpen ? "opacity-100" : "opacity-0"}`}
+                        onClick={() => setIsMenuOpen(false)}
+                    />
+
+                    {/* Drawer Content */}
+                    <div
+                        className={`absolute right-0 top-0 h-screen w-[85%] max-w-[360px] bg-[#0A1622] border-l border-white/5 flex flex-col shadow-[0_0_50px_rgba(0,0,0,0.5)] transition-transform duration-700 ease-[cubic-bezier(0.2,0.8,0.2,1)] ${isMenuOpen ? "translate-x-0" : "translate-x-full"}`}
                     >
-                        <div className="space-y-6 flex flex-col">
-                            <MobileNavLink href="/" onClick={() => setIsMenuOpen(false)}>Home</MobileNavLink>
-                            <MobileNavLink href="/#features" onClick={() => setIsMenuOpen(false)}>Features</MobileNavLink>
-                            <MobileNavLink href="/support" onClick={() => setIsMenuOpen(false)}>Support</MobileNavLink>
+                        {/* Drawer Header */}
+                        <div className="p-8 flex justify-between items-center border-b border-white/5">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 bg-gradient-to-br from-teal to-dark-blue rounded-xl flex items-center justify-center border border-white/10">
+                                    <span className="text-gold font-bold">M</span>
+                                </div>
+                                <span className="text-lg font-bold text-white">Mesoflix</span>
+                            </div>
+                            <button
+                                onClick={() => setIsMenuOpen(false)}
+                                className="p-2 bg-white/5 hover:bg-white/10 rounded-full transition-colors text-white"
+                            >
+                                <X size={20} />
+                            </button>
                         </div>
 
-                        <div className="pt-6 border-t border-white/5 space-y-6">
+                        {/* Drawer Links */}
+                        <div className="flex-1 overflow-y-auto p-8 space-y-2">
+                            <p className="text-[10px] font-bold text-teal uppercase tracking-[0.2em] mb-6 px-4 items-center flex gap-2">
+                                <span className="w-1 h-1 bg-teal rounded-full"></span>
+                                Navigation
+                            </p>
+                            <MobileNavLink href="/" onClick={() => setIsMenuOpen(false)}>
+                                <span className="group-hover:translate-x-2 transition-transform block">Home</span>
+                            </MobileNavLink>
+                            <MobileNavLink href="/#features" onClick={() => setIsMenuOpen(false)}>
+                                <span className="group-hover:translate-x-2 transition-transform block">Core Features</span>
+                            </MobileNavLink>
+                            <MobileNavLink href="/support" onClick={() => setIsMenuOpen(false)}>
+                                <span className="group-hover:translate-x-2 transition-transform block">Help & Support</span>
+                            </MobileNavLink>
+                        </div>
+
+                        {/* Drawer Footer */}
+                        <div className="p-8 border-t border-white/5 bg-black/20">
                             <Link
                                 href="/login"
                                 onClick={() => setIsMenuOpen(false)}
-                                className="w-full py-4 bg-teal text-white rounded-xl text-center font-bold text-lg hover:bg-gold hover:text-dark-blue transition-all inline-block"
+                                className="w-full py-5 bg-gradient-to-r from-teal to-[#008f7a] text-white rounded-2xl text-center font-bold text-lg hover:shadow-[0_0_30px_rgba(0,191,166,0.3)] transition-all flex items-center justify-center gap-3 group"
                             >
-                                Sign In
+                                <span>Get Started</span>
+                                <Sun size={18} className="group-hover:rotate-12 transition-transform" />
                             </Link>
-
-                            <div className="text-center text-xs text-gray-500 uppercase tracking-widest font-medium">
-                                Premium Trading Platform
+                            <div className="mt-8 flex items-center justify-center gap-6">
+                                <div className="h-px bg-white/5 flex-1"></div>
+                                <span className="text-[9px] text-gray-600 font-bold uppercase tracking-[0.15em] whitespace-nowrap">Professional Edition</span>
+                                <div className="h-px bg-white/5 flex-1"></div>
                             </div>
                         </div>
                     </div>
@@ -139,10 +172,10 @@ const Navbar = () => {
 const NavLink = ({ href, children }: { href: string; children: React.ReactNode }) => (
     <Link
         href={href}
-        className="text-white hover:text-gold transition-colors duration-300 relative group"
+        className="text-white/80 hover:text-teal font-semibold transition-all duration-300 relative group text-sm tracking-wide"
     >
         {children}
-        <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gold transition-all group-hover:w-full"></span>
+        <span className="absolute -bottom-1.5 left-0 w-0 h-[2px] bg-teal rounded-full transition-all duration-300 group-hover:w-full"></span>
     </Link>
 );
 
@@ -150,7 +183,7 @@ const MobileNavLink = ({ href, onClick, children }: { href: string; onClick: () 
     <Link
         href={href}
         onClick={onClick}
-        className="text-3xl font-bold text-white hover:text-gold transition-colors"
+        className="text-3xl font-black text-white hover:text-teal transition-all flex items-center py-4 group"
     >
         {children}
     </Link>
