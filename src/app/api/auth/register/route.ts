@@ -9,6 +9,7 @@ import { eq, or } from 'drizzle-orm';
 export async function POST(request: Request) {
     try {
         const { email, password, fullName, apiKey } = await request.json();
+        console.log(`[Register] Attempting validation for: ${email}`);
 
         if (!email || !password || !apiKey) {
             return NextResponse.json({ message: 'Email, password, and API Key are required' }, { status: 400 });
@@ -24,6 +25,7 @@ export async function POST(request: Request) {
         try {
             await createSession(email, password, apiKey);
         } catch (err: any) {
+            console.error(`[Register] Capital.com Validation Failed for ${email}:`, err.message);
             return NextResponse.json({ message: `Capital.com validation failed: ${err.message}` }, { status: 401 });
         }
 

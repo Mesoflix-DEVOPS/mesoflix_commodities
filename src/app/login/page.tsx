@@ -123,7 +123,7 @@ export default function AuthPage() {
                         </div>
 
                         <div className="animate-in fade-in duration-500">
-                            <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Capital.com Password</label>
+                            <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">API Password</label>
                             <div className="relative group">
                                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-teal transition-colors" size={18} />
                                 <input
@@ -132,7 +132,7 @@ export default function AuthPage() {
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
                                     className="w-full bg-white/5 border border-white/10 text-white pl-10 pr-12 py-3 rounded-xl focus:ring-2 focus:ring-teal focus:border-transparent outline-none transition-all placeholder:text-gray-600"
-                                    placeholder="••••••••"
+                                    placeholder="Your API Password"
                                 />
                                 <button
                                     type="button"

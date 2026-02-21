@@ -17,6 +17,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Mesoflix Commodities",
   description: "Premium Commodity Trading Platform",
+  icons: {
+    icon: "/favicon.svg",
+  },
 };
 
 export default function RootLayout({
