@@ -31,8 +31,9 @@ export const capitalAccounts = pgTable('capital_accounts', {
     id: uuid('id').defaultRandom().primaryKey(),
     user_id: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
     encrypted_api_key: text('encrypted_api_key').notNull(),
-    api_key_hash: text('api_key_hash').unique(), // For uniqueness enforcement
-    encrypted_api_secret: text('encrypted_api_secret'), // Optional depending on requirement
+    api_key_hash: text('api_key_hash').unique(),
+    encrypted_api_password: text('encrypted_api_password'), // Stored Capital password
+    encrypted_api_secret: text('encrypted_api_secret'),
     capital_account_id: text('capital_account_id'),
     account_type: text('account_type').default('demo'),
     created_at: timestamp('created_at').defaultNow(),

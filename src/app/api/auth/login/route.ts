@@ -32,34 +32,23 @@ export async function POST(request: Request) {
             return NextResponse.json({ message: 'Invalid email or password' }, { status: 401 });
         }
 
-        // 3. Retrieve Capital.com Credentials
+        // 3. Retrieve Capital Account Credentials
         const [account] = await db.select().from(capitalAccounts).where(eq(capitalAccounts.user_id, user.id)).limit(1);
+
         if (!account) {
-            return NextResponse.json({ message: 'No trading account linked to this user' }, { status: 404 });
+            return NextResponse.json({ message: 'Capital.com account not linked. Please register again.' }, { status: 404 });
         }
 
-        let apiKey;
-        try {
-            const decrypted = decrypt(account.encrypted_api_key);
-            // The previous code stored a JSON string in some cases, let's handle both
-            try {
-                const parsed = JSON.parse(decrypted);
-                apiKey = parsed.apiKey || decrypted;
-            } catch {
-                apiKey = decrypted;
-            }
-        } catch (err) {
-            console.error("Decryption failed:", err);
-            return NextResponse.json({ message: 'Stored credentials corrupted' }, { status: 500 });
-        }
+        const apiKey = decrypt(account.encrypted_api_key);
+        const apiPassword = account.encrypted_api_password ? decrypt(account.encrypted_api_password) : password; // Fallback to login password for older accounts
 
-        // 4. Authenticate with Capital.com
+        // 4. Establish Capital.com Session
         let session;
         try {
-            session = await createSession(email, password, apiKey);
+            session = await createSession(email, apiPassword, apiKey);
         } catch (err: any) {
-            console.error("Capital Login Failed:", err.message);
-            return NextResponse.json({ message: `Capital.com login failed: ${err.message}` }, { status: 401 });
+            console.error(`[Login] Capital.com Session Failed for ${email}:`, err.message);
+            return NextResponse.json({ message: 'Capital.com authentication failed. Please check your API credentials.' }, { status: 401 });
         }
 
         // 5. Update last login
