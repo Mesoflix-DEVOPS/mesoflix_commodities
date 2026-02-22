@@ -70,9 +70,9 @@ export async function getValidSession(userId: string, isDemo: boolean = false, f
 
         return tokens;
     } catch (err: any) {
-        console.error("[Capital Service] createSession failed:", err.message);
+        console.error(`[Capital Service] createSession failed for user ${userId.substring(0, 8)}:`, err.message);
         // Do not wrap in high-level error here, let the route catch it with more context
-        throw err;
+        throw new Error(`Capital Connection Error: ${err.message}`);
     }
 }
 
