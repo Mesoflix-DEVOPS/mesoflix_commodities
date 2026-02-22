@@ -49,7 +49,8 @@ export async function POST(request: Request) {
         // 4. Establish Capital.com Session
         let session;
         try {
-            session = await createSession(email, apiPassword, apiKey);
+            const isDemo = account.account_type === 'demo';
+            session = await createSession(email, apiPassword, apiKey, isDemo);
         } catch (err: any) {
             console.error(`[Login] Capital.com Session Failed for ${email}:`, err.message);
             // If the provided password worked for the site but failed for Capital, 
