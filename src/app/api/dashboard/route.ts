@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { capitalAccounts, systemSettings, users } from '@/lib/db/schema';
 import { decrypt } from '@/lib/crypto';
+import { getValidSession } from '@/lib/capital-service';
 import { createSession, getAccounts, getPositions, getHistory } from '@/lib/capital';
 import { verifyAccessToken } from '@/lib/auth';
 import { eq } from 'drizzle-orm';
@@ -52,18 +53,11 @@ export async function GET(request: Request) {
         }
 
         try {
-            const apiKey = decrypt(account.encrypted_api_key);
-            const apiPassword = account.encrypted_api_password ? decrypt(account.encrypted_api_password) : null;
-
-            if (!apiPassword) {
-                return NextResponse.json({ message: 'API Password missing. Please re-register.' }, { status: 400 });
-            }
-
-            // 2. Establish fresh session
+            // 2. Obtain valid session (Cached or Fresh)
             const isDemo = modeInput === 'demo';
-            const session = await createSession(user.email, apiPassword, apiKey, isDemo);
+            const session = await getValidSession(userId, isDemo);
 
-            // 3. Get Data with fresh session tokens
+            // 3. Get Data with session tokens
             const [accountsData, positionsData, historyData] = await Promise.all([
                 getAccounts(session.cst, session.xSecurityToken, isDemo),
                 getPositions(session.cst, session.xSecurityToken, isDemo),
@@ -81,6 +75,28 @@ export async function GET(request: Request) {
 
         } catch (err: any) {
             console.error("[Dashboard API] Capital.com Error:", err.message);
+
+            // If session expired, we could try once more with force refresh
+            if (err.message.includes("Session Expired")) {
+                try {
+                    const isDemo = modeInput === 'demo';
+                    const session = await getValidSession(userId, isDemo, true);
+                    const [accountsData, positionsData, historyData] = await Promise.all([
+                        getAccounts(session.cst, session.xSecurityToken, isDemo),
+                        getPositions(session.cst, session.xSecurityToken, isDemo),
+                        getHistory(session.cst, session.xSecurityToken, isDemo)
+                    ]);
+                    return NextResponse.json({
+                        ...accountsData,
+                        positions: positionsData.positions || [],
+                        history: historyData.activities || [],
+                        user: { fullName: user.full_name || 'Trader' }
+                    });
+                } catch (retryErr: any) {
+                    return NextResponse.json({ message: `Capital.com retry error: ${retryErr.message}` }, { status: 401 });
+                }
+            }
+
             return NextResponse.json({ message: `Capital.com error: ${err.message}` }, { status: 401 });
         }
 

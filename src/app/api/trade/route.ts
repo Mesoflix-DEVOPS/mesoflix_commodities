@@ -1,6 +1,7 @@
 import { db } from '@/lib/db';
 import { capitalAccounts, users } from '@/lib/db/schema';
 import { decrypt } from '@/lib/crypto';
+import { getValidSession } from '@/lib/capital-service';
 import { createSession, placeOrder } from '@/lib/capital';
 import { verifyAccessToken } from '@/lib/auth';
 import { eq } from 'drizzle-orm';
@@ -41,18 +42,30 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Capital account not found' }, { status: 404 });
         }
 
-        const apiKey = decrypt(account.encrypted_api_key);
-        const apiPassword = account.encrypted_api_password ? decrypt(account.encrypted_api_password) : null;
+        try {
+            // Obtain valid session (Cached or Fresh)
+            const isDemo = requestMode === 'demo';
+            const session = await getValidSession(userId, isDemo);
 
-        if (!apiPassword) return NextResponse.json({ error: 'Password missing' }, { status: 400 });
+            const executionResult = await placeOrder(session.cst, session.xSecurityToken, epic, direction, size, isDemo);
+            return NextResponse.json(executionResult);
 
-        // Session creation
-        const isDemo = requestMode === 'demo';
-        const session = await createSession(user.email, apiPassword, apiKey, isDemo);
+        } catch (err: any) {
+            console.error("[Trade API] Capital.com Error:", err.message);
 
-        const executionResult = await placeOrder(session.cst, session.xSecurityToken, epic, direction, size, isDemo);
+            if (err.message.includes("Session Expired")) {
+                try {
+                    const isDemo = requestMode === 'demo';
+                    const session = await getValidSession(userId, isDemo, true);
+                    const executionResult = await placeOrder(session.cst, session.xSecurityToken, epic, direction, size, isDemo);
+                    return NextResponse.json(executionResult);
+                } catch (retryErr: any) {
+                    return NextResponse.json({ error: retryErr.message }, { status: 401 });
+                }
+            }
 
-        return NextResponse.json(executionResult);
+            return NextResponse.json({ error: err.message }, { status: 500 });
+        }
 
     } catch (error: any) {
         console.error('Trade API Error:', error);

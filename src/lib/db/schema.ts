@@ -34,6 +34,8 @@ export const capitalAccounts = pgTable('capital_accounts', {
     api_key_hash: text('api_key_hash').unique(),
     encrypted_api_password: text('encrypted_api_password'), // Stored Capital password
     encrypted_api_secret: text('encrypted_api_secret'),
+    encrypted_session_tokens: text('encrypted_session_tokens'), // Cached {cst, xSecurityToken}
+    session_updated_at: timestamp('session_updated_at'),
     capital_account_id: text('capital_account_id'),
     account_type: text('account_type').default('demo'),
     created_at: timestamp('created_at').defaultNow(),
