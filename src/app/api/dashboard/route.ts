@@ -54,6 +54,11 @@ export async function GET(request: Request) {
             return NextResponse.json({ message: 'No Capital.com account connected.' }, { status: 404 });
         }
 
+        // 4. Identity Buffer (Ensures user name is returned even if trading fetch fails)
+        const userData = {
+            fullName: user.full_name || 'Trader',
+        };
+
         try {
             // 2. Obtain valid session (Cached or Fresh)
             const isDemo = modeInput === 'demo';
@@ -70,9 +75,7 @@ export async function GET(request: Request) {
                 ...accountsData,
                 positions: positionsData.positions || [],
                 history: historyData.activities || [],
-                user: {
-                    fullName: user.full_name || 'Trader',
-                }
+                user: userData
             });
 
         } catch (err: any) {
@@ -92,14 +95,20 @@ export async function GET(request: Request) {
                         ...accountsData,
                         positions: positionsData.positions || [],
                         history: historyData.activities || [],
-                        user: { fullName: user.full_name || 'Trader' }
+                        user: userData
                     });
                 } catch (retryErr: any) {
-                    return NextResponse.json({ message: `Capital.com retry error: ${retryErr.message}` }, { status: 401 });
+                    return NextResponse.json({
+                        message: `Capital.com connectivity failed: ${retryErr.message}`,
+                        user: userData
+                    }, { status: 401 });
                 }
             }
 
-            return NextResponse.json({ message: `Capital.com error: ${err.message}` }, { status: 401 });
+            return NextResponse.json({
+                message: `Capital.com error: ${err.message}`,
+                user: userData
+            }, { status: 401 });
         }
 
     } catch (error: any) {

@@ -26,11 +26,12 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
 
     useEffect(() => {
         // Shared but lightweight user fetch for the shell
-        fetch("/api/dashboard")
+        // Passing mode ensures we don't trigger a 401 from a mismatched session
+        fetch(`/api/dashboard?mode=${mode}`)
             .then(res => res.json())
             .then(data => setUserData(data?.user))
             .catch(() => { });
-    }, []);
+    }, [mode]);
 
     return (
         <div className="min-h-screen bg-[#0D1B2A] text-white">
