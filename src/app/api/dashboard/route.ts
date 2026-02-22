@@ -60,7 +60,7 @@ export async function GET(request: Request) {
             }
 
             // 2. Establish fresh session
-            const isDemo = account.account_type === 'demo';
+            const isDemo = modeInput === 'demo';
             const session = await createSession(user.email, apiPassword, apiKey, isDemo);
 
             // 3. Get Data with fresh session tokens

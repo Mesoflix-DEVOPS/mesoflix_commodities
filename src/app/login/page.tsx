@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Lock, Mail, ArrowRight, AlertCircle, Eye, EyeOff, Key, User, ArrowLeft } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export default function AuthPage() {
     const router = useRouter();
@@ -137,6 +138,37 @@ export default function AuthPage() {
                                         placeholder="Capital.com API Key"
                                     />
                                 </div>
+
+                                <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Default Environment</label>
+                                <div className="grid grid-cols-2 gap-3 mb-3">
+                                    <button
+                                        type="button"
+                                        onClick={() => setAccountType("demo")}
+                                        className={cn(
+                                            "py-2.5 rounded-xl border font-bold text-xs transition-all",
+                                            accountType === "demo"
+                                                ? "bg-teal/10 border-teal text-teal shadow-[0_0_15px_rgba(0,191,166,0.2)]"
+                                                : "bg-white/5 border-white/10 text-gray-500 hover:text-white"
+                                        )}
+                                    >
+                                        DEMO ACCOUNT
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setAccountType("live")}
+                                        className={cn(
+                                            "py-2.5 rounded-xl border font-bold text-xs transition-all",
+                                            accountType === "live"
+                                                ? "bg-teal/10 border-teal text-teal shadow-[0_0_15px_rgba(0,191,166,0.2)]"
+                                                : "bg-white/5 border-white/10 text-gray-500 hover:text-white"
+                                        )}
+                                    >
+                                        LIVE ACCOUNT
+                                    </button>
+                                </div>
+                                <p className="text-[10px] text-gray-500 mb-6 px-1 italic">
+                                    Tip: You can dynamically switch between Demo and Real data anytime from your terminal without logging out.
+                                </p>
                             </div>
                         )}
 
