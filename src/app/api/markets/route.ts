@@ -17,12 +17,16 @@ export async function GET(request: Request) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        const decoded = await verifyAccessToken(accessToken);
-        if (!decoded) {
-            return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
+        const tokenPayload = await verifyAccessToken(accessToken);
+        if (!tokenPayload) {
+            const secretSet = !!process.env.JWT_SECRET;
+            return NextResponse.json({
+                error: 'Unauthorized',
+                debug: { secretSet }
+            }, { status: 401 });
         }
 
-        const userId = decoded.userId;
+        const userId = tokenPayload.userId;
 
         // Fetch user for login_id
         const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);

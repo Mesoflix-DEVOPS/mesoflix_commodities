@@ -22,8 +22,13 @@ export async function GET(request: Request) {
 
         const tokenPayload = await verifyAccessToken(accessToken);
         if (!tokenPayload) {
-            console.error(`[Dashboard API] Unauthorized: JWT verification failed. Secret set: ${!!process.env.JWT_SECRET}`);
-            return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+            const secretSet = !!process.env.JWT_SECRET;
+            const tokenLen = accessToken?.length || 0;
+            console.error(`[Dashboard API] Unauthorized: JWT verification failed. Secret: ${secretSet}, Token Len: ${tokenLen}`);
+            return NextResponse.json({
+                message: 'Unauthorized: Session Invalid',
+                debug: { secretSet, tokenLen }
+            }, { status: 401 });
         }
 
         const userId = tokenPayload.userId;
