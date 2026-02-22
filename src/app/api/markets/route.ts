@@ -67,15 +67,25 @@ export async function GET(request: Request) {
                     const marketData = await getMarketTickers(session.cst, session.xSecurityToken, epics, isDemo);
                     return NextResponse.json(marketData);
                 } catch (retryErr: any) {
-                    return NextResponse.json({ error: retryErr.message }, { status: 401 });
+                    console.error("[Markets API] Refresh & Retry Failed:", retryErr.message);
+                    return NextResponse.json({
+                        error: `Connectivity restoration failed: ${retryErr.message}`,
+                        debug: { refreshAttempted: true }
+                    }, { status: 401 });
                 }
             }
 
-            return NextResponse.json({ error: err.message }, { status: 500 });
+            return NextResponse.json({
+                error: `Market Analysis Failure: ${err.message}`,
+                debug: { sessionValid: true, endpoint: 'marketnavigation' }
+            }, { status: 500 });
         }
 
     } catch (error: any) {
-        console.error('Markets API Error:', error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        console.error('Markets API Critical Error:', error.message);
+        return NextResponse.json({
+            error: `Markets Bridge Error: ${error.message}`,
+            debug: { fatal: true }
+        }, { status: 500 });
     }
 }

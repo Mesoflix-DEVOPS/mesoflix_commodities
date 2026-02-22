@@ -4,10 +4,11 @@ import { cookies } from 'next/headers';
 function getJwtSecret() {
     const secret = process.env.JWT_SECRET;
     if (!secret && process.env.NODE_ENV === 'production') {
-        console.warn("[Auth] WARNING: JWT_SECRET environment variable is MISSING. Falling back to default.");
+        console.warn("[Auth] WARNING: JWT_SECRET environment variable is MISSING. Falling back to internal default.");
     }
+    // Using a more specific fallback to ensure parity between Edge and Node if env var is missing during deployment
     return new TextEncoder().encode(
-        secret || 'default-jwt-secret-key-change-me'
+        secret || 'mesoflix-commodity-terminal-internal-fallback-v1'
     );
 }
 

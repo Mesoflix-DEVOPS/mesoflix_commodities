@@ -17,12 +17,16 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        const decoded = await verifyAccessToken(accessToken);
-        if (!decoded) {
-            return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
+        const tokenPayload = await verifyAccessToken(accessToken);
+        if (!tokenPayload) {
+            const secretSet = !!process.env.JWT_SECRET;
+            return NextResponse.json({
+                error: 'Unauthorized',
+                debug: { secretSet, context: 'node-trade' }
+            }, { status: 401 });
         }
 
-        const userId = decoded.userId;
+        const userId = tokenPayload.userId;
         const body = await request.json();
         const { epic, direction, size, mode: requestMode = 'demo' } = body;
 
@@ -30,7 +34,7 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
         }
 
-        // Fetch user for session
+        // Fetch user for login_id
         const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
         if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
 
@@ -61,11 +65,17 @@ export async function POST(request: Request) {
                     const executionResult = await placeOrder(session.cst, session.xSecurityToken, epic, direction, size, isDemo);
                     return NextResponse.json(executionResult);
                 } catch (retryErr: any) {
-                    return NextResponse.json({ error: retryErr.message }, { status: 401 });
+                    return NextResponse.json({
+                        error: `Trade recovery failed: ${retryErr.message}`,
+                        debug: { refreshAttempted: true }
+                    }, { status: 401 });
                 }
             }
 
-            return NextResponse.json({ error: err.message }, { status: 500 });
+            return NextResponse.json({
+                error: `Trade Execution Error: ${err.message}`,
+                debug: { sessionValid: true }
+            }, { status: 500 });
         }
 
     } catch (error: any) {
