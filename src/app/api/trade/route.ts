@@ -35,8 +35,9 @@ export async function POST(request: Request) {
         if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
 
         // Get appropriate account for session        
+        const targetType = requestMode === 'real' ? 'live' : requestMode;
         const allAccounts = await db.select().from(capitalAccounts).where(eq(capitalAccounts.user_id, userId));
-        const account = allAccounts.find(a => a.account_type === requestMode) || allAccounts[0];
+        const account = allAccounts.find(a => a.account_type === targetType) || allAccounts[0];
 
         if (!account) {
             return NextResponse.json({ error: 'Capital account not found' }, { status: 404 });
@@ -53,7 +54,7 @@ export async function POST(request: Request) {
         } catch (err: any) {
             console.error("[Trade API] Capital.com Error:", err.message);
 
-            if (err.message.includes("Session Expired")) {
+            if (err.message.includes("Session Expired") || err.message.includes("401") || err.message.includes("unauthorized")) {
                 try {
                     const isDemo = requestMode === 'demo';
                     const session = await getValidSession(userId, isDemo, true);

@@ -44,9 +44,10 @@ export async function GET(request: Request) {
             .limit(1);
 
         // If user has multiple accounts, we should filter by account_type
-        // For now, we take the one they have, but if they have multiple, we find the best match
+        // Handle 'real' alias for 'live' from UI
+        const targetType = modeInput === 'real' ? 'live' : modeInput;
         const allAccounts = await db.select().from(capitalAccounts).where(eq(capitalAccounts.user_id, userId));
-        account = allAccounts.find(a => a.account_type === modeInput) || allAccounts[0];
+        account = allAccounts.find(a => a.account_type === targetType) || allAccounts[0];
 
         if (!account) {
             return NextResponse.json({ message: 'No Capital.com account connected.' }, { status: 404 });
@@ -76,8 +77,8 @@ export async function GET(request: Request) {
         } catch (err: any) {
             console.error("[Dashboard API] Capital.com Error:", err.message);
 
-            // If session expired, we could try once more with force refresh
-            if (err.message.includes("Session Expired")) {
+            // If session expired or unauthorized, we could try once more with force refresh
+            if (err.message.includes("Session Expired") || err.message.includes("401") || err.message.includes("unauthorized")) {
                 try {
                     const isDemo = modeInput === 'demo';
                     const session = await getValidSession(userId, isDemo, true);

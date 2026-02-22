@@ -14,12 +14,13 @@ interface SessionTokens {
  */
 export async function getValidSession(userId: string, isDemo: boolean = false, forceRefresh: boolean = false): Promise<SessionTokens> {
     // 1. Find the account in the database
-    // Note: We use the first account for simplicity in this implementation
+    // Handle 'real' alias for 'live' from UI
+    const targetType = isDemo ? 'demo' : 'live';
     const accounts = await db.select().from(capitalAccounts).where(eq(capitalAccounts.user_id, userId));
-    const account = accounts.find(a => a.account_type === (isDemo ? 'demo' : 'live')) || accounts[0];
+    const account = accounts.find(a => a.account_type === targetType || (targetType === 'live' && a.account_type === 'real')) || accounts[0];
 
     if (!account) {
-        throw new Error('No Capital.com account found.');
+        throw new Error(`No Capital.com account found for environment: ${targetType}`);
     }
 
     // 2. Check if we have a valid cached session
@@ -47,24 +48,32 @@ export async function getValidSession(userId: string, isDemo: boolean = false, f
     const apiKey = decrypt(account.encrypted_api_key);
     const apiPassword = account.encrypted_api_password ? decrypt(account.encrypted_api_password) : null;
 
-    if (!apiPassword) throw new Error('API password missing.');
+    if (!apiPassword) {
+        throw new Error(`API password missing for account: ${account.id.substring(0, 8)}... (Environment: ${targetType})`);
+    }
 
-    const newSession = await createSession(user.email, apiPassword, apiKey, isDemo);
+    try {
+        const newSession = await createSession(user.email, apiPassword, apiKey, isDemo);
 
-    const tokens: SessionTokens = {
-        cst: newSession.cst,
-        xSecurityToken: newSession.xSecurityToken
-    };
+        const tokens: SessionTokens = {
+            cst: newSession.cst,
+            xSecurityToken: newSession.xSecurityToken
+        };
 
-    // 4. Update the cache in the database
-    await db.update(capitalAccounts)
-        .set({
-            encrypted_session_tokens: encrypt(JSON.stringify(tokens)),
-            session_updated_at: new Date()
-        })
-        .where(eq(capitalAccounts.id, account.id));
+        // 4. Update the cache in the database
+        await db.update(capitalAccounts)
+            .set({
+                encrypted_session_tokens: encrypt(JSON.stringify(tokens)),
+                session_updated_at: new Date()
+            })
+            .where(eq(capitalAccounts.id, account.id));
 
-    return tokens;
+        return tokens;
+    } catch (err: any) {
+        console.error("[Capital Service] createSession failed:", err.message);
+        // Do not wrap in high-level error here, let the route catch it with more context
+        throw err;
+    }
 }
 
 /**
