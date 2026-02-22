@@ -184,8 +184,8 @@ function DashboardPageInner() {
                         </div>
                     </div>
 
-                    <div className="flex-1 w-full relative z-10 min-h-[300px]">
-                        <ResponsiveContainer width="100%" height="100%" minHeight={300}>
+                    <div className="h-[300px] w-full relative z-10">
+                        <ResponsiveContainer width="100%" height="100%">
                             <AreaChart data={performanceData}>
                                 <defs>
                                     <linearGradient id="colorEquity" x1="0" y1="0" x2="0" y2="1">

@@ -2,8 +2,12 @@ import { SignJWT, jwtVerify } from 'jose';
 import { cookies } from 'next/headers';
 
 function getJwtSecret() {
+    const secret = process.env.JWT_SECRET;
+    if (!secret && process.env.NODE_ENV === 'production') {
+        console.warn("[Auth] WARNING: JWT_SECRET environment variable is MISSING. Falling back to default.");
+    }
     return new TextEncoder().encode(
-        process.env.JWT_SECRET || 'default-jwt-secret-key-change-me'
+        secret || 'default-jwt-secret-key-change-me'
     );
 }
 
@@ -21,7 +25,7 @@ export async function signAccessToken(payload: JWTPayload) {
     return new SignJWT({ ...payload })
         .setProtectedHeader({ alg: 'HS256' })
         .setIssuedAt()
-        .setExpirationTime('15m') // 15 minutes
+        .setExpirationTime('1h') // Increased to 1 hour to prevent clock-drift issues
         .sign(getJwtSecret());
 }
 
@@ -57,7 +61,7 @@ export async function setAuthCookies(accessToken: string, refreshToken: string) 
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
-        maxAge: 15 * 60, // 15 minutes (short lived, but refreshable)
+        maxAge: 60 * 60, // Increased to 1 hour to match JWT
         path: '/',
     });
 
