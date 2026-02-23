@@ -4,6 +4,7 @@ import { verifyAccessToken } from "@/lib/auth";
 import { cookies } from "next/headers";
 
 export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
 
 export async function GET(req: NextRequest) {
     // 1. Authenticate user request
@@ -116,9 +117,10 @@ export async function GET(req: NextRequest) {
                     controller.close();
                 });
 
-            } catch (err) {
+            } catch (err: any) {
                 console.error("[Stream API] Failed to establish WebSocket:", err);
-                controller.error(err);
+                sendEvent('error', { message: "Internal stream creation error: " + err.message });
+                controller.close();
             }
         },
     });
