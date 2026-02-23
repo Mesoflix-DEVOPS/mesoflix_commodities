@@ -40,24 +40,11 @@ export async function GET(request: Request) {
             return NextResponse.json({ message: 'User not found' }, { status: 404 });
         }
 
-        // 1. Get User Account Credentials
+        // 1. We no longer strictly enforce the user having their own Capital account here.
+        // The getValidSession method below will automatically fallback to the Master Credentials
+        // if the user doesn't have their own account.
         const { searchParams } = new URL(request.url);
         const modeInput = searchParams.get('mode') || 'demo';
-
-        // Find account matching mode
-        let [account] = await db.select().from(capitalAccounts)
-            .where(eq(capitalAccounts.user_id, userId))
-            .limit(1);
-
-        // If user has multiple accounts, we should filter by account_type
-        // Handle 'real' alias for 'live' from UI
-        const targetType = modeInput === 'real' ? 'live' : modeInput;
-        const allAccounts = await db.select().from(capitalAccounts).where(eq(capitalAccounts.user_id, userId));
-        account = allAccounts.find(a => a.account_type === targetType) || allAccounts[0];
-
-        if (!account) {
-            return NextResponse.json({ message: 'No Capital.com account connected.' }, { status: 404 });
-        }
 
         // 4. Identity Buffer (Ensures user name is returned even if trading fetch fails)
         const userData = {

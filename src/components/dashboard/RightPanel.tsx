@@ -12,38 +12,43 @@ import {
     Clock
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useMarketData } from "@/contexts/MarketDataContext";
 
 export default function RightPanel() {
     const [isOpen, setIsOpen] = useState(true);
-    const [marketData, setMarketData] = useState<any>(null);
-
-    const fetchMarkets = async () => {
-        try {
-            const res = await fetch('/api/markets');
-            if (res.ok) {
-                const data = await res.json();
-                setMarketData(data);
-            }
-        } catch (err) {
-            console.error('Failed to fetch markets:', err);
-        }
-    };
+    const { marketData } = useMarketData();
+    const [priceHistory, setPriceHistory] = useState<Record<string, number[]>>({});
 
     useEffect(() => {
-        fetchMarkets();
-        const interval = setInterval(fetchMarkets, 15000);
-        return () => clearInterval(interval);
-    }, []);
+        setPriceHistory(prev => {
+            const next = { ...prev };
+            Object.keys(marketData).forEach(epic => {
+                const currentBid = marketData[epic]?.bid;
+                if (currentBid) {
+                    const history = next[epic] || [];
+                    // Keep last 10 points
+                    next[epic] = [...history, currentBid].slice(-10);
+                }
+            });
+            return next;
+        });
+    }, [marketData]);
 
-    const getPriceData = (symbol: string) => {
-        const item = marketData?.marketdetails?.find((m: any) => m.instrumentName.includes(symbol.split('/')[0]));
+    const getPriceData = (epicCode: string) => {
+        const item = marketData[epicCode];
         if (!item) return { price: '--.--', change: '0.00%', isUp: true };
 
-        const change = ((item.snapshot.bid - item.snapshot.decimalPlacesFactor) / 100).toFixed(2); // Mock change calculation
+        const formattedPrice = typeof item.bid === 'number' ? item.bid.toLocaleString(undefined, { minimumFractionDigits: 2 }) : item.bid;
+
+        // Use provided change % or fallback
+        const changeVal = item.changePct ? item.changePct : item.change;
+        const changeFmt = typeof changeVal === 'number' ? `${changeVal > 0 ? '+' : ''}${changeVal.toFixed(2)}%` : `${changeVal}`;
+        const isUp = typeof changeVal === 'number' ? changeVal >= 0 : true;
+
         return {
-            price: item.snapshot.bid.toLocaleString(),
-            change: item.snapshot.netChange > 0 ? `+${item.snapshot.netChange}%` : `${item.snapshot.netChange}%`,
-            isUp: item.snapshot.netChange >= 0
+            price: formattedPrice,
+            change: changeFmt,
+            isUp: isUp
         };
     };
 
@@ -80,10 +85,10 @@ export default function RightPanel() {
                             <span className="text-[8px] text-teal font-black uppercase tracking-widest bg-teal/5 px-2 py-0.5 rounded border border-teal/10">Streaming</span>
                         </div>
                         <div className="space-y-4">
-                            <TickerItem symbol="GOLD" {...getPriceData("GOLD")} />
-                            <TickerItem symbol="OIL" {...getPriceData("OIL")} />
-                            <TickerItem symbol="EUR/USD" {...getPriceData("EUR/USD")} />
-                            <TickerItem symbol="BTC/USD" {...getPriceData("BTC/USD")} />
+                            <TickerItem symbol="GOLD" {...getPriceData("IX.D.GOLD.IFM.IP")} />
+                            <TickerItem symbol="OIL" {...getPriceData("IX.D.WTI.IFM.IP")} />
+                            <TickerItem symbol="EUR/USD" {...getPriceData("EU.D.EURUSD.CASH.IP")} />
+                            <TickerItem symbol="BTC/USD" {...getPriceData("BT.D.BTCUSD.CASH.IP")} />
                         </div>
                     </div>
 

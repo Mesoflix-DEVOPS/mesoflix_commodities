@@ -1,5 +1,5 @@
 import { db } from './db';
-import { capitalAccounts, users } from './db/schema';
+import { capitalAccounts, users, systemSettings } from './db/schema';
 import { encrypt, decrypt } from './crypto';
 import { createSession } from './capital';
 import { eq, and } from 'drizzle-orm';
@@ -13,65 +13,55 @@ interface SessionTokens {
  * Get a valid Capital.com session, using cache if available.
  */
 export async function getValidSession(userId: string, isDemo: boolean = false, forceRefresh: boolean = false): Promise<SessionTokens> {
-    // 1. Find the account in the database
-    // Handle 'real' alias for 'live' from UI
     const targetType = isDemo ? 'demo' : 'live';
-    const accounts = await db.select().from(capitalAccounts).where(eq(capitalAccounts.user_id, userId));
-    const account = accounts.find(a => a.account_type === targetType || (targetType === 'live' && a.account_type === 'real')) || accounts[0];
-
-    if (!account) {
-        throw new Error(`No Capital.com account found for environment: ${targetType}`);
-    }
-
-    // 2. Check if we have a valid cached session
     const SESSION_EXPIRY = 6 * 60 * 60 * 1000; // 6 hours
     const now = new Date();
 
-    if (!forceRefresh && account.encrypted_session_tokens && account.session_updated_at) {
-        const lastUpdate = new Date(account.session_updated_at);
+    // 1. Try to find a user-specific account first
+    const accounts = await db.select().from(capitalAccounts).where(eq(capitalAccounts.user_id, userId));
+    const userAccount = accounts.find(a => a.account_type === targetType || (targetType === 'live' && a.account_type === 'real')) || accounts[0];
+
+    if (!userAccount) {
+        throw new Error(`Personal Capital.com account not setup for ${targetType} mode.`);
+    }
+
+    // User has their own Capital.com account
+    if (!forceRefresh && userAccount.encrypted_session_tokens && userAccount.session_updated_at) {
+        const lastUpdate = new Date(userAccount.session_updated_at);
         if (now.getTime() - lastUpdate.getTime() < SESSION_EXPIRY) {
             try {
-                const decryptedTokens = JSON.parse(decrypt(account.encrypted_session_tokens));
-                return decryptedTokens;
+                return JSON.parse(decrypt(userAccount.encrypted_session_tokens));
             } catch (err) {
-                console.error("[Capital Service] Failed to decrypt cached session:", err);
+                console.error("[Capital Service] Failed to decrypt cached session for user account:", err);
             }
         }
     }
 
-    // 3. If no valid cache, create a new session
-    console.log(`[Capital Service] Generating fresh session for ${isDemo ? 'DEMO' : 'LIVE'} environment...`);
-
+    console.log(`[Capital Service] Generating fresh session for user ${userId.substring(0, 8)} (${targetType})...`);
     const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
     if (!user) throw new Error('User not found.');
 
-    const apiKey = decrypt(account.encrypted_api_key);
-    const apiPassword = account.encrypted_api_password ? decrypt(account.encrypted_api_password) : null;
+    const apiKey = decrypt(userAccount.encrypted_api_key);
+    const apiPassword = userAccount.encrypted_api_password ? decrypt(userAccount.encrypted_api_password) : null;
 
     if (!apiPassword) {
-        throw new Error(`API password missing for account: ${account.id.substring(0, 8)}... (Environment: ${targetType})`);
+        throw new Error(`API password missing for user account: ${userAccount.id.substring(0, 8)}...`);
     }
 
     try {
         const newSession = await createSession(user.email, apiPassword, apiKey, isDemo);
+        const tokens: SessionTokens = { cst: newSession.cst, xSecurityToken: newSession.xSecurityToken };
 
-        const tokens: SessionTokens = {
-            cst: newSession.cst,
-            xSecurityToken: newSession.xSecurityToken
-        };
-
-        // 4. Update the cache in the database
         await db.update(capitalAccounts)
             .set({
                 encrypted_session_tokens: encrypt(JSON.stringify(tokens)),
                 session_updated_at: new Date()
             })
-            .where(eq(capitalAccounts.id, account.id));
+            .where(eq(capitalAccounts.id, userAccount.id));
 
         return tokens;
     } catch (err: any) {
         console.error(`[Capital Service] createSession failed for user ${userId.substring(0, 8)}:`, err.message);
-        // Do not wrap in high-level error here, let the route catch it with more context
         throw new Error(`Capital Connection Error: ${err.message}`);
     }
 }

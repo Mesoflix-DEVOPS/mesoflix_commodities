@@ -37,17 +37,11 @@ export async function GET(request: Request) {
         const epicsParam = searchParams.get('epics');
         const epics = epicsParam ? epicsParam.split(',') : ['IX.D.GOLD.IFM.IP', 'IX.D.WTI.IFM.IP', 'EU.D.EURUSD.CASH.IP', 'BT.D.BTCUSD.CASH.IP'];
 
-        // Get appropriate account for session
+        // 1. We no longer strictly enforce the user having their own Capital account here.
+        // The getValidSession method below will automatically fallback to the Master Credentials
+        // if the user doesn't have their own account.
         const { searchParams: queryParams } = new URL(request.url);
         const requestMode = queryParams.get('mode') || 'demo';
-        const targetType = requestMode === 'real' ? 'live' : requestMode;
-
-        const allAccounts = await db.select().from(capitalAccounts).where(eq(capitalAccounts.user_id, userId));
-        const account = allAccounts.find(a => a.account_type === targetType) || allAccounts[0];
-
-        if (!account) {
-            return NextResponse.json({ error: 'Capital account not found' }, { status: 404 });
-        }
 
         try {
             // Obtain valid session (Cached or Fresh)

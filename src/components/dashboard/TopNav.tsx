@@ -1,26 +1,27 @@
 "use client";
 
-import { Bell, Search, Settings, User, TrendingUp, Menu, X, LogOut } from "lucide-react";
+import { Bell, Search, Settings, User, TrendingUp, Menu, X, LogOut, Loader2 } from "lucide-react";
 import { useState } from "react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { useMarketData } from "@/contexts/MarketDataContext";
 
 interface TopNavProps {
     userName: string;
     onMenuClick: () => void;
     isMobileOpen: boolean;
-    accountType: "demo" | "real";
-    onAccountTypeChange: (type: "demo" | "real") => void;
+    // Removing old props as they are now handled by Context
 }
 
 export default function TopNav({
     userName,
     onMenuClick,
     isMobileOpen,
-    accountType,
-    onAccountTypeChange
 }: TopNavProps) {
     const [showProfile, setShowProfile] = useState(false);
+
+    // Consume real-time context
+    const { mode, setMode, balanceData, connectionStatus } = useMarketData();
 
     return (
         <header className="h-[70px] bg-[#0A1622]/80 backdrop-blur-xl border-b border-white/5 sticky top-0 z-50 flex items-center justify-between px-6 md:px-12">
@@ -35,25 +36,27 @@ export default function TopNav({
                 {/* Account Mode Switcher */}
                 <div className="flex items-center bg-black/20 p-1 rounded-xl border border-white/5 ml-2">
                     <button
-                        onClick={() => onAccountTypeChange("demo")}
+                        onClick={() => setMode("demo")}
                         className={cn(
-                            "px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-tighter transition-all",
-                            accountType === "demo"
+                            "px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-tighter transition-all flex items-center justify-center gap-2",
+                            mode === "demo"
                                 ? "bg-teal text-dark-blue shadow-lg"
                                 : "text-gray-500 hover:text-gray-300"
                         )}
                     >
+                        {mode === "demo" && connectionStatus === 'connecting' && <Loader2 size={10} className="animate-spin" />}
                         Demo
                     </button>
                     <button
-                        onClick={() => onAccountTypeChange("real")}
+                        onClick={() => setMode("real")}
                         className={cn(
-                            "px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-tighter transition-all",
-                            accountType === "real"
+                            "px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-tighter transition-all flex items-center justify-center gap-2",
+                            mode === "real"
                                 ? "bg-amber-500 text-dark-blue shadow-lg"
                                 : "text-gray-500 hover:text-gray-300"
                         )}
                     >
+                        {mode === "real" && connectionStatus === 'connecting' && <Loader2 size={10} className="animate-spin" />}
                         Real
                     </button>
                 </div>
@@ -76,10 +79,16 @@ export default function TopNav({
                 <div className="hidden sm:flex flex-col items-end mr-2">
                     <span className="text-[10px] text-teal font-bold uppercase tracking-widest leading-none mb-1">Total Equity</span>
                     <div className="flex items-center gap-2">
-                        <span className="text-sm font-bold text-white font-mono">$ --.--</span>
-                        <div className="flex items-center text-[10px] text-green-500 bg-green-500/10 px-1.5 py-0.5 rounded">
-                            <TrendingUp size={10} className="mr-0.5" />
-                            <span>--%</span>
+                        <span className="text-sm font-bold text-white font-mono">
+                            {balanceData ? `$ ${balanceData.equity.toLocaleString()}` : "$ --.--"}
+                        </span>
+                        <div className={cn("flex items-center text-[10px] px-1.5 py-0.5 rounded",
+                            balanceData?.profitLoss && balanceData.profitLoss > 0 ? "text-green-500 bg-green-500/10" :
+                                balanceData?.profitLoss && balanceData.profitLoss < 0 ? "text-red-500 bg-red-500/10" :
+                                    "text-gray-500 bg-white/5"
+                        )}>
+                            <TrendingUp size={10} className={cn("mr-0.5", balanceData?.profitLoss && balanceData.profitLoss < 0 ? "rotate-90 text-red-500" : "")} />
+                            <span>{balanceData?.profitLoss ? `$${balanceData.profitLoss}` : "0"}</span>
                         </div>
                     </div>
                 </div>
