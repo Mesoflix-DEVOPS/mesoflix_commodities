@@ -41,19 +41,20 @@ export async function getValidSession(userId: string, isDemo: boolean = false, f
         throw new Error(`No Capital.com account found — please set up master credentials.`);
     }
 
-    // KEY FIX: Use the account's ACTUAL type to determine the endpoint.
-    // A live account must ALWAYS call the live endpoint, even if the frontend
-    // requested 'demo' mode. Sending live API keys to the demo endpoint = 401.
-    // The `isDemo` param only controls account selection (which Row to use),
-    // not which Capital.com server to connect to.
+    // KEY: accountIsDemo is ALWAYS derived from the DB, not from params or cache.
+    // This is the single source of truth for which Capital.com endpoint to use.
+    // Capital.com live credentials → api-capital.backend-capital.com
+    // Capital.com demo credentials → demo-api-capital.backend-capital.com
     const accountIsDemo = userAccount.account_type === 'demo';
 
-    // Use cached session if still fresh
+    // Return cached session if still fresh (overlay accountIsDemo from DB always)
     if (!forceRefresh && userAccount.encrypted_session_tokens && userAccount.session_updated_at) {
         const lastUpdate = new Date(userAccount.session_updated_at);
         if (now.getTime() - lastUpdate.getTime() < SESSION_EXPIRY) {
             try {
-                return JSON.parse(decrypt(userAccount.encrypted_session_tokens));
+                const cached = JSON.parse(decrypt(userAccount.encrypted_session_tokens));
+                // Always inject accountIsDemo from DB even if cache is old format
+                return { ...cached, accountIsDemo };
             } catch (err) {
                 console.error('[Capital Service] Failed to decrypt cached session:', err);
             }
