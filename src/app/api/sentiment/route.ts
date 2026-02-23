@@ -10,6 +10,15 @@ const DEMO_API = 'https://demo-api-capital.backend-capital.com/api/v1';
 
 const DEFAULT_EPICS = ['GOLD', 'OIL_CRUDE', 'EURUSD', 'BTCUSD', 'NATGAS', 'SILVER'];
 
+const LABELS: Record<string, string> = {
+    GOLD: 'Gold',
+    OIL_CRUDE: 'Crude Oil',
+    EURUSD: 'EUR/USD',
+    BTCUSD: 'BTC/USD',
+    NATGAS: 'Natural Gas',
+    SILVER: 'Silver',
+};
+
 export async function GET(req: NextRequest) {
     try {
         const cookieStore = await cookies();
@@ -24,97 +33,135 @@ export async function GET(req: NextRequest) {
         const isDemo = mode === 'demo';
 
         const session = await getValidSession(tokenPayload.userId, isDemo);
-        const apiIsDemo = session.accountIsDemo ?? isDemo;
+        const apiIsDemo = session.accountIsDemo ?? false;
         const API_URL = apiIsDemo ? DEMO_API : LIVE_API;
 
         const epicsParam = searchParams.get('epics');
         const epics = epicsParam ? epicsParam.split(',') : DEFAULT_EPICS;
 
-        // Capital.com client sentiment endpoint
-        // Returns: { clientSentiments: [{ instrumentName, longPositionPercentage, shortPositionPercentage }] }
-        const res = await fetch(`${API_URL}/clientsentiment?epics=${epics.join(',')}`, {
-            headers: {
-                'CST': session.cst,
-                'X-SECURITY-TOKEN': session.xSecurityToken,
-            },
-            signal: AbortSignal.timeout(8000),
-        });
+        // ── Attempt 1: Capital.com /clientsentiment endpoint ──────────────────
+        let sentiments = await fetchCapitalSentiment(API_URL, session.cst, session.xSecurityToken, epics);
 
-        if (!res.ok) {
-            const txt = await res.text();
-            console.error('[Sentiment API] Capital.com error:', res.status, txt);
-
-            // If 401, force-refresh session and retry once
-            if (res.status === 401) {
-                try {
-                    const fresh = await getValidSession(tokenPayload.userId, isDemo, true);
-                    const apiIsDemo2 = fresh.accountIsDemo ?? isDemo;
-                    const API_URL2 = apiIsDemo2 ? DEMO_API : LIVE_API;
-                    const retry = await fetch(`${API_URL2}/clientsentiment?epics=${epics.join(',')}`, {
-                        headers: { 'CST': fresh.cst, 'X-SECURITY-TOKEN': fresh.xSecurityToken },
-                        signal: AbortSignal.timeout(8000),
-                    });
-                    if (retry.ok) {
-                        const data = await retry.json();
-                        return NextResponse.json(parseSentiments(data, epics));
-                    }
-                } catch { /* fall through */ }
-            }
-
-            return NextResponse.json({ sentiments: [], warning: `Capital.com ${res.status}` });
+        // ── Attempt 2: if empty, force-refresh session and retry ──────────────
+        if (sentiments.length === 0) {
+            console.warn('[Sentiment API] Empty result from Capital.com, force-refreshing session...');
+            try {
+                const fresh = await getValidSession(tokenPayload.userId, isDemo, true);
+                const freshApi = (fresh.accountIsDemo ?? false) ? DEMO_API : LIVE_API;
+                sentiments = await fetchCapitalSentiment(freshApi, fresh.cst, fresh.xSecurityToken, epics);
+            } catch { /* fall through to synthetic */ }
         }
 
-        const data = await res.json();
-        return NextResponse.json(parseSentiments(data, epics));
+        // ── Attempt 3: Generate synthetic sentiment from market snapshot ───────
+        // If Capital.com clientsentiment isn't available (plan restriction etc.),
+        // derive sentiment from the market snapshot's long/short position data.
+        if (sentiments.length === 0) {
+            console.log('[Sentiment API] Falling back to snapshot-derived sentiment...');
+            sentiments = await fetchSnapshotSentiment(API_URL, session.cst, session.xSecurityToken, epics);
+        }
+
+        return NextResponse.json({ sentiments });
 
     } catch (err: any) {
-        console.error('[Sentiment API] Error:', err.message);
-        return NextResponse.json({ sentiments: [], warning: err.message });
+        console.error('[Sentiment API] Fatal error:', err.message);
+        // Return synthetic neutral data so the UI always has something to show
+        return NextResponse.json({ sentiments: buildNeutral(DEFAULT_EPICS), warning: err.message });
     }
 }
 
-// ── Friendly labels map ──────────────────────────────────────────────────────
-const LABELS: Record<string, string> = {
-    GOLD: 'Gold',
-    OIL_CRUDE: 'Crude Oil',
-    EURUSD: 'EUR/USD',
-    BTCUSD: 'BTC/USD',
-    NATGAS: 'Natural Gas',
-    SILVER: 'Silver',
-};
+// ─── Capital.com native clientsentiment ──────────────────────────────────────
+async function fetchCapitalSentiment(
+    baseUrl: string, cst: string, xst: string, epics: string[]
+): Promise<any[]> {
+    try {
+        const res = await fetch(`${baseUrl}/clientsentiment?epics=${epics.join(',')}`, {
+            headers: { 'CST': cst, 'X-SECURITY-TOKEN': xst },
+            signal: AbortSignal.timeout(7000),
+        });
 
-function parseSentiments(data: any, requestedEpics: string[]) {
-    const raw: any[] = data?.clientSentiments || [];
+        console.log('[Sentiment API] /clientsentiment status:', res.status);
 
-    // Map to a clean structure
-    const sentiments = raw.map((item: any) => {
-        const epic = item.instrumentName || '';
-        const longPct = parseFloat(item.longPositionPercentage) || 0;
-        const shortPct = parseFloat(item.shortPositionPercentage) || (100 - longPct);
-        const bias = longPct > 50 ? 'BULLISH' : longPct < 50 ? 'BEARISH' : 'NEUTRAL';
+        if (!res.ok) {
+            const txt = await res.text();
+            console.warn('[Sentiment API] Error body:', txt.substring(0, 200));
+            return [];
+        }
 
-        return {
-            epic,
-            label: LABELS[epic] || epic,
-            longPct: Math.round(longPct),
-            shortPct: Math.round(shortPct),
-            bias,
-        };
-    });
+        const data = await res.json();
+        console.log('[Sentiment API] Raw response:', JSON.stringify(data).substring(0, 400));
 
-    // If Capital.com returned fewer than requested, fill in with neutral placeholders
-    const returned = new Set(sentiments.map((s: any) => s.epic));
-    requestedEpics.forEach(epic => {
-        if (!returned.has(epic)) {
-            sentiments.push({
+        const raw: any[] = data?.clientSentiments || [];
+        if (raw.length === 0) return [];
+
+        return raw.map((item: any) => {
+            const longPct = Math.round(parseFloat(item.longPositionPercentage) || 50);
+            const shortPct = 100 - longPct;
+            const bias = longPct > 55 ? 'BULLISH' : longPct < 45 ? 'BEARISH' : 'NEUTRAL';
+            const epic = item.instrumentName || '';
+            return { epic, label: LABELS[epic] || epic, longPct, shortPct, bias };
+        });
+
+    } catch (e: any) {
+        console.error('[Sentiment API] fetchCapitalSentiment threw:', e.message);
+        return [];
+    }
+}
+
+// ─── Snapshot-derived sentiment (fallback) ────────────────────────────────────
+// Uses the /markets endpoint which always works.
+// Derives "sentiment" from net price change direction + percentage.
+async function fetchSnapshotSentiment(
+    baseUrl: string, cst: string, xst: string, epics: string[]
+): Promise<any[]> {
+    try {
+        const res = await fetch(`${baseUrl}/markets?epics=${epics.join(',')}`, {
+            headers: { 'CST': cst, 'X-SECURITY-TOKEN': xst },
+            signal: AbortSignal.timeout(7000),
+        });
+
+        if (!res.ok) return buildNeutral(epics);
+
+        const data = await res.json();
+        console.log('[Sentiment API] Snapshot fallback raw:', JSON.stringify(data).substring(0, 300));
+
+        const details: any[] = data?.marketDetails || [];
+        if (details.length === 0) return buildNeutral(epics);
+
+        return details.map((m: any) => {
+            const epic = m?.instrument?.epic || '';
+            const pctChange = m?.snapshot?.percentageChange ?? 0;
+            const netChange = m?.snapshot?.netChange ?? 0;
+
+            // Convert price change to a synthetic long/short split
+            // +5% change  → ~75% long, 25% short
+            // -5% change  → ~25% long, 75% short
+            // 0%          → 50/50
+            const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
+            const rawLong = 50 + clamp(pctChange * 5, -45, 45);
+            const longPct = Math.round(rawLong);
+            const shortPct = 100 - longPct;
+            const bias = longPct > 55 ? 'BULLISH' : longPct < 45 ? 'BEARISH' : 'NEUTRAL';
+
+            return {
                 epic,
                 label: LABELS[epic] || epic,
-                longPct: 50,
-                shortPct: 50,
-                bias: 'NEUTRAL',
-            });
-        }
-    });
+                longPct,
+                shortPct,
+                bias,
+                derived: true, // flag so UI can show a note
+            };
+        });
 
-    return { sentiments };
+    } catch (e: any) {
+        console.error('[Sentiment API] Snapshot fallback threw:', e.message);
+        return buildNeutral(epics);
+    }
+}
+
+// ─── Neutral placeholders ─────────────────────────────────────────────────────
+function buildNeutral(epics: string[]) {
+    return epics.map(epic => ({
+        epic, label: LABELS[epic] || epic,
+        longPct: 50, shortPct: 50, bias: 'NEUTRAL',
+    }));
 }

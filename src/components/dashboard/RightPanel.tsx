@@ -259,11 +259,14 @@ export default function RightPanel() {
             const res = await fetch(`/api/sentiment?mode=${mode}`);
             if (!res.ok) return;
             const data = await res.json();
-            if (data.sentiments?.length > 0) {
+            // Always update — even if empty, clear loading so UI doesn't spin forever
+            if (Array.isArray(data.sentiments)) {
                 setSentiments(data.sentiments);
-                setSentimentLoading(false);
             }
-        } catch { /* keep last */ }
+        } catch { /* keep last data on network error */ }
+        finally {
+            setSentimentLoading(false); // always clear, regardless of result
+        }
     }, [mode]);
 
     useEffect(() => {
