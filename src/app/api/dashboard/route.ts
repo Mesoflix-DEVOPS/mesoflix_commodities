@@ -80,10 +80,16 @@ export async function GET(request: Request) {
             });
 
         } catch (err: any) {
-            console.error("[Dashboard API] Capital.com Error:", err.message);
+            const msg = err.message || 'Unknown error';
+            console.error('[Dashboard API] Capital.com Error:', msg);
 
-            // If session expired or unauthorized, we could try once more with force refresh
-            if (err.message.includes("Session Expired") || err.message.includes("401") || err.message.includes("unauthorized")) {
+            // CRITICAL: Capital.com errors must NEVER return 401 to the browser.
+            // HTTP 401 signals "not authenticated" and triggers logout/redirect.
+            // Capital.com connectivity issues should be 503 (Service Unavailable).
+            // We return 200 with empty arrays so the dashboard renders gracefully.
+
+            // If the session token itself is stale, try a force-refresh once
+            if (msg.includes('401') || msg.includes('unauthorized') || msg.toLowerCase().includes('session')) {
                 try {
                     const isDemo = modeInput === 'demo';
                     const session = await getValidSession(userId, isDemo, true);
@@ -92,26 +98,37 @@ export async function GET(request: Request) {
                         getPositions(session.cst, session.xSecurityToken, isDemo),
                         getHistory(session.cst, session.xSecurityToken, isDemo)
                     ]);
+                    const activities = historyData.activities || [];
                     return NextResponse.json({
                         ...accountsData,
+                        accounts: (accountsData.accounts || []).map((a: any) => ({
+                            ...a,
+                            balance: {
+                                ...a.balance,
+                                availableToWithdraw: a.balance?.available,
+                                equity: (a.balance?.balance ?? 0) + (a.balance?.profitLoss ?? 0),
+                            }
+                        })),
                         positions: positionsData.positions || [],
-                        history: historyData.activities || [],
+                        history: activities,
                         user: userData
                     });
                 } catch (retryErr: any) {
+                    // Retry also failed — return safe empty payload, NOT 401
                     return NextResponse.json({
                         accounts: [], positions: [], history: [],
-                        error: `Capital.com connectivity failed: ${retryErr.message}`,
+                        warning: `Capital.com session could not be established: ${retryErr.message}`,
                         user: userData
-                    }); // Return 200 to prevent frontend crash
+                    }); // HTTP 200 — user IS authenticated, just Capital.com is down
                 }
             }
 
+            // Other Capital.com errors (not session-related)
             return NextResponse.json({
                 accounts: [], positions: [], history: [],
-                error: `Capital.com error: ${err.message}`,
+                warning: `Capital.com error: ${msg}`,
                 user: userData
-            });
+            }); // HTTP 200 — user IS authenticated
         }
 
     } catch (error: any) {

@@ -52,27 +52,23 @@ export async function GET(request: Request) {
             return NextResponse.json(marketData);
 
         } catch (err: any) {
-            console.error("[Markets API] Capital.com Error:", err.message);
+            const msg = err.message || 'Unknown';
+            console.error('[Markets API] Capital.com Error:', msg);
 
-            if (err.message.includes("Session Expired") || err.message.includes("401") || err.message.includes("unauthorized")) {
+            // NEVER return HTTP 401 for Capital.com errors — that signals logout to the browser.
+            // Try refresh once, then return 200 with a warning.
+            if (msg.includes('401') || msg.includes('unauthorized') || msg.toLowerCase().includes('session')) {
                 try {
                     const isDemo = requestMode === 'demo';
                     const session = await getValidSession(userId, isDemo, true);
                     const marketData = await getMarketTickers(session.cst, session.xSecurityToken, epics, isDemo);
                     return NextResponse.json(marketData);
                 } catch (retryErr: any) {
-                    console.error("[Markets API] Refresh & Retry Failed:", retryErr.message);
-                    return NextResponse.json({
-                        error: `Connectivity restoration failed: ${retryErr.message}`,
-                        debug: { refreshAttempted: true }
-                    }, { status: 401 });
+                    return NextResponse.json({ warning: `Capital.com unavailable: ${retryErr.message}` });
                 }
             }
 
-            return NextResponse.json({
-                error: `Market Analysis Failure: ${err.message}`,
-                debug: { sessionValid: true, endpoint: 'marketnavigation' }
-            }, { status: 500 });
+            return NextResponse.json({ warning: `Capital.com error: ${msg}` });
         }
 
     } catch (error: any) {

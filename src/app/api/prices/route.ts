@@ -51,24 +51,30 @@ export async function GET(req: NextRequest) {
             const text = await response.text();
             console.error('[Prices API] Capital.com error:', response.status, text);
 
+            // Capital.com session may be stale — try a force-refresh once
             if (response.status === 401) {
-                // Retry once with force-refresh session
-                const freshSession = await getValidSession(tokenPayload.userId, isDemo, true);
-                const retry = await fetch(`${API_URL}/markets?epics=${epics.join(',')}`, {
-                    headers: {
-                        'CST': freshSession.cst,
-                        'X-SECURITY-TOKEN': freshSession.xSecurityToken,
-                    },
-                    signal: AbortSignal.timeout(8000),
-                });
-                if (!retry.ok) {
-                    return NextResponse.json({ error: 'Session expired', prices: {} });
+                try {
+                    const freshSession = await getValidSession(tokenPayload.userId, isDemo, true);
+                    const retry = await fetch(`${API_URL}/markets?epics=${epics.join(',')}`, {
+                        headers: {
+                            'CST': freshSession.cst,
+                            'X-SECURITY-TOKEN': freshSession.xSecurityToken,
+                        },
+                        signal: AbortSignal.timeout(8000),
+                    });
+                    if (retry.ok) {
+                        const retryData = await retry.json();
+                        return NextResponse.json({ prices: parseMarketDetails(retryData) });
+                    }
+                    // Retry failed — return safe empty payload, NOT 401
+                    return NextResponse.json({ prices: {}, warning: 'Capital.com session could not be refreshed' });
+                } catch (refreshErr: any) {
+                    return NextResponse.json({ prices: {}, warning: refreshErr.message });
                 }
-                const retryData = await retry.json();
-                return NextResponse.json({ prices: parseMarketDetails(retryData) });
             }
 
-            return NextResponse.json({ error: `Capital.com error: ${response.status}`, prices: {} });
+            // Other non-200 from Capital.com
+            return NextResponse.json({ prices: {}, warning: `Capital.com returned ${response.status}` });
         }
 
         const data = await response.json();
