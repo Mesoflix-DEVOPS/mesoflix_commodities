@@ -35,7 +35,7 @@ export async function GET(request: Request) {
         // Get epics from query params
         const { searchParams } = new URL(request.url);
         const epicsParam = searchParams.get('epics');
-        const epics = epicsParam ? epicsParam.split(',') : ['IX.D.GOLD.IFM.IP', 'IX.D.WTI.IFM.IP', 'EU.D.EURUSD.CASH.IP', 'BT.D.BTCUSD.CASH.IP'];
+        const epics = epicsParam ? epicsParam.split(',') : ['GOLD', 'OIL_CRUDE', 'EURUSD', 'BTCUSD'];
 
         // 1. We no longer strictly enforce the user having their own Capital account here.
         // The getValidSession method below will automatically fallback to the Master Credentials
