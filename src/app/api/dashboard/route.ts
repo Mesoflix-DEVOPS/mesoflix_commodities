@@ -63,20 +63,19 @@ export async function GET(request: Request) {
                 getHistory(session.cst, session.xSecurityToken, isDemo)
             ]);
 
+            const activities = historyData.activities || [];
             return NextResponse.json({
                 ...accountsData,
                 accounts: (accountsData.accounts || []).map((a: any) => ({
                     ...a,
                     balance: {
                         ...a.balance,
-                        // Capital.com returns "available" not "availableToWithdraw"
                         availableToWithdraw: a.balance?.available,
-                        // Derive equity = balance + profitLoss (not returned directly)
                         equity: (a.balance?.balance ?? 0) + (a.balance?.profitLoss ?? 0),
                     }
                 })),
                 positions: positionsData.positions || [],
-                history: historyData.activities || [],
+                history: activities,  // Capital.com: { activities: [...] }
                 user: userData
             });
 

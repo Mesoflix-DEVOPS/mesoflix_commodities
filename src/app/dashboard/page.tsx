@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
     TrendingUp,
     TrendingDown,
@@ -14,8 +14,6 @@ import {
     BarChart2,
     Activity,
     ChevronRight,
-    Search,
-    User
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -29,78 +27,138 @@ import {
     PieChart as RePieChart,
     Pie,
     Cell,
-    BarChart as ReBarChart,
-    Bar
 } from 'recharts';
-
-import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
+import { useMarketData } from "@/contexts/MarketDataContext";
+
+// ---------------------------------------------------------------------------
+// Capital.com API field mappings
+// Positions: { position: { dealId, direction, size, upl, limitLevel, level, ... }, market: { epic, instrumentName, streamingPricesAvailable } }
+// Accounts:  { accountId, accountName, accountType, preferred, balance: { balance, deposit, profitLoss, available }, currency }
+// History:   { activityHistory: [{ date, type, status, dealReference, description, details }] }
+// ---------------------------------------------------------------------------
 
 function DashboardPageInner() {
-    const searchParams = useSearchParams();
-    const mode = searchParams.get("mode") || "demo";
+    const { mode, balanceData } = useMarketData();
     const [loading, setLoading] = useState(true);
     const [data, setData] = useState<any>(null);
 
-    const fetchData = (isSilent = false) => {
+    const fetchData = useCallback((isSilent = false) => {
         if (!isSilent) setLoading(true);
         fetch(`/api/dashboard?mode=${mode}`)
             .then(async (res) => {
-                if (res.status === 200) {
+                if (res.ok) {
                     const jsonData = await res.json();
                     setData(jsonData);
                 }
             })
-            .catch((err) => console.error(err))
+            .catch((err) => console.error('[Dashboard] Fetch error:', err))
             .finally(() => {
                 if (!isSilent) setLoading(false);
             });
-    };
+    }, [mode]);
 
     useEffect(() => {
         fetchData();
-        const interval = setInterval(() => fetchData(true), 10000);
+        const interval = setInterval(() => fetchData(true), 15000);
         return () => clearInterval(interval);
-    }, []);
+    }, [fetchData]);
 
-    // Filter account based on mode
-    const activeAccount = data?.accounts?.find((acc: any) =>
-        mode === "real" ? acc.accountType === "LIVE" : acc.accountType === "DEMO"
-    ) || data?.accounts?.[0] || {
-        balance: { balance: 0, currency: "USD", profitLoss: 0, available: 0 },
-        accountId: ""
+    // -----------------------------------------------------------------------
+    // Account selection
+    // Capital.com accountType is "CFD" for both demo and live accounts
+    // The preferred account is the active one; alternatively filter by mode
+    // -----------------------------------------------------------------------
+    const accounts = data?.accounts || [];
+    const activeAccount = accounts.find((a: any) =>
+        mode === 'real'
+            ? a.accountType === 'CFD' && !a.accountName?.toLowerCase().includes('demo')
+            : a.accountName?.toLowerCase().includes('demo') || a.accountId?.toLowerCase().includes('demo')
+    ) || accounts.find((a: any) => a.preferred) || accounts[0];
+
+    // Use balance from context (polled every 5s) which is more reliable than one-off fetch
+    const balance = {
+        balance: balanceData?.balance ?? activeAccount?.balance?.balance ?? 0,
+        deposit: balanceData?.deposit ?? activeAccount?.balance?.deposit ?? 0,
+        profitLoss: balanceData?.profitLoss ?? activeAccount?.balance?.profitLoss ?? 0,
+        available: balanceData?.availableToWithdraw ?? activeAccount?.balance?.available ?? 0,
+        equity: balanceData?.equity ?? ((activeAccount?.balance?.balance ?? 0) + (activeAccount?.balance?.profitLoss ?? 0)),
+        currency: activeAccount?.currency || activeAccount?.balance?.currency || 'USD',
     };
 
-    // Filter positions for the active account
-    const activePositions = data?.positions?.filter((pos: any) =>
-        pos.accountId === activeAccount.accountId
-    ) || [];
+    // -----------------------------------------------------------------------
+    // Positions
+    // Capital.com response: { positions: [{ position: {...}, market: {...} }] }
+    // -----------------------------------------------------------------------
+    const rawPositions: any[] = data?.positions || [];
+    const positions = rawPositions.map((p: any) => ({
+        epic: p.market?.epic || p.position?.epic || '',
+        name: p.market?.instrumentName || p.position?.epic || 'Unknown',
+        direction: p.position?.direction || 'BUY',
+        size: p.position?.size ?? 0,
+        level: p.position?.level ?? 0,         // entry price
+        upl: p.position?.upl ?? 0,             // unrealised P&L
+        currency: p.position?.currency || balance.currency,
+    }));
 
-    // Derive Chart Data from History
-    const performanceData = (data?.history && data.history.length > 0)
-        ? data.history.slice(0, 10).reverse().map((h: any, i: number) => ({
-            name: new Date(h.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            equity: activeAccount.balance.balance + (h.amount || 0),
-            balance: activeAccount.balance.balance
-        }))
+    // -----------------------------------------------------------------------
+    // History Chart
+    // Capital.com activityHistory items: { date, type (e.g. POSITION, SYSTEM), details: { actions: [{actionType, affectedDeals:[{profit,...}]}] } }
+    // Build running equity line from the last N activities
+    // -----------------------------------------------------------------------
+    const rawHistory: any[] = data?.history || [];
+    const profitEvents = rawHistory
+        .filter((h: any) => h.details?.actions?.some((a: any) => a.affectedDeals?.length > 0))
+        .slice(0, 20)
+        .reverse();
+
+    let runningEquity = balance.balance;
+    const performanceData = profitEvents.length > 2
+        ? profitEvents.map((h: any) => {
+            const totalProfit = h.details.actions.reduce((sum: number, action: any) => {
+                return sum + (action.affectedDeals || []).reduce((s: number, d: any) => s + (d.profit ?? 0), 0);
+            }, 0);
+            runningEquity += totalProfit;
+            return {
+                name: new Date(h.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                equity: parseFloat(runningEquity.toFixed(2)),
+            };
+        })
         : [
-            { name: '00:00', equity: activeAccount.balance.balance, balance: activeAccount.balance.balance },
-            { name: 'NOW', equity: activeAccount.balance.balance, balance: activeAccount.balance.balance }
+            { name: 'Open', equity: balance.balance },
+            { name: 'Now', equity: balance.equity },
         ];
 
-    // Derive Risk Data from Positions
+    // -----------------------------------------------------------------------
+    // Risk / Asset Exposure from open positions
+    // -----------------------------------------------------------------------
     const assetExposure: Record<string, number> = {};
-    activePositions.forEach((p: any) => {
-        assetExposure[p.symbol] = (assetExposure[p.symbol] || 0) + Math.abs(p.upl || 0);
+    positions.forEach((p) => {
+        const sym = p.name || p.epic;
+        assetExposure[sym] = (assetExposure[sym] || 0) + Math.abs(p.upl);
     });
-
+    const COLORS = ['#00BFA6', '#3b82f6', '#f59e0b', '#ef4444', '#a78bfa'];
     const riskByAsset = Object.keys(assetExposure).length > 0
-        ? Object.entries(assetExposure).map(([name, value], i) => ({
-            name,
-            value,
-            color: ['#00BFA6', '#3b82f6', '#f59e0b', '#ef4444'][i % 4]
-        }))
+        ? Object.entries(assetExposure).map(([name, value], i) => ({ name, value, color: COLORS[i % COLORS.length] }))
         : [{ name: 'No Exposure', value: 1, color: '#1f2937' }];
+
+    // -----------------------------------------------------------------------
+    // Recent Activity from history
+    // -----------------------------------------------------------------------
+    const recentActivity = rawHistory.slice(0, 5).map((h: any) => ({
+        type: h.type || 'EVENT',
+        desc: h.description || (h.details?.actions?.[0]?.actionType) || 'Account activity',
+        date: h.date ? new Date(h.date).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—',
+        profit: h.details?.actions?.reduce((s: number, a: any) =>
+            s + (a.affectedDeals || []).reduce((ss: number, d: any) => ss + (d.profit ?? 0), 0), 0) ?? null,
+    }));
+
+    // -----------------------------------------------------------------------
+    // Stats
+    // -----------------------------------------------------------------------
+    const totalPnL = positions.reduce((s, p) => s + p.upl, 0);
+    const winPositions = positions.filter(p => p.upl >= 0).length;
+    const lossPositions = positions.filter(p => p.upl < 0).length;
 
     if (loading && !data) {
         return (
@@ -117,6 +175,7 @@ function DashboardPageInner() {
 
     return (
         <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-1000">
+
             {/* Page Header */}
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
                 <div>
@@ -128,64 +187,74 @@ function DashboardPageInner() {
                         <span className="text-[9px] text-gray-500 font-bold uppercase tracking-widest">Active Market</span>
                         <span className="text-xs font-bold text-white uppercase">{mode === 'real' ? 'Live Capital' : 'Demo Sandbox'}</span>
                     </div>
-                    <button className="bg-teal text-dark-blue px-6 py-2.5 rounded-xl font-bold text-sm hover:shadow-[0_0_20px_rgba(0,191,166,0.4)] transition-all flex items-center gap-2">
-                        <Zap size={16} fill="currentColor" />
-                        Quick Engine Trade
-                    </button>
+                    <div className={cn("px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border",
+                        positions.length > 0 ? 'text-teal border-teal/30 bg-teal/10' : 'text-gray-500 border-white/10 bg-white/5'
+                    )}>
+                        {positions.length} Live Position{positions.length !== 1 ? 's' : ''}
+                    </div>
                 </div>
             </div>
 
-            {/* Section A: Account Summary Row */}
+            {/* Section A: Account Summary Stat Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                 <SummaryCard
                     label="Portfolio Balance"
-                    value={activeAccount.balance.balance}
-                    currency={activeAccount.balance.currency}
-                    trend={0}
+                    value={balance.balance}
+                    currency={balance.currency}
+                    trend={balance.profitLoss !== 0 && balance.balance > 0 ? parseFloat(((balance.profitLoss / balance.balance) * 100).toFixed(2)) : 0}
                     icon={Wallet}
                     color="teal"
                 />
                 <SummaryCard
                     label="Account Equity"
-                    value={activeAccount.balance.balance + activeAccount.balance.profitLoss}
-                    currency={activeAccount.balance.currency}
+                    value={balance.equity}
+                    currency={balance.currency}
                     trend={0}
                     icon={TrendingUp}
                     color="blue"
                 />
                 <SummaryCard
-                    label="Margin Occupied"
-                    value={activeAccount.balance.deposit || 0}
-                    currency={activeAccount.balance.currency}
+                    label="Margin Used"
+                    value={balance.deposit}
+                    currency={balance.currency}
                     trend={0}
                     icon={Shield}
                     color="amber"
                 />
                 <SummaryCard
-                    label="Liquidity Available"
-                    value={activeAccount.balance.available}
-                    currency={activeAccount.balance.currency}
+                    label="Available Funds"
+                    value={balance.available}
+                    currency={balance.currency}
                     trend={0}
                     icon={Zap}
                     color="green"
                 />
             </div>
 
-            {/* Section B & C: Main Content Grid */}
+            {/* Section B: Performance Chart + Live P&L Stats */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* Performance Graph Panel */}
-                <div className="lg:col-span-2 bg-[#0E1B2A] rounded-[2.5rem] border border-white/5 p-10 flex flex-col h-[450px] shadow-2xl relative overflow-hidden group">
+                <div className="lg:col-span-2 bg-[#0E1B2A] rounded-[2.5rem] border border-white/5 p-10 flex flex-col h-[420px] shadow-2xl relative overflow-hidden group">
                     <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-teal/5 rounded-full blur-[100px] -mr-64 -mt-64 transition-all duration-1000 group-hover:bg-teal/10" />
 
-                    <div className="flex justify-between items-start mb-10 relative z-10">
+                    <div className="flex justify-between items-start mb-8 relative z-10">
                         <div>
                             <h3 className="text-xl font-bold text-white tracking-tight">Aggregate Performance</h3>
-                            <p className="text-xs text-gray-400 mt-1">Relative equity growth for {activeAccount.accountName || 'Primary Account'}</p>
+                            <p className="text-xs text-gray-400 mt-1">
+                                {activeAccount?.accountName || (mode === 'real' ? 'Live Account' : 'Demo Account')} — equity curve
+                            </p>
+                        </div>
+                        <div className={cn("text-right px-4 py-2 rounded-2xl border",
+                            totalPnL >= 0 ? 'border-teal/20 bg-teal/5' : 'border-red-500/20 bg-red-500/5'
+                        )}>
+                            <span className="text-[9px] text-gray-500 font-black uppercase tracking-widest block mb-0.5">Open P/L</span>
+                            <span className={cn("text-lg font-black font-mono", totalPnL >= 0 ? 'text-teal' : 'text-red-500')}>
+                                {totalPnL >= 0 ? '+' : ''}{totalPnL.toFixed(2)}
+                            </span>
                         </div>
                     </div>
 
-                    <div className="h-[300px] min-h-[300px] w-full relative z-10">
-                        <ResponsiveContainer width="100%" height="100%" minHeight={300} minWidth={1}>
+                    <div className="h-[280px] min-h-[280px] w-full relative z-10 min-w-0">
+                        <ResponsiveContainer width="100%" height="100%" minWidth={1}>
                             <AreaChart data={performanceData}>
                                 <defs>
                                     <linearGradient id="colorEquity" x1="0" y1="0" x2="0" y2="1">
@@ -201,13 +270,12 @@ function DashboardPageInner() {
                                     tick={{ fill: '#4b5563', fontSize: 10, fontWeight: 'bold' }}
                                     dy={10}
                                 />
-                                <YAxis
-                                    hide={true}
-                                />
+                                <YAxis hide />
                                 <Tooltip
                                     contentStyle={{ backgroundColor: '#0A1622', border: '1px solid #ffffff10', borderRadius: '12px' }}
-                                    itemStyle={{ fontSize: '12px', fontWeight: 'bold' }}
+                                    itemStyle={{ fontSize: '12px', fontWeight: 'bold', color: '#00BFA6' }}
                                     labelStyle={{ color: '#9ca3af', marginBottom: '4px', fontSize: '10px' }}
+                                    formatter={(v: any) => [`${balance.currency} ${Number(v).toFixed(2)}`, 'Equity']}
                                 />
                                 <Area
                                     type="monotone"
@@ -216,76 +284,124 @@ function DashboardPageInner() {
                                     strokeWidth={3}
                                     fillOpacity={1}
                                     fill="url(#colorEquity)"
-                                    animationDuration={2000}
+                                    animationDuration={1500}
                                 />
                             </AreaChart>
                         </ResponsiveContainer>
                     </div>
                 </div>
 
-                {/* Section C: Active Trading Engines */}
-                <div className="space-y-6 flex flex-col pt-2">
-                    <div className="flex items-center justify-between px-2 mb-2">
-                        <h3 className="text-[11px] font-black text-teal uppercase tracking-[0.3em] flex items-center gap-2">
-                            <Activity size={14} className="animate-pulse" />
-                            Engine Control
-                        </h3>
+                {/* Section C: Quick Stats + Activity */}
+                <div className="space-y-4 flex flex-col">
+                    {/* Win/Loss/Open stats */}
+                    <div className="bg-[#0E1B2A] p-6 rounded-3xl border border-white/5 shadow-lg">
+                        <h3 className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-5">Session Snapshot</h3>
+                        <div className="space-y-3">
+                            {[
+                                { label: 'Positions Open', value: positions.length, color: 'text-white' },
+                                { label: 'Profitable', value: winPositions, color: 'text-teal' },
+                                { label: 'At Loss', value: lossPositions, color: 'text-red-500' },
+                                {
+                                    label: 'Win Rate', color: positions.length > 0 ? 'text-teal' : 'text-gray-500',
+                                    value: positions.length > 0 ? `${((winPositions / positions.length) * 100).toFixed(0)}%` : '—'
+                                },
+                                { label: 'Deposit (Margin)', value: `${balance.currency} ${balance.deposit.toFixed(2)}`, color: 'text-amber-400' },
+                            ].map(({ label, value, color }) => (
+                                <div key={label} className="flex justify-between items-center py-2 border-b border-white/5 last:border-0">
+                                    <span className="text-[10px] text-gray-500 font-black uppercase tracking-widest">{label}</span>
+                                    <span className={cn("text-sm font-black font-mono", color)}>{String(value)}</span>
+                                </div>
+                            ))}
+                        </div>
                     </div>
 
-                    <EngineCard name="Commodity Vortex" status="Active" pnl={+142.40} risk="Low" />
-                    <EngineCard name="Volatility Scalper" status="Paused" pnl={-12.20} risk="Medium" />
-
-                    <button className="mt-auto w-full py-5 bg-white/5 hover:bg-white/[0.08] border border-white/5 rounded-3xl transition-all flex flex-col items-center justify-center gap-2 group">
-                        <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-gray-500 group-hover:text-teal transition-colors">
-                            <Zap size={16} />
-                        </div>
-                        <span className="text-[10px] font-black text-gray-500 group-hover:text-gray-300 uppercase tracking-widest transition-colors">Deploy New Engine</span>
-                    </button>
+                    {/* Recent Activity */}
+                    <div className="flex-1 bg-[#0E1B2A] p-6 rounded-3xl border border-white/5 shadow-lg overflow-hidden">
+                        <h3 className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-5 flex items-center gap-2">
+                            <Clock size={12} /> Recent Activity
+                        </h3>
+                        {recentActivity.length > 0 ? (
+                            <div className="space-y-4">
+                                {recentActivity.map((item, i) => (
+                                    <div key={i} className="flex items-start gap-3 group">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-teal mt-1.5 shrink-0 group-hover:shadow-[0_0_8px_#00BFA6]" />
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-[11px] font-bold text-gray-300 leading-tight truncate">{item.desc}</p>
+                                            <div className="flex items-center gap-2 mt-0.5">
+                                                <span className="text-[9px] text-gray-600 font-black uppercase">{item.date}</span>
+                                                {item.profit !== null && item.profit !== 0 && (
+                                                    <span className={cn("text-[9px] font-black", item.profit >= 0 ? 'text-teal' : 'text-red-500')}>
+                                                        {item.profit >= 0 ? '+' : ''}{item.profit.toFixed(2)}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <span className="text-[8px] font-black text-gray-600 uppercase tracking-widest shrink-0">{item.type}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="h-full flex items-center justify-center">
+                                <p className="text-[10px] text-gray-600 font-black uppercase tracking-widest">No recent activity</p>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
 
-            {/* Section D, E: Detailed Performance */}
+            {/* Section D + E: Positions Table + Risk Chart */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 pt-4">
-                {/* Section D: Open Positions */}
+                {/* Active Positions Table */}
                 <div className="bg-[#0E1B2A] rounded-[2.5rem] border border-white/5 overflow-hidden shadow-xl lg:col-span-2">
                     <div className="p-8 border-b border-white/5 flex justify-between items-center">
-                        <h3 className="text-lg font-bold text-white tracking-tight">Active Execution</h3>
-                        <span className="text-[10px] text-gray-500 font-black uppercase tracking-widest">
-                            {activePositions.length} Positions Open
+                        <div>
+                            <h3 className="text-lg font-bold text-white tracking-tight">Active Execution</h3>
+                            <p className="text-[10px] text-gray-500 font-black uppercase tracking-widest mt-0.5">{mode} account</p>
+                        </div>
+                        <span className={cn("text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border",
+                            positions.length > 0 ? 'text-teal border-teal/30 bg-teal/10' : 'text-gray-600 border-white/10'
+                        )}>
+                            {positions.length} Open
                         </span>
                     </div>
                     <div className="overflow-x-auto">
                         <table className="w-full text-left text-sm border-collapse">
                             <thead>
                                 <tr className="text-[10px] text-gray-600 uppercase tracking-widest bg-black/10">
-                                    <th className="px-8 py-5 font-black">Asset</th>
-                                    <th className="px-8 py-5 font-black">Size</th>
-                                    <th className="px-8 py-5 font-black">Entry</th>
-                                    <th className="px-8 py-5 font-black text-right">P/L</th>
+                                    <th className="px-8 py-4 font-black">Asset</th>
+                                    <th className="px-8 py-4 font-black">Direction</th>
+                                    <th className="px-8 py-4 font-black">Size</th>
+                                    <th className="px-8 py-4 font-black">Entry</th>
+                                    <th className="px-8 py-4 font-black text-right">Unreal. P/L</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {activePositions.map((pos: any, idx: number) => (
-                                    <tr key={idx} className="border-b border-white/5 hover:bg-white/[0.03] transition-colors group">
-                                        <td className="px-8 py-6">
+                                {positions.map((pos, idx) => (
+                                    <tr key={idx} className="border-b border-white/5 hover:bg-white/[0.03] transition-colors">
+                                        <td className="px-8 py-5">
                                             <div className="flex items-center gap-3">
-                                                <div className={cn("w-2 h-2 rounded-full", pos.direction === 'BUY' ? 'bg-teal' : 'bg-red-500')}></div>
-                                                <span className="font-bold text-white uppercase tracking-tight">{pos.symbol}</span>
+                                                <div className={cn("w-2 h-2 rounded-full shrink-0", pos.direction === 'BUY' ? 'bg-teal' : 'bg-red-500')} />
+                                                <span className="font-bold text-white uppercase tracking-tight text-sm">{pos.name}</span>
                                             </div>
                                         </td>
-                                        <td className="px-8 py-6 text-gray-400 font-medium">{pos.size} {pos.direction}</td>
-                                        <td className="px-8 py-6 font-mono text-gray-300">{pos.level}</td>
-                                        <td className="px-8 py-6 text-right">
-                                            <span className={cn("font-bold font-mono text-base", pos.upl >= 0 ? "text-green-500" : "text-red-500")}>
-                                                {pos.upl >= 0 ? "+" : ""}{pos.upl.toFixed(2)}
+                                        <td className="px-8 py-5">
+                                            <span className={cn("text-[10px] font-black uppercase px-2 py-1 rounded-lg tracking-widest",
+                                                pos.direction === 'BUY' ? 'text-teal bg-teal/10' : 'text-red-400 bg-red-500/10'
+                                            )}>{pos.direction}</span>
+                                        </td>
+                                        <td className="px-8 py-5 text-gray-400 font-bold font-mono">{pos.size}</td>
+                                        <td className="px-8 py-5 font-mono text-gray-300">{Number(pos.level).toFixed(4)}</td>
+                                        <td className="px-8 py-5 text-right">
+                                            <span className={cn("font-black font-mono text-base", pos.upl >= 0 ? "text-teal" : "text-red-500")}>
+                                                {pos.upl >= 0 ? "+" : ""}{Number(pos.upl).toFixed(2)}
                                             </span>
                                         </td>
                                     </tr>
                                 ))}
-                                {activePositions.length === 0 && (
+                                {positions.length === 0 && (
                                     <tr>
-                                        <td colSpan={4} className="px-8 py-12 text-center text-gray-600 text-[10px] font-black uppercase tracking-widest">
-                                            No active positions found for {mode} account
+                                        <td colSpan={5} className="px-8 py-16 text-center text-gray-600 text-[10px] font-black uppercase tracking-widest">
+                                            No active positions on the {mode} account
                                         </td>
                                     </tr>
                                 )}
@@ -294,32 +410,54 @@ function DashboardPageInner() {
                     </div>
                 </div>
 
-                {/* Section E: Risk Overview */}
+                {/* Section E: Risk Pie Chart */}
                 <div className="bg-[#0E1B2A] rounded-[2.5rem] border border-white/5 p-8 shadow-xl flex flex-col">
-                    <h3 className="text-sm font-black text-teal uppercase tracking-[0.2em] mb-8 flex items-center gap-2 px-2">
+                    <h3 className="text-sm font-black text-teal uppercase tracking-[0.2em] mb-6 flex items-center gap-2 px-2">
                         <Shield size={14} /> Risk Analysis
                     </h3>
 
-                    <div className="flex-1 flex flex-col items-center justify-center p-4 bg-white/5 rounded-3xl relative min-h-[200px]">
-                        <ResponsiveContainer width="100%" height={150} minWidth={1}>
+                    <div className="flex-1 flex flex-col items-center justify-center p-4 bg-white/5 rounded-3xl relative min-h-[200px] min-w-0">
+                        <ResponsiveContainer width="100%" height={160} minWidth={1}>
                             <RePieChart>
                                 <Pie
                                     data={riskByAsset}
-                                    innerRadius={45}
-                                    outerRadius={65}
-                                    paddingAngle={5}
+                                    innerRadius={50}
+                                    outerRadius={70}
+                                    paddingAngle={4}
                                     dataKey="value"
+                                    animationDuration={1000}
                                 >
                                     {riskByAsset.map((entry, index) => (
                                         <Cell key={`cell-${index}`} fill={entry.color} />
                                     ))}
                                 </Pie>
+                                <Tooltip
+                                    contentStyle={{ backgroundColor: '#0A1622', border: '1px solid #ffffff10', borderRadius: '10px' }}
+                                    itemStyle={{ fontSize: '11px', fontWeight: 'bold' }}
+                                    formatter={(v: any) => [`${Number(v).toFixed(2)}`, 'P/L Exposure']}
+                                />
                             </RePieChart>
                         </ResponsiveContainer>
-                        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none mt-4">
-                            <span className="text-[10px] text-gray-500 font-black uppercase tracking-widest">Exposure</span>
+                        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                            <span className="text-[9px] text-gray-500 font-black uppercase tracking-widest">Exposure</span>
                         </div>
                     </div>
+
+                    {/* Legend */}
+                    {positions.length > 0 && (
+                        <div className="mt-5 space-y-2">
+                            {riskByAsset.slice(0, 5).map((r) => (
+                                <div key={r.name} className="flex items-center gap-2.5">
+                                    <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: r.color }} />
+                                    <span className="text-[10px] text-gray-400 font-bold flex-1 truncate">{r.name}</span>
+                                    <span className="text-[10px] font-black text-gray-500 font-mono">{r.value.toFixed(2)}</span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                    {positions.length === 0 && (
+                        <p className="text-center text-[10px] text-gray-600 font-black uppercase tracking-widest mt-4">No open positions</p>
+                    )}
                 </div>
             </div>
         </div>
@@ -340,6 +478,7 @@ export default function DashboardPage() {
 
 function SummaryCard({ label, value, currency, trend, icon: Icon, color }: any) {
     const isPositive = trend >= 0;
+    const numValue = typeof value === 'number' ? value : 0;
     return (
         <div className="group bg-[#0E1B2A] p-8 rounded-[2.5rem] border border-white/5 transition-all duration-700 hover:border-teal/30 hover:bg-[#112338] relative overflow-hidden shadow-xl">
             <div className={cn("absolute top-0 right-0 w-32 h-32 -mr-12 -mt-12 rounded-full opacity-[0.03] transition-all duration-700 group-hover:opacity-[0.08]",
@@ -362,68 +501,9 @@ function SummaryCard({ label, value, currency, trend, icon: Icon, color }: any) 
 
             <p className="text-[10px] text-gray-500 font-black uppercase tracking-[0.25em] mb-2">{label}</p>
             <h4 className="text-3xl font-black text-white font-mono tracking-tighter flex items-baseline gap-1.5">
-                <span className="text-sm font-bold text-gray-600">{currency}</span>
-                {value.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                <span className="text-sm font-bold text-gray-600">{currency || 'USD'}</span>
+                {numValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </h4>
-        </div>
-    );
-}
-
-function EngineCard({ name, status, pnl, risk }: any) {
-    return (
-        <div className="bg-[#0E1B2A] p-6 rounded-3xl border border-white/5 flex flex-col gap-6 group hover:bg-[#112338] hover:border-white/10 transition-all duration-500 shadow-lg">
-            <div className="flex justify-between items-start">
-                <div className="flex items-start gap-3">
-                    <div className={cn("w-2 h-2 rounded-full mt-1.5 animate-pulse",
-                        status === 'Active' ? 'bg-teal shadow-[0_0_10px_#00BFA6]' :
-                            status === 'Paused' ? 'bg-amber-500' : 'bg-gray-700'
-                    )} />
-                    <div>
-                        <h4 className="text-sm font-black text-white tracking-tight">{name}</h4>
-                        <p className={cn("text-[9px] font-black uppercase tracking-[0.2em] mt-1 opacity-60",
-                            status === 'Active' ? 'text-teal' : status === 'Paused' ? 'text-amber-500' : 'text-gray-500'
-                        )}>{status}</p>
-                    </div>
-                </div>
-                <button className={cn("p-3 rounded-2xl border transition-all duration-500",
-                    status === 'Active'
-                        ? 'bg-white/5 border-white/5 hover:bg-amber-500 hover:text-dark-blue hover:border-transparent'
-                        : 'bg-teal text-dark-blue border-transparent hover:shadow-[0_0_15px_rgba(0,191,166,0.3)]'
-                )}>
-                    {status === 'Active' ? <Pause size={16} fill="currentColor" /> : <Play size={16} fill="currentColor" />}
-                </button>
-            </div>
-
-            <div className="flex justify-between items-end bg-black/10 p-4 rounded-2xl">
-                <div>
-                    <span className="text-[9px] text-gray-600 font-black uppercase tracking-widest block mb-1">Session P/L</span>
-                    <span className={cn("text-xl font-black font-mono tracking-tighter", pnl >= 0 ? "text-green-500" : "text-red-500")}>
-                        {pnl >= 0 ? "+" : ""}{pnl.toFixed(2)}
-                    </span>
-                </div>
-                <div className="text-right">
-                    <span className="text-[9px] text-gray-600 font-black uppercase tracking-widest block mb-1.5">Risk Config</span>
-                    <span className={cn("text-[9px] font-black px-3 py-1 rounded-full border tracking-[0.1em]",
-                        risk === 'Low' ? 'text-teal border-teal/20 bg-teal/5' :
-                            risk === 'Medium' ? 'text-amber-500 border-amber-500/20 bg-amber-500/5' :
-                                'text-red-500 border-red-500/20 bg-red-500/5'
-                    )}>{risk}</span>
-                </div>
-            </div>
-        </div>
-    );
-}
-
-function ActivityItem({ icon: Icon, text, time }: any) {
-    return (
-        <div className="flex gap-5 group">
-            <div className="w-10 h-10 shrink-0 bg-white/5 rounded-xl border border-white/5 flex items-center justify-center text-gray-600 group-hover:bg-teal/10 group-hover:text-teal group-hover:border-teal/20 transition-all duration-500">
-                <Icon size={18} strokeWidth={1.5} />
-            </div>
-            <div className="flex-1 pb-2">
-                <p className="text-xs text-gray-300 font-bold leading-relaxed tracking-tight group-hover:text-white transition-colors">{text}</p>
-                <span className="text-[9px] text-gray-600 mt-1.5 block font-black uppercase tracking-widest">{time}</span>
-            </div>
         </div>
     );
 }
