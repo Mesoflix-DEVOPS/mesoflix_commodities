@@ -14,14 +14,12 @@ import {
     ResponsiveContainer, ReferenceLine
 } from "recharts";
 
-// ─── Instruments ──────────────────────────────────────────────────────────────
 const INSTRUMENTS = [
-    { epic: "GOLD", label: "Gold", symbol: "XAU/USD", flag: "🥇", tvSymbol: "TVC:GOLD" },
-    { epic: "SILVER", label: "Silver", symbol: "XAG/USD", flag: "🥈", tvSymbol: "TVC:SILVER" },
-    { epic: "OIL_CRUDE", label: "Crude Oil", symbol: "WTI", flag: "🛢️", tvSymbol: "TVC:USOIL" },
-    { epic: "NATGAS", label: "Natural Gas", symbol: "NG", flag: "🔥", tvSymbol: "TVC:NATURALGAS" },
-    { epic: "EURUSD", label: "EUR/USD", symbol: "EURUSD", flag: "💶", tvSymbol: "FX:EURUSD" },
-    { epic: "BTCUSD", label: "Bitcoin", symbol: "BTC/USD", flag: "₿", tvSymbol: "COINBASE:BTCUSD" },
+    { epic: "GOLD", label: "Gold", symbol: "XAU/USD", flag: "🥇", tvSymbol: "TVC:GOLD", sizes: ["1", "5", "10", "50"], defaultSize: "1" },
+    { epic: "SILVER", label: "Silver", symbol: "XAG/USD", flag: "🥈", tvSymbol: "TVC:SILVER", sizes: ["50", "100", "500", "1000"], defaultSize: "50" },
+    { epic: "OIL_CRUDE", label: "Crude Oil", symbol: "WTI", flag: "🛢️", tvSymbol: "TVC:USOIL", sizes: ["10", "50", "100", "500"], defaultSize: "10" },
+    { epic: "EURUSD", label: "EUR/USD", symbol: "EURUSD", flag: "💶", tvSymbol: "FX:EURUSD", sizes: ["1000", "5000", "10000", "50000"], defaultSize: "1000" },
+    { epic: "BTCUSD", label: "Bitcoin", symbol: "BTC/USD", flag: "₿", tvSymbol: "COINBASE:BTCUSD", sizes: ["0.01", "0.1", "0.5", "1.0"], defaultSize: "0.01" },
 ];
 
 type Resolution = "MINUTE_5" | "MINUTE_30" | "HOUR" | "DAY";
@@ -99,13 +97,19 @@ function ManualTab({ mode }: { mode: string }) {
     const [chartLoading, setChartLoading] = useState(true);
     const [analysis, setAnalysis] = useState<Analysis | null>(null);
     const [direction, setDirection] = useState<"BUY" | "SELL">("BUY");
-    const [size, setSize] = useState("0.1");
+    const [size, setSize] = useState(INSTRUMENTS[0].defaultSize);
     const [takeProfit, setTakeProfit] = useState("");
     const [stopLoss, setStopLoss] = useState("");
     const [trailingStop, setTrailingStop] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [execResult, setExecResult] = useState<{ ok: boolean; msg: string } | null>(null);
     const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    // SSE live tick
+    const [tick, setTick] = useState<Snapshot | null>(null);
+    const [priceDir, setPriceDir] = useState<"up" | "down" | null>(null);
+    const [streamStatus, setStreamStatus] = useState<"connecting" | "live" | "offline">("connecting");
+    const prevBid = useRef<number | null>(null);
+    const esRef = useRef<EventSource | null>(null);
 
     const fetchChart = useCallback(async () => {
         setChartLoading(true);
@@ -119,6 +123,62 @@ function ManualTab({ mode }: { mode: string }) {
         } finally { setChartLoading(false); }
     }, [instrument.epic, mode, resolution]);
 
+    // ── SSE stream for live price ticks ─────────────────────────────────────
+    useEffect(() => {
+        let es: EventSource;
+        let reconnectTimer: ReturnType<typeof setTimeout>;
+        let flashTimer: ReturnType<typeof setTimeout>;
+
+        const connect = () => {
+            setStreamStatus("connecting");
+            es = new EventSource(`/api/stream/${instrument.epic}?mode=${mode}`);
+            esRef.current = es;
+
+            es.onmessage = (ev) => {
+                try {
+                    const msg = JSON.parse(ev.data);
+                    if (msg.type === "tick") {
+                        setStreamStatus("live");
+                        const snap: Snapshot = {
+                            bid: msg.bid, offer: msg.ask,
+                            high: msg.high, low: msg.low,
+                            netChange: msg.net, percentageChange: msg.pct,
+                        };
+                        setTick(snap);
+                        setSnapshot(snap);          // keep chart snapshot in sync
+                        // Price direction flash
+                        if (prevBid.current !== null) {
+                            const dir = msg.bid > prevBid.current ? "up" : msg.bid < prevBid.current ? "down" : null;
+                            if (dir) {
+                                setPriceDir(dir);
+                                clearTimeout(flashTimer);
+                                flashTimer = setTimeout(() => setPriceDir(null), 600);
+                            }
+                        }
+                        prevBid.current = msg.bid;
+                    } else if (msg.type === "connected") {
+                        setStreamStatus("live");
+                    }
+                } catch { }
+            };
+
+            es.onerror = () => {
+                setStreamStatus("offline");
+                es.close();
+                // Reconnect after 2s
+                reconnectTimer = setTimeout(connect, 2000);
+            };
+        };
+
+        connect();
+        return () => {
+            es?.close();
+            clearTimeout(reconnectTimer);
+            clearTimeout(flashTimer);
+        };
+    }, [instrument.epic, mode]);
+
+    // ── Chart OHLC: refresh every 10s ────────────────────────────────────────
     useEffect(() => {
         fetchChart();
         if (timerRef.current) clearInterval(timerRef.current);
@@ -126,16 +186,17 @@ function ManualTab({ mode }: { mode: string }) {
         return () => { if (timerRef.current) clearInterval(timerRef.current); };
     }, [fetchChart]);
 
-    // Auto TP/SL from ATR when instrument/direction/snapshot changes
+    // Auto TP/SL: react to live tick (or snapshot fallback)
+    const liveSnap = tick ?? snapshot;
     useEffect(() => {
-        if (!snapshot) return;
-        const price = direction === "BUY" ? snapshot.offer : snapshot.bid;
-        const atr = Math.max(snapshot.high - snapshot.low, price * 0.002);
+        if (!liveSnap) return;
+        const price = direction === "BUY" ? liveSnap.offer : liveSnap.bid;
+        const atr = Math.max(liveSnap.high - liveSnap.low, price * 0.002);
         const isForex = instrument.epic.includes("USD") && !instrument.epic.includes("BTC");
         const dp = isForex ? 5 : 2;
         setTakeProfit((direction === "BUY" ? price + atr * 1.5 : price - atr * 1.5).toFixed(dp));
         setStopLoss((direction === "BUY" ? price - atr : price + atr).toFixed(dp));
-    }, [snapshot, direction, instrument]);
+    }, [liveSnap, direction, instrument]);
 
     const placeTrade = async () => {
         setSubmitting(true); setExecResult(null);
@@ -164,9 +225,11 @@ function ManualTab({ mode }: { mode: string }) {
         }
     };
 
-    const isUp = (snapshot?.percentageChange ?? 0) >= 0;
-    const currentPrice = snapshot
-        ? (direction === "BUY" ? snapshot.offer : snapshot.bid)
+    // Use live tick as the source of truth for price display
+    const displaySnap = tick ?? snapshot;
+    const isUp = (displaySnap?.percentageChange ?? 0) >= 0;
+    const currentPrice = displaySnap
+        ? (direction === "BUY" ? displaySnap.offer : displaySnap.bid)
             .toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 5 })
         : "--";
 
@@ -189,7 +252,7 @@ function ManualTab({ mode }: { mode: string }) {
                         </button>
                         {INSTRUMENTS.filter(i => i.epic !== instrument.epic).map(inst => (
                             <button key={inst.epic}
-                                onClick={() => { setInstrument(inst); setChartSource("internal"); }}
+                                onClick={() => { setInstrument(inst); setSize(inst.defaultSize); setChartSource("internal"); }}
                                 className="flex items-center gap-2 bg-white/5 border border-white/5 rounded-2xl px-3 py-2 hover:border-teal/20 hover:bg-teal/5 transition-all"
                             >
                                 <span className="text-base">{inst.flag}</span>
@@ -274,7 +337,7 @@ function ManualTab({ mode }: { mode: string }) {
                                 <div className="w-8 h-8 border-2 border-teal/20 border-t-teal rounded-full animate-spin" />
                             </div>
                         ) : chartData.length > 0 ? (
-                            <ResponsiveContainer width="100%" height="100%" minWidth={1}>
+                            <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
                                 <AreaChart data={chartData} margin={{ top: 4, right: 4, bottom: 0, left: 4 }}>
                                     <defs>
                                         <linearGradient id="cGrad" x1="0" y1="0" x2="0" y2="1">
@@ -371,7 +434,7 @@ function ManualTab({ mode }: { mode: string }) {
                     <input type="number" value={size} onChange={e => setSize(e.target.value)} step="0.01" min="0.01"
                         className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white font-bold text-sm font-mono focus:outline-none focus:border-teal/40 transition-all mb-3" />
                     <div className="flex gap-2">
-                        {["0.01", "0.1", "0.5", "1.0"].map(s => (
+                        {instrument.sizes.map(s => (
                             <button key={s} onClick={() => setSize(s)}
                                 className={cn("flex-1 py-1.5 rounded-lg text-[9px] font-black transition-all border",
                                     size === s ? "bg-teal/20 text-teal border-teal/30" : "bg-white/5 text-gray-500 border-white/5 hover:text-gray-300 hover:border-white/10"
