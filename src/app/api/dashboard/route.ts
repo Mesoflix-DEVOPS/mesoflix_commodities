@@ -52,15 +52,16 @@ export async function GET(request: Request) {
         };
 
         try {
-            // 2. Obtain valid session (Cached or Fresh)
             const isDemo = modeInput === 'demo';
             const session = await getValidSession(userId, isDemo);
+            // Use the account's actual endpoint, not just the frontend mode
+            const apiIsDemo = session.accountIsDemo ?? isDemo;
 
             // 3. Get Data with session tokens
             const [accountsData, positionsData, historyData] = await Promise.all([
-                getAccounts(session.cst, session.xSecurityToken, isDemo),
-                getPositions(session.cst, session.xSecurityToken, isDemo),
-                getHistory(session.cst, session.xSecurityToken, isDemo)
+                getAccounts(session.cst, session.xSecurityToken, apiIsDemo),
+                getPositions(session.cst, session.xSecurityToken, apiIsDemo),
+                getHistory(session.cst, session.xSecurityToken, apiIsDemo)
             ]);
 
             const activities = historyData.activities || [];
@@ -91,12 +92,13 @@ export async function GET(request: Request) {
             // If the session token itself is stale, try a force-refresh once
             if (msg.includes('401') || msg.includes('unauthorized') || msg.toLowerCase().includes('session')) {
                 try {
-                    const isDemo = modeInput === 'demo';
-                    const session = await getValidSession(userId, isDemo, true);
+                    const isDemo2 = modeInput === 'demo';
+                    const session = await getValidSession(userId, isDemo2, true);
+                    const apiIsDemo2 = session.accountIsDemo ?? isDemo2;
                     const [accountsData, positionsData, historyData] = await Promise.all([
-                        getAccounts(session.cst, session.xSecurityToken, isDemo),
-                        getPositions(session.cst, session.xSecurityToken, isDemo),
-                        getHistory(session.cst, session.xSecurityToken, isDemo)
+                        getAccounts(session.cst, session.xSecurityToken, apiIsDemo2),
+                        getPositions(session.cst, session.xSecurityToken, apiIsDemo2),
+                        getHistory(session.cst, session.xSecurityToken, apiIsDemo2)
                     ]);
                     const activities = historyData.activities || [];
                     return NextResponse.json({

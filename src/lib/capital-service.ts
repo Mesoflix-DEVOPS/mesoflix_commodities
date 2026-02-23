@@ -7,6 +7,7 @@ import { eq, and } from 'drizzle-orm';
 interface SessionTokens {
     cst: string;
     xSecurityToken: string;
+    accountIsDemo: boolean; // which Capital.com server these tokens belong to
 }
 
 /**
@@ -37,36 +38,43 @@ export async function getValidSession(userId: string, isDemo: boolean = false, f
     }
 
     if (!userAccount) {
-        throw new Error(`Personal Capital.com account not setup for ${targetType} mode.`);
+        throw new Error(`No Capital.com account found — please set up master credentials.`);
     }
 
-    // User or Master has their own Capital.com account
+    // KEY FIX: Use the account's ACTUAL type to determine the endpoint.
+    // A live account must ALWAYS call the live endpoint, even if the frontend
+    // requested 'demo' mode. Sending live API keys to the demo endpoint = 401.
+    // The `isDemo` param only controls account selection (which Row to use),
+    // not which Capital.com server to connect to.
+    const accountIsDemo = userAccount.account_type === 'demo';
+
+    // Use cached session if still fresh
     if (!forceRefresh && userAccount.encrypted_session_tokens && userAccount.session_updated_at) {
         const lastUpdate = new Date(userAccount.session_updated_at);
         if (now.getTime() - lastUpdate.getTime() < SESSION_EXPIRY) {
             try {
                 return JSON.parse(decrypt(userAccount.encrypted_session_tokens));
             } catch (err) {
-                console.error("[Capital Service] Failed to decrypt cached session for user account:", err);
+                console.error('[Capital Service] Failed to decrypt cached session:', err);
             }
         }
     }
 
-    console.log(`[Capital Service] Generating fresh session for account ${userAccount.id.substring(0, 8)} (${targetType})...`);
-    // Query the *actual* owner of the capital account, not necessarily the requesting user
+    console.log(`[Capital Service] Creating fresh session for account ${userAccount.id.substring(0, 8)} (actual type: ${userAccount.account_type}, requested mode: ${targetType})...`);
     const [user] = await db.select().from(users).where(eq(users.id, userAccount.user_id)).limit(1);
-    if (!user) throw new Error('User not found.');
+    if (!user) throw new Error('Account owner not found.');
 
     const apiKey = decrypt(userAccount.encrypted_api_key);
     const apiPassword = userAccount.encrypted_api_password ? decrypt(userAccount.encrypted_api_password) : null;
 
     if (!apiPassword) {
-        throw new Error(`API password missing for user account: ${userAccount.id.substring(0, 8)}...`);
+        throw new Error(`API password missing for account: ${userAccount.id.substring(0, 8)}`);
     }
 
     try {
-        const newSession = await createSession(user.email, apiPassword, apiKey, isDemo);
-        const tokens: SessionTokens = { cst: newSession.cst, xSecurityToken: newSession.xSecurityToken };
+        // Use accountIsDemo (not isDemo from params) so we hit the correct Capital.com server
+        const newSession = await createSession(user.email, apiPassword, apiKey, accountIsDemo);
+        const tokens: SessionTokens = { cst: newSession.cst, xSecurityToken: newSession.xSecurityToken, accountIsDemo };
 
         await db.update(capitalAccounts)
             .set({
@@ -77,7 +85,7 @@ export async function getValidSession(userId: string, isDemo: boolean = false, f
 
         return tokens;
     } catch (err: any) {
-        console.error(`[Capital Service] createSession failed for user ${userId.substring(0, 8)}:`, err.message);
+        console.error(`[Capital Service] createSession failed:`, err.message);
         throw new Error(`Capital Connection Error: ${err.message}`);
     }
 }

@@ -29,13 +29,16 @@ export async function GET(req: NextRequest) {
         const { searchParams } = new URL(req.url);
         const mode = searchParams.get('mode') || 'demo';
         const isDemo = mode === 'demo';
-        const API_URL = isDemo ? DEMO_API : LIVE_API;
 
         // Default epics using Capital.com's correct short symbol format
         const epicsParam = searchParams.get('epics');
         const epics = epicsParam ? epicsParam.split(',') : ['GOLD', 'OIL_CRUDE', 'EURUSD', 'BTCUSD'];
 
         const session = await getValidSession(tokenPayload.userId, isDemo);
+        // CRITICAL: use the account's actual endpoint — live keys must go to live endpoint.
+        // Even if user clicked 'demo' mode, the master account in our DB is 'live'.
+        const apiIsDemo = session.accountIsDemo ?? isDemo;
+        const API_URL = apiIsDemo ? DEMO_API : LIVE_API;
 
         // Fetch market snapshots via REST (no websocket, Netlify compatible)
         const response = await fetch(`${API_URL}/markets?epics=${epics.join(',')}`, {
