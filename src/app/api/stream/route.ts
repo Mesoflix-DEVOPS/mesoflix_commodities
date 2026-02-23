@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { getValidSession } from "@/lib/capital-service";
 import { verifyAccessToken } from "@/lib/auth";
 import { cookies } from "next/headers";
+import WebSocket from "ws";
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -66,8 +67,6 @@ export async function GET(req: NextRequest) {
             let ws: any;
 
             try {
-                // Dynamically import ws inside the stream start to avoid Edge runtime issues if this runs there
-                const WebSocket = require('ws');
                 ws = new WebSocket(wsUrl);
 
                 ws.on('open', () => {
