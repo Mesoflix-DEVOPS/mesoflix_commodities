@@ -32,30 +32,23 @@ export async function POST(request: Request) {
             return NextResponse.json({ message: 'Invalid email or password' }, { status: 401 });
         }
 
-        // 3. Retrieve Capital Account Credentials
+        // 3. Retrieve Capital Account Credentials (optional - not required for login)
         const [account] = await db.select().from(capitalAccounts).where(eq(capitalAccounts.user_id, user.id)).limit(1);
 
-        if (!account) {
-            return NextResponse.json({ message: 'Capital.com account not linked. Please register again.' }, { status: 404 });
-        }
-
-        // Since the site password IS the API password now, we can use it directly
-        // or decrypt the stored one to be absolutely sure. Decrypting is safer 
-        // in case the user changed their Capital password but not their Mesoflix one 
-        // (though we try to keep them sync'd now).
-        const apiKey = decrypt(account.encrypted_api_key);
-        const apiPassword = account.encrypted_api_password ? decrypt(account.encrypted_api_password) : password;
-
-        // 4. Establish Capital.com Session
-        let session;
-        try {
-            const isDemo = account.account_type === 'demo';
-            session = await createSession(email, apiPassword, apiKey, isDemo);
-        } catch (err: any) {
-            console.error(`[Login] Capital.com Session Failed for ${email}:`, err.message);
-            // If the provided password worked for the site but failed for Capital, 
-            // the credentials might be out of sync.
-            return NextResponse.json({ message: 'Capital.com authentication failed. Your trading password may have changed.' }, { status: 401 });
+        // 4. Attempt Capital.com Session (non-blocking - failure should not block login)
+        if (account) {
+            try {
+                const apiKey = decrypt(account.encrypted_api_key);
+                const apiPassword = account.encrypted_api_password ? decrypt(account.encrypted_api_password) : password;
+                const isDemo = account.account_type === 'demo';
+                await createSession(email, apiPassword, apiKey, isDemo);
+                console.log(`[Login] Capital.com session established for ${email}`);
+            } catch (err: any) {
+                // Non-blocking: log but do NOT fail login
+                console.warn(`[Login] Capital.com session failed for ${email} (non-blocking): ${err.message}`);
+            }
+        } else {
+            console.log(`[Login] No Capital.com account linked for ${email} — will use master credentials for trading`);
         }
 
         // 5. Update last login

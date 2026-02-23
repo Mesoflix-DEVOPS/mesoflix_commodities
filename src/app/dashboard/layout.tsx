@@ -1,32 +1,50 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Sidebar from "@/components/dashboard/Sidebar";
 import TopNav from "@/components/dashboard/TopNav";
 import RightPanel from "@/components/dashboard/RightPanel";
 import { cn } from "@/lib/utils";
-import { useSearchParams, useRouter, usePathname } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Suspense } from "react";
-import { MarketDataProvider, useMarketData } from "@/contexts/MarketDataContext";
+import { MarketDataProvider } from "@/contexts/MarketDataContext";
+
+// Wraps a fetch and auto-refreshes the access token on 401.
+// If refresh also fails, redirects to /login.
+async function authedFetch(url: string, router: ReturnType<typeof useRouter>, options?: RequestInit): Promise<Response | null> {
+    let res = await fetch(url, options);
+    if (res.status === 401) {
+        // Try silent refresh
+        const refreshRes = await fetch('/api/auth/refresh', { method: 'POST' });
+        if (refreshRes.ok) {
+            // Retry original request with fresh cookie
+            res = await fetch(url, options);
+        } else {
+            // Refresh failed — force re-login
+            router.push('/login?debug=session_expired');
+            return null;
+        }
+    }
+    return res;
+}
 
 function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
     const [isCollapsed, setCollapsed] = useState(false);
     const [isMobileOpen, setMobileOpen] = useState(false);
     const [userData, setUserData] = useState<any>(null);
-
     const router = useRouter();
-    const pathname = usePathname();
-    const searchParams = useSearchParams();
-    const mode = searchParams.get("mode") || "demo";
+
+    const fetchUserData = useCallback(async () => {
+        const res = await authedFetch('/api/dashboard?mode=real', router);
+        if (res?.ok) {
+            const data = await res.json();
+            setUserData(data?.user);
+        }
+    }, [router]);
 
     useEffect(() => {
-        // Shared but lightweight user fetch for the shell
-        // Passing mode ensures we don't trigger a 401 from a mismatched session
-        fetch(`/api/dashboard?mode=${mode}`)
-            .then(res => res.json())
-            .then(data => setUserData(data?.user))
-            .catch(() => { });
-    }, [mode]);
+        fetchUserData();
+    }, [fetchUserData]);
 
     return (
         <MarketDataProvider>
@@ -56,7 +74,6 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
                             </div>
                         </main>
 
-                        {/* Integrated Right Panel - Collapsible within the flex flow */}
                         <div className="hidden xl:block">
                             <RightPanel />
                         </div>
@@ -67,7 +84,6 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
                     </footer>
                 </div>
 
-                {/* Backdrop for mobile */}
                 {isMobileOpen && (
                     <div
                         className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[55] md:hidden transition-all duration-500"
