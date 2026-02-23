@@ -33,8 +33,8 @@ async function fetchTick(epic: string, cst: string, xst: string, isDemo: boolean
     };
 }
 
-export async function GET(req: NextRequest, { params }: { params: { epic: string } }) {
-    const { epic } = params;
+export async function GET(req: NextRequest, { params }: { params: Promise<{ epic: string }> }) {
+    const { epic } = await params;
 
     // Auth
     const cookieStore = await cookies();
