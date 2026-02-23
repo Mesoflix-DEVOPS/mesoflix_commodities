@@ -185,7 +185,7 @@ function DashboardPageInner() {
                     </div>
 
                     <div className="h-[300px] min-h-[300px] w-full relative z-10">
-                        <ResponsiveContainer width="100%" height="100%" minHeight={300}>
+                        <ResponsiveContainer width="100%" height="100%" minHeight={300} minWidth={1}>
                             <AreaChart data={performanceData}>
                                 <defs>
                                     <linearGradient id="colorEquity" x1="0" y1="0" x2="0" y2="1">
@@ -301,7 +301,7 @@ function DashboardPageInner() {
                     </h3>
 
                     <div className="flex-1 flex flex-col items-center justify-center p-4 bg-white/5 rounded-3xl relative min-h-[200px]">
-                        <ResponsiveContainer width="100%" height={150}>
+                        <ResponsiveContainer width="100%" height={150} minWidth={1}>
                             <RePieChart>
                                 <Pie
                                     data={riskByAsset}

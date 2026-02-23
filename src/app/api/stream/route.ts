@@ -41,7 +41,14 @@ export async function GET(req: NextRequest) {
         session = await getValidSession(userId, isDemo);
     } catch (err: any) {
         console.error("[Stream API] Failed to get Valid Session:", err.message);
-        return new Response(`Capital session failed: ${err.message}`, { status: 500 });
+        const errorStream = new ReadableStream({
+            start(controller) {
+                const message = `event: error\ndata: ${JSON.stringify({ message: err.message })}\n\n`;
+                controller.enqueue(new TextEncoder().encode(message));
+                controller.close();
+            }
+        });
+        return new Response(errorStream, { headers });
     }
 
     // 4. Create an SSE stream

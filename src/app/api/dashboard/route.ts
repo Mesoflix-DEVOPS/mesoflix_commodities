@@ -91,16 +91,18 @@ export async function GET(request: Request) {
                     });
                 } catch (retryErr: any) {
                     return NextResponse.json({
-                        message: `Capital.com connectivity failed: ${retryErr.message}`,
+                        accounts: [], positions: [], history: [],
+                        error: `Capital.com connectivity failed: ${retryErr.message}`,
                         user: userData
-                    }, { status: 401 });
+                    }); // Return 200 to prevent frontend crash
                 }
             }
 
             return NextResponse.json({
-                message: `Capital.com error: ${err.message}`,
+                accounts: [], positions: [], history: [],
+                error: `Capital.com error: ${err.message}`,
                 user: userData
-            }, { status: 401 });
+            });
         }
 
     } catch (error: any) {

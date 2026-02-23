@@ -107,6 +107,11 @@ export function MarketDataProvider({ children }: { children: React.ReactNode }) 
             });
         };
 
+        // Clear old data when mode changes
+        setMarketData({});
+        setBalanceData(null);
+        setConnectionStatus('connecting');
+
         // Also fetch initial static balance
         fetch(`/api/dashboard?mode=${mode}`)
             .then(res => res.json())
@@ -119,9 +124,14 @@ export function MarketDataProvider({ children }: { children: React.ReactNode }) 
                         availableToWithdraw: data.accounts[0].balance.availableToWithdraw,
                         equity: data.accounts[0].balance.equity
                     });
+                } else {
+                    setBalanceData(null);
                 }
             })
-            .catch(err => console.error("Error fetching balance data:", err));
+            .catch(err => {
+                console.error("Error fetching balance data:", err);
+                setBalanceData(null);
+            });
 
         connectStream();
 

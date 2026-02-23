@@ -80,7 +80,7 @@ export default function TopNav({
                     <span className="text-[10px] text-teal font-bold uppercase tracking-widest leading-none mb-1">Total Equity</span>
                     <div className="flex items-center gap-2">
                         <span className="text-sm font-bold text-white font-mono">
-                            {balanceData ? `$ ${balanceData.equity.toLocaleString()}` : "$ --.--"}
+                            {balanceData && typeof balanceData.equity === 'number' ? `$ ${balanceData.equity.toLocaleString()}` : "$ --.--"}
                         </span>
                         <div className={cn("flex items-center text-[10px] px-1.5 py-0.5 rounded",
                             balanceData?.profitLoss && balanceData.profitLoss > 0 ? "text-green-500 bg-green-500/10" :
