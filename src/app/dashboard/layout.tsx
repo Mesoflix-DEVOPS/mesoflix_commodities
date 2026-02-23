@@ -9,24 +9,25 @@ import { useRouter } from "next/navigation";
 import { Suspense } from "react";
 import { MarketDataProvider } from "@/contexts/MarketDataContext";
 
-// Wraps a fetch and auto-refreshes the access token on 401.
-// If refresh also fails, redirects to /login.
+// Only redirects to login when the token is genuinely invalid.
+// Capital.com data errors return 200+warning, so they won't trigger this.
 async function authedFetch(url: string, router: ReturnType<typeof useRouter>, options?: RequestInit): Promise<Response | null> {
     let res = await fetch(url, options);
     if (res.status === 401) {
-        // Try silent refresh
+        // Try silent token refresh first
         const refreshRes = await fetch('/api/auth/refresh', { method: 'POST' });
         if (refreshRes.ok) {
-            // Retry original request with fresh cookie
             res = await fetch(url, options);
         } else {
-            // Refresh failed — force re-login
+            // Refresh truly failed — user needs to log in again
             router.push('/login?debug=session_expired');
             return null;
         }
     }
+    // For everything else (200, 502, etc.) just return the response
     return res;
 }
+
 
 function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
     const [isCollapsed, setCollapsed] = useState(false);
@@ -35,12 +36,14 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
     const router = useRouter();
 
     const fetchUserData = useCallback(async () => {
-        const res = await authedFetch('/api/dashboard?mode=real', router);
+        // Use a lightweight user endpoint — don't depend on Capital.com being up
+        const res = await authedFetch('/api/user', router);
         if (res?.ok) {
             const data = await res.json();
             setUserData(data?.user);
         }
     }, [router]);
+
 
     useEffect(() => {
         fetchUserData();

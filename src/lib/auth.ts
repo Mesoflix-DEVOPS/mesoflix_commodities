@@ -72,8 +72,9 @@ export async function setAuthCookies(accessToken: string, refreshToken: string) 
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
         maxAge: 3 * 24 * 60 * 60, // 3 days
-        path: '/api/auth/refresh', // Scope to refresh endpoint only
+        path: '/',
     });
+
 }
 
 /**
