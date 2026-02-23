@@ -85,10 +85,10 @@ export default function RightPanel() {
                             <span className="text-[8px] text-teal font-black uppercase tracking-widest bg-teal/5 px-2 py-0.5 rounded border border-teal/10">Streaming</span>
                         </div>
                         <div className="space-y-4">
-                            <TickerItem symbol="GOLD" {...getPriceData("IX.D.GOLD.IFM.IP")} />
-                            <TickerItem symbol="OIL" {...getPriceData("IX.D.WTI.IFM.IP")} />
-                            <TickerItem symbol="EUR/USD" {...getPriceData("EU.D.EURUSD.CASH.IP")} />
-                            <TickerItem symbol="BTC/USD" {...getPriceData("BT.D.BTCUSD.CASH.IP")} />
+                            <TickerItem symbol="GOLD" {...getPriceData("GOLD")} />
+                            <TickerItem symbol="OIL" {...getPriceData("OIL_CRUDE")} />
+                            <TickerItem symbol="EUR/USD" {...getPriceData("EURUSD")} />
+                            <TickerItem symbol="BTC/USD" {...getPriceData("BTCUSD")} />
                         </div>
                     </div>
 

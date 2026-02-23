@@ -55,36 +55,40 @@ export function MarketDataProvider({ children }: { children: React.ReactNode }) 
                 try {
                     const data = JSON.parse(event.data);
 
-                    if (data.payload && data.payload.quotes) {
-                        setMarketData(prev => {
-                            const newData = { ...prev };
-                            data.payload.quotes.forEach((q: any) => {
-                                newData[q.epic] = {
-                                    bid: q.bid,
-                                    offer: q.offer,
-                                    change: q.netChange || 0,
-                                    changePct: q.netChangePct || 0,
-                                    updateTime: q.updateTime
-                                };
-                            });
-                            return newData;
-                        });
+                    // Capital.com WebSocket quote format:
+                    // { "status": "OK", "destination": "quote", "payload": { "epic": "GOLD", "bid": 1234.5, "ofr": 1234.7, ... } }
+                    // Note: field is "ofr" NOT "offer", and each message is one quote, not an array
+                    if (data.destination === 'quote' && data.payload?.epic) {
+                        const q = data.payload;
+                        setMarketData(prev => ({
+                            ...prev,
+                            [q.epic]: {
+                                bid: q.bid,
+                                offer: q.ofr,  // API uses "ofr" not "offer"
+                                change: 0,
+                                changePct: 0,
+                                updateTime: String(q.timestamp || Date.now())
+                            }
+                        }));
                         setConnectionStatus('connected');
-                    } else if (data.payload && data.payload.ohlc) {
-                        setMarketData(prev => {
-                            const newData = { ...prev };
-                            data.payload.ohlc.forEach((o: any) => {
-                                if (o.epic) {
-                                    newData[o.epic] = {
-                                        ...newData[o.epic],
-                                        bid: o.close.bid,
-                                        offer: o.close.ask,
-                                        change: 0,
-                                    };
-                                }
-                            });
-                            return newData;
-                        });
+                    } else if (data.destination === 'ohlc.event' && data.payload?.epic) {
+                        // OHLC event format: { destination: 'ohlc.event', payload: { epic, h, l, o, c, ... } }
+                        const o = data.payload;
+                        setMarketData(prev => ({
+                            ...prev,
+                            [o.epic]: {
+                                ...prev[o.epic],
+                                bid: o.c,   // close price as current price
+                                offer: o.c,
+                                change: 0,
+                                changePct: 0,
+                                updateTime: String(o.t || Date.now())
+                            }
+                        }));
+                        setConnectionStatus('connected');
+                    } else if (data.status === 'OK' && data.destination?.includes('subscribe')) {
+                        // Subscription confirmation - mark as connected
+                        console.log('[Stream] Subscription confirmed:', data.destination);
                         setConnectionStatus('connected');
                     }
                 } catch (e) {

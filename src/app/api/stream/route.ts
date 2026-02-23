@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
     const mode = searchParams.get('mode') || 'demo';
     const isDemo = mode === 'demo';
     const epicsParam = searchParams.get('epics');
-    const epics = epicsParam ? epicsParam.split(',') : ['IX.D.GOLD.IFM.IP', 'IX.D.WTI.IFM.IP', 'EU.D.EURUSD.CASH.IP', 'BT.D.BTCUSD.CASH.IP'];
+    const epics = epicsParam ? epicsParam.split(',') : ['GOLD', 'OIL_CRUDE', 'EURUSD', 'BTCUSD'];
 
     // 3. Obtain Capital.com session
     let session;
@@ -70,19 +70,34 @@ export async function GET(req: NextRequest) {
                 ws = new WebSocket(wsUrl);
 
                 ws.on('open', () => {
-                    // Send ping/auth or subscribe messages immediately
                     console.log(`[Stream API] WebSocket Connected to ${wsUrl}`);
 
-                    // The subscribe request for Ohlc/Quotes
+                    // Subscribe to real-time price quotes (marketData.subscribe)
+                    // API docs: destination must be exactly "marketData.subscribe"
+                    // Response comes as messages with destination "quote"
                     ws.send(JSON.stringify({
-                        destination: "OHLCMarketData.subscribe",
+                        destination: "marketData.subscribe",
+                        correlationId: "1",
                         cst: session.cst,
                         securityToken: session.xSecurityToken,
                         payload: {
-                            epics: epics,
-                            resolution: "MINUTE_1"
+                            epics: epics
                         }
                     }));
+
+                    // Keep session alive with pings every 9 minutes (tokens expire after 10 min)
+                    const pingInterval = setInterval(() => {
+                        if (ws.readyState === 1 /* OPEN */) {
+                            ws.send(JSON.stringify({
+                                destination: "ping",
+                                correlationId: "ping",
+                                cst: session.cst,
+                                securityToken: session.xSecurityToken
+                            }));
+                        } else {
+                            clearInterval(pingInterval);
+                        }
+                    }, 9 * 60 * 1000);
                 });
 
                 ws.on('message', (dataRaw: any) => {
