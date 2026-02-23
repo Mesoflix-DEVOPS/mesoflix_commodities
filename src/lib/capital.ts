@@ -117,24 +117,36 @@ export const placeOrder = async (
     epic: string,
     direction: 'BUY' | 'SELL',
     size: number,
-    isDemo: boolean = false
+    accountIsDemo: boolean = false,
+    options?: {
+        takeProfit?: number | null;
+        stopLoss?: number | null;
+        trailingStop?: boolean;
+    }
 ) => {
-    const API_URL = getApiUrl(isDemo);
+    const API_URL = getApiUrl(accountIsDemo);
+
+    const body: Record<string, any> = {
+        epic,
+        direction,
+        size,
+        orderType: 'MARKET',
+        guaranteedStop: false,
+        forceOpen: true,
+    };
+
+    if (options?.takeProfit != null) body.profitLevel = options.takeProfit;
+    if (options?.stopLoss != null) body.stopLevel = options.stopLoss;
+    if (options?.trailingStop) body.trailingStop = true;
+
     const response = await fetch(`${API_URL}/positions`, {
         method: 'POST',
         headers: {
             'X-SECURITY-TOKEN': xSecurityToken,
             'CST': cst,
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-            epic,
-            direction,
-            size,
-            orderType: 'MARKET',
-            guaranteedStop: false,
-            forceOpen: true
-        })
+        body: JSON.stringify(body),
     });
 
     if (!response.ok) {

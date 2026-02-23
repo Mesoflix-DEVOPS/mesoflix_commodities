@@ -1,8 +1,7 @@
 import { db } from '@/lib/db';
-import { capitalAccounts, users } from '@/lib/db/schema';
-import { decrypt } from '@/lib/crypto';
+import { users } from '@/lib/db/schema';
 import { getValidSession } from '@/lib/capital-service';
-import { createSession, placeOrder } from '@/lib/capital';
+import { placeOrder } from '@/lib/capital';
 import { verifyAccessToken } from '@/lib/auth';
 import { eq } from 'drizzle-orm';
 import { cookies } from 'next/headers';
@@ -10,76 +9,64 @@ import { NextResponse } from 'next/server';
 
 export async function POST(request: Request) {
     try {
-        const cookieStore = cookies();
-        const accessToken = (await cookieStore).get('access_token')?.value;
-
-        if (!accessToken) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-        }
+        const cookieStore = await cookies();
+        const accessToken = cookieStore.get('access_token')?.value;
+        if (!accessToken) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
         const tokenPayload = await verifyAccessToken(accessToken);
-        if (!tokenPayload) {
-            const secretSet = !!process.env.JWT_SECRET;
-            return NextResponse.json({
-                error: 'Unauthorized',
-                debug: { secretSet, context: 'node-trade' }
-            }, { status: 401 });
-        }
+        if (!tokenPayload) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
         const userId = tokenPayload.userId;
         const body = await request.json();
-        const { epic, direction, size, mode: requestMode = 'demo' } = body;
+        const {
+            epic, direction, size,
+            takeProfit, stopLoss, trailingStop,
+            mode: requestMode = 'demo',
+        } = body;
 
         if (!epic || !direction || !size) {
-            return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+            return NextResponse.json({ error: 'Missing required fields: epic, direction, size' }, { status: 400 });
         }
 
-        // Fetch user for login_id
         const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
         if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
 
-        // Get appropriate account for session        
-        const targetType = requestMode === 'real' ? 'live' : requestMode;
-        const allAccounts = await db.select().from(capitalAccounts).where(eq(capitalAccounts.user_id, userId));
-        const account = allAccounts.find(a => a.account_type === targetType) || allAccounts[0];
+        const isDemo = requestMode === 'demo';
 
-        if (!account) {
-            return NextResponse.json({ error: 'Capital account not found' }, { status: 404 });
-        }
+        const executeWithSession = async (forceRefresh = false) => {
+            const session = await getValidSession(userId, isDemo, forceRefresh);
+            const accountIsDemo = session.accountIsDemo ?? false;
+            return placeOrder(
+                session.cst, session.xSecurityToken,
+                epic, direction, parseFloat(size),
+                accountIsDemo,
+                {
+                    takeProfit: takeProfit ? parseFloat(takeProfit) : null,
+                    stopLoss: stopLoss ? parseFloat(stopLoss) : null,
+                    trailingStop: Boolean(trailingStop),
+                }
+            );
+        };
 
         try {
-            // Obtain valid session (Cached or Fresh)
-            const isDemo = requestMode === 'demo';
-            const session = await getValidSession(userId, isDemo);
-
-            const executionResult = await placeOrder(session.cst, session.xSecurityToken, epic, direction, size, isDemo);
-            return NextResponse.json(executionResult);
-
+            const result = await executeWithSession();
+            return NextResponse.json({ success: true, ...result });
         } catch (err: any) {
-            console.error("[Trade API] Capital.com Error:", err.message);
-
-            if (err.message.includes("Session Expired") || err.message.includes("401") || err.message.includes("unauthorized")) {
+            console.error('[Trade API] First attempt failed:', err.message);
+            // Auto-retry with fresh session on auth errors
+            if (err.message.includes('401') || err.message.toLowerCase().includes('session') || err.message.toLowerCase().includes('unauthorized')) {
                 try {
-                    const isDemo = requestMode === 'demo';
-                    const session = await getValidSession(userId, isDemo, true);
-                    const executionResult = await placeOrder(session.cst, session.xSecurityToken, epic, direction, size, isDemo);
-                    return NextResponse.json(executionResult);
+                    const result = await executeWithSession(true);
+                    return NextResponse.json({ success: true, ...result });
                 } catch (retryErr: any) {
-                    return NextResponse.json({
-                        error: `Trade recovery failed: ${retryErr.message}`,
-                        debug: { refreshAttempted: true }
-                    }, { status: 401 });
+                    return NextResponse.json({ error: `Trade failed after retry: ${retryErr.message}` }, { status: 502 });
                 }
             }
-
-            return NextResponse.json({
-                error: `Trade Execution Error: ${err.message}`,
-                debug: { sessionValid: true }
-            }, { status: 500 });
+            return NextResponse.json({ error: err.message }, { status: 502 });
         }
 
     } catch (error: any) {
-        console.error('Trade API Error:', error);
+        console.error('[Trade API] Fatal error:', error.message);
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }
