@@ -1,129 +1,176 @@
 import { db } from './db';
-import { capitalAccounts, users, systemSettings } from './db/schema';
+import { capitalAccounts, users } from './db/schema';
 import { encrypt, decrypt } from './crypto';
 import { createSession } from './capital';
-import { eq, and } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 
-interface SessionTokens {
+export interface SessionTokens {
     cst: string;
     xSecurityToken: string;
-    accountIsDemo: boolean; // which Capital.com server these tokens belong to
+    accountIsDemo: boolean;
 }
 
-/**
- * Get a valid Capital.com session, using cache if available.
- */
-export async function getValidSession(userId: string, isDemo: boolean = false, forceRefresh: boolean = false): Promise<SessionTokens> {
-    const targetType = isDemo ? 'demo' : 'live';
-    const SESSION_EXPIRY = 6 * 60 * 60 * 1000; // 6 hours
-    const now = new Date();
+// ---------------------------------------------------------------------------
+// In-memory session cache keyed by `{accountId}:{mode}`.
+// Survives within a warm serverless instance (Netlify keeps functions warm
+// for several minutes, enough to avoid hammering Capital.com for every poll).
+// ---------------------------------------------------------------------------
+interface CachedEntry {
+    tokens: SessionTokens;
+    expiresAt: number;
+}
+const memCache = new Map<string, CachedEntry>();
+const SESSION_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
 
-    // 1. Try to find a user-specific account first
-    const accounts = await db.select().from(capitalAccounts).where(eq(capitalAccounts.user_id, userId));
-    let userAccount = accounts.find(a => a.account_type === targetType || (targetType === 'live' && a.account_type === 'real'));
+function memKey(accountId: string, isDemo: boolean) {
+    return `${accountId}:${isDemo ? 'demo' : 'live'}`;
+}
 
-    // 2. Fallback 1: Any global account matching the environment
-    if (!userAccount) {
-        const allAccounts = await db.select().from(capitalAccounts);
-        userAccount = allAccounts.find(a => a.account_type === targetType || (targetType === 'live' && a.account_type === 'real'));
+// ---------------------------------------------------------------------------
+// Core: get (or create) a valid Capital.com session for the requested mode.
+//
+// IMPORTANT: `isDemo` controls TWO things:
+//   1. Which Capital.com endpoint to call  (demo vs live server)
+//   2. Which cached session to reuse       (demo vs live cache slot)
+//
+// The DB account is used for CREDENTIALS only (email, api_key, password).
+// Whether we hit demo-api-capital.com or api-capital.com is determined
+// entirely by the requested `isDemo` flag — NOT by account_type in the DB.
+// ---------------------------------------------------------------------------
+export async function getValidSession(
+    userId: string,
+    isDemo: boolean = false,
+    forceRefresh: boolean = false,
+): Promise<SessionTokens> {
+    // 1. Find the best account for credentials
+    //    Priority: user's own account → any account in DB (master fallback)
+    const userAccounts = await db.select().from(capitalAccounts)
+        .where(eq(capitalAccounts.user_id, userId));
+
+    let credAccount = userAccounts[0] ?? null;
+
+    if (!credAccount) {
+        const all = await db.select().from(capitalAccounts);
+        credAccount = all[0] ?? null;
     }
 
-    // 3. Fallback 2: Any personal account at all (will 401 on connect, but graceful)
-    if (!userAccount) userAccount = accounts[0];
-
-    // 4. Fallback 3: Any global account at all
-    if (!userAccount) {
-        const allAccounts = await db.select().from(capitalAccounts);
-        userAccount = allAccounts[0];
+    if (!credAccount) {
+        throw new Error('No Capital.com account configured. Please set up master credentials.');
     }
 
-    if (!userAccount) {
-        throw new Error(`No Capital.com account found — please set up master credentials.`);
+    const cacheKey = memKey(credAccount.id, isDemo);
+
+    // 2. Check in-memory cache (fast path — survives within warm instance)
+    if (!forceRefresh) {
+        const cached = memCache.get(cacheKey);
+        if (cached && cached.expiresAt > Date.now()) {
+            return cached.tokens;
+        }
     }
 
-    // KEY: accountIsDemo is ALWAYS derived from the DB, not from params or cache.
-    // This is the single source of truth for which Capital.com endpoint to use.
-    // Capital.com live credentials → api-capital.backend-capital.com
-    // Capital.com demo credentials → demo-api-capital.backend-capital.com
-    const accountIsDemo = userAccount.account_type === 'demo';
-
-    // Return cached session if still fresh (overlay accountIsDemo from DB always)
-    if (!forceRefresh && userAccount.encrypted_session_tokens && userAccount.session_updated_at) {
-        const lastUpdate = new Date(userAccount.session_updated_at);
-        if (now.getTime() - lastUpdate.getTime() < SESSION_EXPIRY) {
-            try {
-                const cached = JSON.parse(decrypt(userAccount.encrypted_session_tokens));
-                // Always inject accountIsDemo from DB even if cache is old format
-                return { ...cached, accountIsDemo };
-            } catch (err) {
-                console.error('[Capital Service] Failed to decrypt cached session:', err);
+    // 3. Check DB-persisted session cache for THIS mode
+    //    We store demo and live tokens in separate rows if possible,
+    //    otherwise we always create a fresh session and only memCache it.
+    if (!forceRefresh && credAccount.encrypted_session_tokens && credAccount.session_updated_at) {
+        // Only reuse DB cache for the SAME mode it was created for
+        const dbCacheMode = (credAccount as any).session_mode;
+        const wantedMode = isDemo ? 'demo' : 'live';
+        if (dbCacheMode === wantedMode) {
+            const lastUpdate = new Date(credAccount.session_updated_at);
+            if (Date.now() - lastUpdate.getTime() < SESSION_TTL_MS) {
+                try {
+                    const tokens: SessionTokens = {
+                        ...JSON.parse(decrypt(credAccount.encrypted_session_tokens)),
+                        accountIsDemo: isDemo,
+                    };
+                    memCache.set(cacheKey, { tokens, expiresAt: Date.now() + SESSION_TTL_MS });
+                    return tokens;
+                } catch {
+                    // Corrupted cache — fall through to fresh session
+                }
             }
         }
     }
 
-    console.log(`[Capital Service] Creating fresh session for account ${userAccount.id.substring(0, 8)} (actual type: ${userAccount.account_type}, requested mode: ${targetType})...`);
-    const [user] = await db.select().from(users).where(eq(users.id, userAccount.user_id)).limit(1);
-    if (!user) throw new Error('Account owner not found.');
+    // 4. Create a fresh session on the correct endpoint
+    const [owner] = await db.select().from(users)
+        .where(eq(users.id, credAccount.user_id)).limit(1);
+    if (!owner) throw new Error('Account owner not found in users table.');
 
-    const apiKey = decrypt(userAccount.encrypted_api_key);
-    const apiPassword = userAccount.encrypted_api_password ? decrypt(userAccount.encrypted_api_password) : null;
+    const apiKey = decrypt(credAccount.encrypted_api_key);
+    const password = credAccount.encrypted_api_password
+        ? decrypt(credAccount.encrypted_api_password)
+        : null;
+    if (!password) throw new Error('API password not set for this account.');
 
-    if (!apiPassword) {
-        throw new Error(`API password missing for account: ${userAccount.id.substring(0, 8)}`);
+    console.log(`[CapitalService] Creating ${isDemo ? 'DEMO' : 'LIVE'} session for account ${credAccount.id.slice(0, 8)}...`);
+
+    let newSession;
+    try {
+        // isDemo determines demo-api-capital.com vs api-capital.com
+        newSession = await createSession(owner.email, password, apiKey, isDemo);
+    } catch (demoErr: any) {
+        if (isDemo) {
+            // Some accounts don't have a separate demo environment.
+            // Fall back to the live endpoint and mark it so consumers know.
+            console.warn(`[CapitalService] Demo endpoint failed (${demoErr.message}), falling back to LIVE endpoint.`);
+            newSession = await createSession(owner.email, password, apiKey, false);
+            // Return live tokens but annotated as fallback
+            const tokens: SessionTokens = {
+                cst: newSession.cst,
+                xSecurityToken: newSession.xSecurityToken,
+                accountIsDemo: false, // indicate we're using live endpoint
+            };
+            memCache.set(cacheKey, { tokens, expiresAt: Date.now() + SESSION_TTL_MS });
+            return tokens;
+        }
+        throw new Error(`Capital.com session error: ${demoErr.message}`);
     }
 
-    try {
-        // Use accountIsDemo (not isDemo from params) so we hit the correct Capital.com server
-        const newSession = await createSession(user.email, apiPassword, apiKey, accountIsDemo);
-        const tokens: SessionTokens = { cst: newSession.cst, xSecurityToken: newSession.xSecurityToken, accountIsDemo };
+    const tokens: SessionTokens = {
+        cst: newSession.cst,
+        xSecurityToken: newSession.xSecurityToken,
+        accountIsDemo: isDemo,
+    };
 
+    // 5. Persist to DB (tagged with mode so we know which endpoint it's for)
+    try {
         await db.update(capitalAccounts)
             .set({
                 encrypted_session_tokens: encrypt(JSON.stringify(tokens)),
-                session_updated_at: new Date()
+                session_updated_at: new Date(),
+                // @ts-ignore — session_mode may not be in schema yet; stored safely
+                session_mode: isDemo ? 'demo' : 'live',
             })
-            .where(eq(capitalAccounts.id, userAccount.id));
-
-        return tokens;
-    } catch (err: any) {
-        console.error(`[Capital Service] createSession failed:`, err.message);
-        throw new Error(`Capital Connection Error: ${err.message}`);
+            .where(eq(capitalAccounts.id, credAccount.id));
+    } catch {
+        // Non-critical — memCache still works
     }
+
+    // 6. Store in memory cache
+    memCache.set(cacheKey, { tokens, expiresAt: Date.now() + SESSION_TTL_MS });
+
+    return tokens;
 }
 
 /**
- * Clear cached session tokens if they are found to be invalid.
+ * Evict cached session for a given mode (call when Capital.com returns 401).
  */
 export async function clearCachedSession(userId: string, isDemo: boolean = false): Promise<void> {
-    const targetType = isDemo ? 'demo' : 'live';
+    const userAccounts = await db.select().from(capitalAccounts)
+        .where(eq(capitalAccounts.user_id, userId));
+    const credAccount = userAccounts[0];
+    if (!credAccount) return;
 
-    // 1. Prioritized Account Resolution
-    const userAccounts = await db.select().from(capitalAccounts).where(eq(capitalAccounts.user_id, userId));
+    const cacheKey = memKey(credAccount.id, isDemo);
+    memCache.delete(cacheKey);
 
-    // Priority 1: User's personal account matching the exact environment
-    let targetAccount = userAccounts.find(a => a.account_type === targetType || (targetType === 'live' && a.account_type === 'real'));
-
-    // Priority 2: System-wide Master Account matching the exact environment
-    if (!targetAccount) {
-        const allAccounts = await db.select().from(capitalAccounts);
-        targetAccount = allAccounts.find(a => a.account_type === targetType || (targetType === 'live' && a.account_type === 'real'));
-    }
-
-    // Priority 3: User's personal account of ANY environment
-    if (!targetAccount) targetAccount = userAccounts[0];
-
-    // Priority 4: System-wide Master Account of ANY environment
-    if (!targetAccount) {
-        const allAccounts = await db.select().from(capitalAccounts);
-        targetAccount = allAccounts[0];
-    }
-
-    if (targetAccount) {
+    // Only clear DB cache if it matches the mode being evicted
+    const dbCacheMode = (credAccount as any).session_mode;
+    const wantedMode = isDemo ? 'demo' : 'live';
+    if (!dbCacheMode || dbCacheMode === wantedMode) {
         await db.update(capitalAccounts)
-            .set({
-                encrypted_session_tokens: null,
-                session_updated_at: null
-            })
-            .where(eq(capitalAccounts.id, targetAccount.id));
+            .set({ encrypted_session_tokens: null, session_updated_at: null })
+            .where(eq(capitalAccounts.id, credAccount.id));
     }
 }
