@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useState, Suspense, useCallback, useRef } from "react";
-import { useSearchParams } from "next/navigation";
 import {
-    BarChart3, Cpu, History, TrendingUp, TrendingDown,
+    BarChart3, History, TrendingUp, TrendingDown,
     ChevronDown, Zap, Activity, RefreshCw, Target, ShieldCheck,
-    AlertTriangle, CheckCircle2, BookOpen, ArrowUpRight, ArrowDownRight, Clock
+    AlertTriangle, CheckCircle2, BookOpen, ArrowUpRight, ArrowDownRight,
+    Clock, ExternalLink, LineChart
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useMarketData } from "@/contexts/MarketDataContext";
@@ -16,15 +16,16 @@ import {
 
 // ─── Instruments ──────────────────────────────────────────────────────────────
 const INSTRUMENTS = [
-    { epic: "GOLD", label: "Gold", symbol: "XAU/USD", flag: "🥇" },
-    { epic: "SILVER", label: "Silver", symbol: "XAG/USD", flag: "🥈" },
-    { epic: "OIL_CRUDE", label: "Crude Oil", symbol: "WTI", flag: "🛢️" },
-    { epic: "NATGAS", label: "Natural Gas", symbol: "NG", flag: "🔥" },
-    { epic: "EURUSD", label: "EUR/USD", symbol: "EURUSD", flag: "💶" },
-    { epic: "BTCUSD", label: "Bitcoin", symbol: "BTC/USD", flag: "₿" },
+    { epic: "GOLD", label: "Gold", symbol: "XAU/USD", flag: "🥇", tvSymbol: "TVC:GOLD" },
+    { epic: "SILVER", label: "Silver", symbol: "XAG/USD", flag: "🥈", tvSymbol: "TVC:SILVER" },
+    { epic: "OIL_CRUDE", label: "Crude Oil", symbol: "WTI", flag: "🛢️", tvSymbol: "TVC:USOIL" },
+    { epic: "NATGAS", label: "Natural Gas", symbol: "NG", flag: "🔥", tvSymbol: "TVC:NATURALGAS" },
+    { epic: "EURUSD", label: "EUR/USD", symbol: "EURUSD", flag: "💶", tvSymbol: "FX:EURUSD" },
+    { epic: "BTCUSD", label: "Bitcoin", symbol: "BTC/USD", flag: "₿", tvSymbol: "COINBASE:BTCUSD" },
 ];
 
 type Resolution = "MINUTE_5" | "MINUTE_30" | "HOUR" | "DAY";
+type ChartSource = "internal" | "tradingview";
 
 interface ChartPoint { time: string; open: number; high: number; low: number; close: number; }
 interface Snapshot { bid: number; offer: number; high: number; low: number; netChange: number; percentageChange: number; }
@@ -44,11 +45,9 @@ function analyseMarket(chart: ChartPoint[]): Analysis | null {
         const d = closes[i] - closes[i - 1];
         gains.push(d > 0 ? d : 0); losses.push(d < 0 ? -d : 0);
     }
-    const rsi = (() => {
-        const ag = gains.slice(-14).reduce((a, b) => a + b, 0) / 14;
-        const al = losses.slice(-14).reduce((a, b) => a + b, 0) / 14;
-        return al === 0 ? 100 : 100 - 100 / (1 + ag / al);
-    })();
+    const ag = gains.slice(-14).reduce((a, b) => a + b, 0) / 14;
+    const al = losses.slice(-14).reduce((a, b) => a + b, 0) / 14;
+    const rsi = al === 0 ? 100 : 100 - 100 / (1 + ag / al);
     const ema9 = ema(closes, 9);
     const ema21 = ema(closes, 21);
     const ema50 = ema(closes, Math.min(50, n));
@@ -67,15 +66,34 @@ function analyseMarket(chart: ChartPoint[]): Analysis | null {
             ? `Bullish EMA crossover + RSI ${rsi.toFixed(0)} ${rsi < 40 ? "(oversold)" : ""}. Price above key moving averages.`
             : signal === "SELL"
                 ? `Bearish EMA crossover + RSI ${rsi.toFixed(0)} ${rsi > 60 ? "(overbought)" : ""}. Price below key moving averages.`
-                : `Mixed signals: RSI ${rsi.toFixed(0)}, short ${shortTrend}, long ${longTrend}. Wait for clearer setup.`,
+                : `Mixed signals — RSI ${rsi.toFixed(0)}, short ${shortTrend}, long ${longTrend}. Wait for a clearer setup.`,
     };
+}
+
+// ─── TradingView Iframe ────────────────────────────────────────────────────────
+function TradingViewChart({ tvSymbol }: { tvSymbol: string }) {
+    const src = `https://www.tradingview.com/widgetembed/?frameElementId=tv_embed&symbol=${encodeURIComponent(tvSymbol)}&interval=60&hidesidetoolbar=0&hidetoptoolbar=0&theme=dark&style=1&locale=en&enable_publishing=0&toolbar_bg=%230E1B2A&hide_side_toolbar=0&allow_symbol_change=0&save_image=0&calendar=0&studies=%5B%5D`;
+    return (
+        <div className="w-full h-full rounded-2xl overflow-hidden bg-[#0E1B2A] border border-white/5">
+            <iframe
+                key={tvSymbol}                            // remount on symbol change
+                src={src}
+                title={`TradingView chart for ${tvSymbol}`}
+                width="100%"
+                height="100%"
+                frameBorder="0"
+                allowFullScreen
+                style={{ display: "block", minHeight: "100%" }}
+            />
+        </div>
+    );
 }
 
 // ─── Manual Trading Tab ───────────────────────────────────────────────────────
 function ManualTab({ mode }: { mode: string }) {
     const [instrument, setInstrument] = useState(INSTRUMENTS[0]);
-    const [showPicker, setShowPicker] = useState(false);
     const [resolution, setResolution] = useState<Resolution>("HOUR");
+    const [chartSource, setChartSource] = useState<ChartSource>("internal");
     const [chartData, setChartData] = useState<ChartPoint[]>([]);
     const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
     const [chartLoading, setChartLoading] = useState(true);
@@ -108,11 +126,11 @@ function ManualTab({ mode }: { mode: string }) {
         return () => { if (timerRef.current) clearInterval(timerRef.current); };
     }, [fetchChart]);
 
-    // Auto TP/SL from ATR
+    // Auto TP/SL from ATR when instrument/direction/snapshot changes
     useEffect(() => {
         if (!snapshot) return;
         const price = direction === "BUY" ? snapshot.offer : snapshot.bid;
-        const atr = snapshot.high - snapshot.low || price * 0.01;
+        const atr = Math.max(snapshot.high - snapshot.low, price * 0.002);
         const isForex = instrument.epic.includes("USD") && !instrument.epic.includes("BTC");
         const dp = isForex ? 5 : 2;
         setTakeProfit((direction === "BUY" ? price + atr * 1.5 : price - atr * 1.5).toFixed(dp));
@@ -154,25 +172,24 @@ function ManualTab({ mode }: { mode: string }) {
 
     return (
         <div className="grid grid-cols-1 xl:grid-cols-[1fr_340px] gap-6">
-            {/* ── LEFT: Chart + Analysis ─────────────────────────────────── */}
+            {/* ── LEFT COLUMN ───────────────────────────────────────────── */}
             <div className="space-y-4">
                 {/* Instrument picker */}
                 <div className="bg-[#0E1B2A] rounded-3xl border border-white/5 p-4">
                     <div className="flex flex-wrap gap-2">
                         <button
-                            onClick={() => setShowPicker(!showPicker)}
-                            className="flex items-center gap-2 bg-teal/10 border border-teal/20 rounded-2xl px-4 py-2.5 hover:bg-teal/20 transition-all"
+                            className="flex items-center gap-2 bg-teal/10 border border-teal/20 rounded-2xl px-4 py-2.5"
                         >
                             <span className="text-lg">{instrument.flag}</span>
-                            <div className="text-left">
+                            <div>
                                 <p className="text-xs font-black text-white">{instrument.label}</p>
                                 <p className="text-[9px] text-gray-500">{instrument.symbol}</p>
                             </div>
-                            <ChevronDown size={12} className={cn("text-teal ml-1 transition-transform", showPicker && "rotate-180")} />
+                            <ChevronDown size={12} className="text-teal ml-1" />
                         </button>
                         {INSTRUMENTS.filter(i => i.epic !== instrument.epic).map(inst => (
                             <button key={inst.epic}
-                                onClick={() => { setInstrument(inst); setShowPicker(false); }}
+                                onClick={() => { setInstrument(inst); setChartSource("internal"); }}
                                 className="flex items-center gap-2 bg-white/5 border border-white/5 rounded-2xl px-3 py-2 hover:border-teal/20 hover:bg-teal/5 transition-all"
                             >
                                 <span className="text-base">{inst.flag}</span>
@@ -182,7 +199,7 @@ function ManualTab({ mode }: { mode: string }) {
                     </div>
                 </div>
 
-                {/* Price header */}
+                {/* Price strip */}
                 <div className="bg-[#0E1B2A] rounded-3xl border border-white/5 p-5">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                         <div className="flex items-baseline gap-3 flex-wrap">
@@ -209,24 +226,50 @@ function ManualTab({ mode }: { mode: string }) {
                     </div>
                 </div>
 
-                {/* Chart */}
+                {/* Chart box */}
                 <div className="bg-[#0E1B2A] rounded-3xl border border-white/5 p-5">
+                    {/* Toolbar: resolution (internal only) + TV toggle */}
                     <div className="flex items-center gap-2 mb-4 flex-wrap">
-                        {(["MINUTE_5", "MINUTE_30", "HOUR", "DAY"] as Resolution[]).map((r, i) => (
+                        {chartSource === "internal" && (["MINUTE_5", "MINUTE_30", "HOUR", "DAY"] as Resolution[]).map((r, i) => (
                             <button key={r} onClick={() => setResolution(r)}
                                 className={cn("px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
                                     resolution === r ? "bg-teal text-dark-blue" : "bg-white/5 text-gray-500 hover:text-white border border-white/10"
-                                )}
-                            >
+                                )}>
                                 {["5M", "30M", "1H", "1D"][i]}
                             </button>
                         ))}
-                        <span className="ml-auto text-[9px] text-gray-600 font-black uppercase tracking-widest flex items-center gap-1">
-                            <Clock size={9} /> 10s update
-                        </span>
+                        {chartSource === "internal" && (
+                            <span className="text-[9px] text-gray-600 font-black flex items-center gap-1">
+                                <Clock size={9} /> 10s
+                            </span>
+                        )}
+
+                        {/* Spacer */}
+                        <div className="flex-1" />
+
+                        {/* TradingView / Internal toggle — always visible */}
+                        <button
+                            onClick={() => setChartSource(s => s === "internal" ? "tradingview" : "internal")}
+                            title={chartSource === "internal" ? "Switch to TradingView chart" : "Switch to internal chart"}
+                            className={cn(
+                                "flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all",
+                                chartSource === "tradingview"
+                                    ? "bg-blue-500/20 text-blue-400 border-blue-500/30"
+                                    : "bg-white/5 text-gray-500 border-white/10 hover:text-white hover:border-white/20"
+                            )}
+                        >
+                            {chartSource === "tradingview"
+                                ? <><LineChart size={11} /> Our Chart</>
+                                : <><ExternalLink size={11} /> TradingView</>
+                            }
+                        </button>
                     </div>
-                    <div className="h-64 w-full">
-                        {chartLoading && chartData.length === 0 ? (
+
+                    {/* Chart area */}
+                    <div className="h-72 w-full">
+                        {chartSource === "tradingview" ? (
+                            <TradingViewChart tvSymbol={instrument.tvSymbol} />
+                        ) : chartLoading && chartData.length === 0 ? (
                             <div className="h-full flex items-center justify-center">
                                 <div className="w-8 h-8 border-2 border-teal/20 border-t-teal rounded-full animate-spin" />
                             </div>
@@ -240,13 +283,13 @@ function ManualTab({ mode }: { mode: string }) {
                                         </linearGradient>
                                     </defs>
                                     <CartesianGrid strokeDasharray="3 3" stroke="#ffffff05" vertical={false} />
-                                    <XAxis dataKey="time" tick={{ fill: '#374151', fontSize: 9, fontWeight: 'bold' }} axisLine={false} tickLine={false} interval={Math.max(1, Math.floor(chartData.length / 6))} />
-                                    <YAxis domain={['auto', 'auto']} tick={{ fill: '#374151', fontSize: 9, fontWeight: 'bold' }} axisLine={false} tickLine={false} width={65}
+                                    <XAxis dataKey="time" tick={{ fill: "#374151", fontSize: 9, fontWeight: "bold" }} axisLine={false} tickLine={false} interval={Math.max(1, Math.floor(chartData.length / 6))} />
+                                    <YAxis domain={["auto", "auto"]} tick={{ fill: "#374151", fontSize: 9, fontWeight: "bold" }} axisLine={false} tickLine={false} width={65}
                                         tickFormatter={v => v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })} />
-                                    <Tooltip contentStyle={{ background: '#0A1622', border: '1px solid #ffffff10', borderRadius: '12px', fontSize: '11px' }} labelStyle={{ color: '#9ca3af' }} />
+                                    <Tooltip contentStyle={{ background: "#0A1622", border: "1px solid #ffffff10", borderRadius: "12px", fontSize: "11px" }} labelStyle={{ color: "#9ca3af" }} />
                                     {analysis && <>
-                                        <ReferenceLine y={analysis.support} stroke="#ef4444" strokeDasharray="4 2" label={{ value: 'S', fill: '#ef4444', fontSize: 9 }} />
-                                        <ReferenceLine y={analysis.resistance} stroke="#00BFA6" strokeDasharray="4 2" label={{ value: 'R', fill: '#00BFA6', fontSize: 9 }} />
+                                        <ReferenceLine y={analysis.support} stroke="#ef4444" strokeDasharray="4 2" label={{ value: "S", fill: "#ef4444", fontSize: 9 }} />
+                                        <ReferenceLine y={analysis.resistance} stroke="#00BFA6" strokeDasharray="4 2" label={{ value: "R", fill: "#00BFA6", fontSize: 9 }} />
                                     </>}
                                     <Area type="monotone" dataKey="close" stroke={isUp ? "#00BFA6" : "#ef4444"} strokeWidth={2.5} fill="url(#cGrad)" dot={false} activeDot={{ r: 4 }} animationDuration={600} />
                                 </AreaChart>
@@ -254,8 +297,7 @@ function ManualTab({ mode }: { mode: string }) {
                         ) : (
                             <div className="h-full flex flex-col items-center justify-center text-gray-700">
                                 <Activity size={28} className="mb-3 opacity-40" />
-                                <p className="text-[10px] font-black uppercase tracking-widest">Chart data unavailable</p>
-                                <p className="text-[9px] text-gray-700 mt-1">Check Netlify logs for Capital.com error</p>
+                                <p className="text-[10px] font-black uppercase tracking-widest">Chart unavailable</p>
                             </div>
                         )}
                     </div>
@@ -263,10 +305,14 @@ function ManualTab({ mode }: { mode: string }) {
 
                 {/* Analysis badge */}
                 {analysis && (
-                    <div className={cn("rounded-3xl border p-5", analysis.signal === "BUY" ? "bg-teal/5 border-teal/20" : analysis.signal === "SELL" ? "bg-red-500/5 border-red-500/20" : "bg-white/[0.02] border-white/5")}>
+                    <div className={cn("rounded-3xl border p-5",
+                        analysis.signal === "BUY" ? "bg-teal/5 border-teal/20"
+                            : analysis.signal === "SELL" ? "bg-red-500/5 border-red-500/20"
+                                : "bg-white/[0.02] border-white/5")}>
                         <div className="flex items-start justify-between mb-4">
                             <div className="flex items-center gap-3">
-                                <div className={cn("w-9 h-9 rounded-xl flex items-center justify-center", analysis.signal === "BUY" ? "bg-teal/20" : analysis.signal === "SELL" ? "bg-red-500/20" : "bg-white/10")}>
+                                <div className={cn("w-9 h-9 rounded-xl flex items-center justify-center",
+                                    analysis.signal === "BUY" ? "bg-teal/20" : analysis.signal === "SELL" ? "bg-red-500/20" : "bg-white/10")}>
                                     {analysis.signal === "BUY" ? <TrendingUp size={16} className="text-teal" /> : analysis.signal === "SELL" ? <TrendingDown size={16} className="text-red-400" /> : <Activity size={16} className="text-gray-400" />}
                                 </div>
                                 <div>
@@ -299,7 +345,7 @@ function ManualTab({ mode }: { mode: string }) {
                 )}
             </div>
 
-            {/* ── RIGHT: Trade Form ─────────────────────────────────────────── */}
+            {/* ── RIGHT COLUMN: Trade Form ──────────────────────────────────── */}
             <div className="space-y-4">
                 {/* Direction */}
                 <div className="bg-[#0E1B2A] rounded-3xl border border-white/5 p-5">
@@ -311,8 +357,7 @@ function ManualTab({ mode }: { mode: string }) {
                                     direction === d
                                         ? d === "BUY" ? "bg-teal text-dark-blue border-teal shadow-[0_0_20px_rgba(0,191,166,0.3)]" : "bg-red-500 text-white border-red-500 shadow-[0_0_20px_rgba(239,68,68,0.3)]"
                                         : d === "BUY" ? "bg-teal/5 text-teal/50 border-teal/10 hover:border-teal/30 hover:bg-teal/10" : "bg-red-500/5 text-red-400/50 border-red-500/10 hover:border-red-500/30 hover:bg-red-500/10"
-                                )}
-                            >
+                                )}>
                                 {d === "BUY" ? <TrendingUp size={18} /> : <TrendingDown size={18} />}
                                 {d} / {d === "BUY" ? "LONG" : "SHORT"}
                             </button>
@@ -352,19 +397,17 @@ function ManualTab({ mode }: { mode: string }) {
                         <input type="number" value={stopLoss} onChange={e => setStopLoss(e.target.value)} step="any"
                             className="w-full bg-white/5 border border-red-500/10 rounded-xl px-4 py-2.5 text-red-400 font-bold text-sm font-mono focus:outline-none focus:border-red-500/20 transition-all" />
                     </div>
-                    {/* Trailing stop toggle */}
                     <label className="flex items-center gap-3 cursor-pointer">
                         <div onClick={() => setTrailingStop(!trailingStop)}
-                            className={cn("w-9 h-5 rounded-full transition-all border relative flex-shrink-0 cursor-pointer", trailingStop ? "bg-teal border-teal" : "bg-white/10 border-white/10")}>
+                            className={cn("w-9 h-5 rounded-full border relative flex-shrink-0 cursor-pointer transition-all", trailingStop ? "bg-teal border-teal" : "bg-white/10 border-white/10")}>
                             <div className={cn("absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all", trailingStop ? "left-[18px]" : "left-0.5")} />
                         </div>
                         <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Trailing Stop</span>
                     </label>
-                    {/* R:R display */}
                     {takeProfit && stopLoss && snapshot && (() => {
                         const entry = direction === "BUY" ? snapshot.offer : snapshot.bid;
-                        const tp = parseFloat(takeProfit), sl = parseFloat(stopLoss);
-                        const reward = Math.abs(tp - entry), risk = Math.abs(sl - entry);
+                        const reward = Math.abs(parseFloat(takeProfit) - entry);
+                        const risk = Math.abs(parseFloat(stopLoss) - entry);
                         const rrr = risk > 0 ? (reward / risk).toFixed(2) : "—";
                         return (
                             <div className="bg-black/20 rounded-2xl p-3 border border-white/5 text-[9px] font-black space-y-1.5">
@@ -393,13 +436,18 @@ function ManualTab({ mode }: { mode: string }) {
                         ].map(([l, v]) => (
                             <div key={l} className="flex justify-between text-[10px]">
                                 <span className="text-gray-600 font-black uppercase tracking-widest">{l}</span>
-                                <span className={cn("font-black", l === "Direction" && direction === "BUY" ? "text-teal" : l === "Direction" && direction === "SELL" ? "text-red-400" : "text-gray-300")}>{v}</span>
+                                <span className={cn("font-black",
+                                    l === "Direction" && direction === "BUY" ? "text-teal" :
+                                        l === "Direction" && direction === "SELL" ? "text-red-400" :
+                                            "text-gray-300")}>{v}</span>
                             </div>
                         ))}
                     </div>
                     <button onClick={placeTrade} disabled={submitting || !size}
                         className={cn("w-full py-4 rounded-2xl font-black text-sm uppercase tracking-widest transition-all flex items-center justify-center gap-2",
-                            direction === "BUY" ? "bg-teal text-dark-blue hover:bg-teal/90 shadow-[0_4px_20px_rgba(0,191,166,0.4)]" : "bg-red-500 text-white hover:bg-red-400 shadow-[0_4px_20px_rgba(239,68,68,0.4)]",
+                            direction === "BUY"
+                                ? "bg-teal text-dark-blue hover:bg-teal/90 shadow-[0_4px_20px_rgba(0,191,166,0.4)]"
+                                : "bg-red-500 text-white hover:bg-red-400 shadow-[0_4px_20px_rgba(239,68,68,0.4)]",
                             (submitting || !size) && "opacity-50 cursor-not-allowed"
                         )}>
                         {submitting ? <><RefreshCw size={15} className="animate-spin" />Executing...</> : <><Zap size={15} />Place {direction} Order</>}
@@ -420,143 +468,222 @@ function ManualTab({ mode }: { mode: string }) {
     );
 }
 
-// ─── Engines tab (preserved from original) ────────────────────────────────────
-function EngineCard({ id, name, description, config, onToggle }: any) {
-    const isActive = config?.is_active || false;
+// ─── Execution Logs Tab ───────────────────────────────────────────────────────
+function ExecutionLogsTab({ mode }: { mode: string }) {
+    const [logs, setLogs] = useState<any[]>([]);
+    const [positions, setPositions] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
+    const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+
+    const fetchLogs = useCallback(async (silent = false) => {
+        if (!silent) setLoading(true); else setRefreshing(true);
+        try {
+            const res = await fetch(`/api/dashboard?mode=${mode}`);
+            if (res.ok) {
+                const d = await res.json();
+                // Capital.com activity — each item may have: date, channel, dealId, description, details, epic, period, status[]
+                setLogs(d.history || []);
+                setPositions(d.positions || []);
+                setLastUpdate(new Date());
+            }
+        } finally {
+            setLoading(false);
+            setRefreshing(false);
+        }
+    }, [mode]);
+
+    useEffect(() => {
+        fetchLogs();
+        const t = setInterval(() => fetchLogs(true), 15_000);
+        return () => clearInterval(t);
+    }, [fetchLogs]);
+
+    // Parse Capital.com activity item into useful display fields
+    const parseLog = (log: any) => {
+        const rawStatus = Array.isArray(log.status) ? log.status[0] : (log.status || "");
+        const statusMap: Record<string, { label: string; color: string }> = {
+            ACCEPTED: { label: "Accepted", color: "text-teal" },
+            REJECTED: { label: "Rejected", color: "text-red-400" },
+            CANCELLED: { label: "Cancelled", color: "text-gray-400" },
+            OPEN: { label: "Open", color: "text-blue-400" },
+            CLOSED: { label: "Closed", color: "text-gray-400" },
+            AMENDED: { label: "Amended", color: "text-amber-400" },
+        };
+        const statusInfo = statusMap[rawStatus] || { label: rawStatus, color: "text-gray-400" };
+
+        // Derive direction from description or details
+        const desc = (log.description || "").toUpperCase();
+        const isBuy = desc.includes("BUY") || desc.includes("LONG");
+        const isSell = desc.includes("SELL") || desc.includes("SHORT");
+
+        const pnl = log.details?.profitAndLoss ?? log.details?.pl ?? null;
+        const size = log.details?.size ?? log.size ?? null;
+        const epic = log.epic || log.details?.epic || "—";
+        const channel = log.channel || "—";
+
+        return { rawStatus, statusInfo, isBuy, isSell, pnl, size, epic, channel };
+    };
+
+    if (loading) {
+        return (
+            <div className="flex flex-col items-center justify-center h-48 gap-4">
+                <div className="w-8 h-8 border-2 border-teal/20 border-t-teal rounded-full animate-spin" />
+                <p className="text-[10px] font-black text-gray-600 uppercase tracking-widest">Loading execution logs...</p>
+            </div>
+        );
+    }
+
     return (
-        <div className={cn("bg-[#0E1B2A] rounded-3xl border p-8 shadow-2xl transition-all duration-500 relative overflow-hidden group",
-            isActive ? "border-teal/30" : "border-white/5 hover:border-white/10")}>
-            <div className="absolute top-6 right-6">
-                <div className={cn("w-2.5 h-2.5 rounded-full", isActive ? "bg-teal animate-pulse shadow-[0_0_8px_#00BFA6]" : "bg-gray-700")} />
-            </div>
-            <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center mb-5">
-                <Cpu size={24} className={cn(isActive ? "text-teal" : "text-gray-500")} />
-            </div>
-            <h3 className="text-base font-black text-white uppercase mb-1">{name}</h3>
-            <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-6">{description}</p>
-            <div className="space-y-3 mb-6">
-                <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-gray-500">
-                    <span>Performance</span><span className="text-teal">+12.4%</span>
+        <div className="space-y-6">
+            {/* Active Positions */}
+            <div className="bg-[#0E1B2A] rounded-3xl border border-white/5 overflow-hidden">
+                <div className="px-6 py-5 border-b border-white/5 flex items-center justify-between">
+                    <div>
+                        <p className="text-[9px] text-teal font-black uppercase tracking-widest mb-1">Live Exposure</p>
+                        <h3 className="text-lg font-black text-white">Active Positions
+                            <span className="ml-2 text-sm font-black text-teal">({positions.length})</span>
+                        </h3>
+                    </div>
+                    <button onClick={() => fetchLogs(true)} className={cn("p-2 rounded-xl hover:bg-white/5 transition-all text-gray-500 hover:text-teal", refreshing && "text-teal")}>
+                        <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
+                    </button>
                 </div>
-                <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-gray-500">
-                    <span>Status</span><span className={cn(isActive ? "text-teal" : "text-gray-700")}>{isActive ? "OPERATIONAL" : "IDLE"}</span>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                        <thead>
+                            <tr className="text-[9px] text-gray-600 uppercase tracking-widest bg-black/10">
+                                {["Position", "Instrument", "Entry Price", "Size", "Unrealised P/L"].map(h => (
+                                    <th key={h} className={cn("px-6 py-4 font-black", h === "Unrealised P/L" && "text-right")}>{h}</th>
+                                ))}
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-white/5">
+                            {positions.map((pos: any, i: number) => (
+                                <tr key={i} className="hover:bg-white/[0.02] transition-colors">
+                                    <td className="px-6 py-4">
+                                        <span className={cn("px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest",
+                                            pos.direction === "BUY" ? "bg-teal/10 text-teal" : "bg-red-500/10 text-red-400")}>
+                                            {pos.direction || "—"}
+                                        </span>
+                                    </td>
+                                    <td className="px-6 py-4 text-[11px] font-bold text-gray-300 uppercase tracking-tight">{pos.epic || pos.symbol || "—"}</td>
+                                    <td className="px-6 py-4 text-[11px] font-mono text-gray-400">{pos.level?.toFixed(4) ?? "—"}</td>
+                                    <td className="px-6 py-4 text-[11px] font-mono text-gray-400">{pos.size ?? "—"}</td>
+                                    <td className={cn("px-6 py-4 text-right font-mono font-black text-sm",
+                                        (pos.upl ?? 0) >= 0 ? "text-teal" : "text-red-400")}>
+                                        {(pos.upl ?? 0) >= 0 ? "+" : ""}{(pos.upl ?? 0).toFixed(2)}
+                                    </td>
+                                </tr>
+                            ))}
+                            {positions.length === 0 && (
+                                <tr><td colSpan={5} className="px-6 py-10 text-center text-[10px] font-black text-gray-600 uppercase tracking-widest">No active positions in {mode} account</td></tr>
+                            )}
+                        </tbody>
+                    </table>
                 </div>
             </div>
-            <button onClick={() => onToggle(isActive)}
-                className={cn("w-full py-3.5 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all",
-                    isActive ? "bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500 hover:text-white" : "bg-teal text-dark-blue hover:shadow-[0_0_20px_rgba(0,191,166,0.3)]"
-                )}>
-                {isActive ? "TERMINATE ENGINE" : "ACTIVATE ENGINE"}
-            </button>
+
+            {/* Activity History */}
+            <div className="bg-[#0E1B2A] rounded-3xl border border-white/5 overflow-hidden">
+                <div className="px-6 py-5 border-b border-white/5 flex items-center justify-between">
+                    <div>
+                        <p className="text-[9px] text-teal font-black uppercase tracking-widest mb-1">Audit Trail</p>
+                        <h3 className="text-lg font-black text-white">Execution History
+                            <span className="ml-2 text-sm text-gray-600 font-black">({logs.length})</span>
+                        </h3>
+                    </div>
+                    {lastUpdate && (
+                        <span className="text-[9px] text-gray-600 font-black uppercase tracking-widest flex items-center gap-1">
+                            <Clock size={9} /> {lastUpdate.toLocaleTimeString()}
+                        </span>
+                    )}
+                </div>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                        <thead>
+                            <tr className="text-[9px] text-gray-600 uppercase tracking-widest bg-black/10">
+                                {["Time", "Status", "Instrument", "Description", "Channel", "P/L"].map(h => (
+                                    <th key={h} className={cn("px-6 py-4 font-black", h === "P/L" && "text-right")}>{h}</th>
+                                ))}
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-white/5">
+                            {logs.map((log: any, i: number) => {
+                                const { statusInfo, isBuy, isSell, pnl, epic, channel } = parseLog(log);
+                                return (
+                                    <tr key={i} className="hover:bg-white/[0.02] transition-colors">
+                                        <td className="px-6 py-4 text-[10px] font-mono text-gray-500">
+                                            {log.date ? new Date(log.date).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"}
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <span className={cn("text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-lg border",
+                                                statusInfo.color,
+                                                statusInfo.color === "text-teal" ? "bg-teal/10 border-teal/20" :
+                                                    statusInfo.color === "text-red-400" ? "bg-red-500/10 border-red-500/20" :
+                                                        statusInfo.color === "text-blue-400" ? "bg-blue-500/10 border-blue-500/20" :
+                                                            "bg-white/5 border-white/10"
+                                            )}>{statusInfo.label}</span>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <div className="flex items-center gap-2">
+                                                {(isBuy || isSell) && <div className={cn("w-1.5 h-1.5 rounded-full flex-shrink-0", isBuy ? "bg-teal" : "bg-red-500")} />}
+                                                <span className="text-[11px] font-bold text-gray-300 uppercase">{epic}</span>
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4 text-[10px] text-gray-500 max-w-[200px] truncate">{log.description || "—"}</td>
+                                        <td className="px-6 py-4 text-[9px] font-black text-gray-600 uppercase tracking-widest">{channel}</td>
+                                        <td className={cn("px-6 py-4 text-right font-mono font-bold text-[11px]",
+                                            pnl == null ? "text-gray-600" : pnl >= 0 ? "text-teal" : "text-red-400")}>
+                                            {pnl != null ? `${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)}` : "—"}
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                            {logs.length === 0 && (
+                                <tr><td colSpan={6} className="px-6 py-16 text-center text-[10px] font-black text-gray-600 uppercase tracking-widest">No execution history found for {mode} account</td></tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     );
 }
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 function TradingPageInner() {
-    const searchParams = useSearchParams();
     const { mode } = useMarketData();
     const [activeTab, setActiveTab] = useState("manual");
-    const [engineConfigs, setEngineConfigs] = useState<any[]>([]);
-    const [history, setHistory] = useState<any[]>([]);
-
-    useEffect(() => {
-        fetch("/api/engines").then(r => r.json()).then(setEngineConfigs).catch(() => { });
-        fetch(`/api/dashboard?mode=${mode}`).then(r => r.json()).then(d => setHistory(d.history || [])).catch(() => { });
-    }, [mode]);
-
-    const toggleEngine = async (engineId: string, isActive: boolean) => {
-        try {
-            const r = await fetch("/api/engines", {
-                method: "POST", headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ engine_id: engineId, is_active: !isActive })
-            });
-            if (r.ok) fetch("/api/engines").then(r => r.json()).then(setEngineConfigs);
-        } catch { }
-    };
 
     const tabs = [
         { key: "manual", label: "Manual", icon: BarChart3 },
-        { key: "engines", label: "Engine Control", icon: Cpu },
         { key: "logs", label: "Execution Logs", icon: History },
     ];
 
     return (
         <div className="space-y-6 animate-in fade-in duration-700">
-            {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
                 <div>
                     <h2 className="text-teal font-black text-[10px] uppercase tracking-[0.3em] mb-1">Execution Hub</h2>
                     <h1 className="text-3xl font-black text-white tracking-tight">Trading Desk</h1>
                 </div>
-                <div className="flex bg-[#0A1622] p-1.5 rounded-2xl border border-white/5 self-start sm:self-auto overflow-x-auto">
+                <div className="flex bg-[#0A1622] p-1.5 rounded-2xl border border-white/5 self-start sm:self-auto">
                     {tabs.map(t => (
                         <button key={t.key} onClick={() => setActiveTab(t.key)}
-                            className={cn("flex items-center gap-1.5 px-4 py-2 rounded-xl transition-all font-black text-[9px] uppercase tracking-widest whitespace-nowrap",
-                                activeTab === t.key ? "bg-teal text-dark-blue shadow-[0_0_15px_rgba(0,191,166,0.3)]" : "text-gray-500 hover:text-white hover:bg-white/5"
+                            className={cn("flex items-center gap-1.5 px-5 py-2.5 rounded-xl transition-all font-black text-[10px] uppercase tracking-widest",
+                                activeTab === t.key
+                                    ? "bg-teal text-dark-blue shadow-[0_0_15px_rgba(0,191,166,0.3)]"
+                                    : "text-gray-500 hover:text-white hover:bg-white/5"
                             )}>
-                            <t.icon size={12} />{t.label}
+                            <t.icon size={13} />{t.label}
                         </button>
                     ))}
                 </div>
             </div>
 
             {activeTab === "manual" && <ManualTab mode={mode} />}
-
-            {activeTab === "engines" && (
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                    <EngineCard id="vortex" name="Vortex Prime" description="Institutional Momentum Scalper" config={engineConfigs.find(c => c.engine_id === 'vortex')} onToggle={(a: boolean) => toggleEngine('vortex', a)} />
-                    <EngineCard id="scalper" name="Swift Scalper" description="High-Frequency Liquidity Harvester" config={engineConfigs.find(c => c.engine_id === 'scalper')} onToggle={(a: boolean) => toggleEngine('scalper', a)} />
-                    <div className="bg-[#0E1B2A]/50 rounded-3xl border border-white/5 p-8 flex flex-col items-center justify-center text-center opacity-40">
-                        <Cpu size={24} className="text-gray-600 mb-4" />
-                        <h3 className="text-xs font-black text-gray-500 uppercase tracking-widest">Next Engine Slot</h3>
-                        <p className="text-[9px] text-gray-600 font-bold uppercase mt-2">Custom Strategy API Coming Soon</p>
-                    </div>
-                </div>
-            )}
-
-            {activeTab === "logs" && (
-                <div className="bg-[#0E1B2A] rounded-3xl border border-white/5 overflow-hidden shadow-2xl">
-                    <div className="p-6 border-b border-white/5 flex items-center justify-between">
-                        <div>
-                            <h3 className="text-[10px] text-teal font-black uppercase tracking-[0.3em] mb-1">Audit Trail</h3>
-                            <h2 className="text-xl font-black text-white">Execution Logs</h2>
-                        </div>
-                        <span className="px-3 py-1.5 bg-white/5 rounded-xl border border-white/10 text-[9px] font-black text-gray-400 uppercase tracking-widest">Live Stream</span>
-                    </div>
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left text-sm">
-                            <thead>
-                                <tr className="text-[10px] text-gray-600 uppercase tracking-widest bg-black/10">
-                                    {["Time", "Action", "Instrument", "P/L"].map(h => (
-                                        <th key={h} className={cn("px-6 py-4 font-black", h === "P/L" && "text-right")}>{h}</th>
-                                    ))}
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-white/5">
-                                {history.map((log: any, i: number) => (
-                                    <tr key={i} className="hover:bg-white/[0.02] transition-colors">
-                                        <td className="px-6 py-4 text-gray-500 font-mono text-[11px]">{new Date(log.date).toLocaleString()}</td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex items-center gap-2">
-                                                <div className={cn("w-2 h-2 rounded-full", log.action?.includes('SELL') ? "bg-red-500" : "bg-teal")} />
-                                                <span className="text-white font-black text-[10px] uppercase tracking-widest">{log.action || 'POSITION_ADJ'}</span>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 text-gray-400 font-bold text-[11px] uppercase">{log.marketName || 'Capital.com'}</td>
-                                        <td className={cn("px-6 py-4 text-right font-mono font-bold text-[11px]", log.amount >= 0 ? "text-teal" : "text-red-400")}>
-                                            {log.amount >= 0 ? "+" : ""}{log.amount.toFixed(2)} {log.currency || 'USD'}
-                                        </td>
-                                    </tr>
-                                ))}
-                                {history.length === 0 && (
-                                    <tr><td colSpan={4} className="px-6 py-16 text-center text-gray-600 text-[10px] font-black uppercase tracking-widest">No execution logs found</td></tr>
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            )}
+            {activeTab === "logs" && <ExecutionLogsTab mode={mode} />}
         </div>
     );
 }
