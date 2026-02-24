@@ -34,22 +34,24 @@ export async function POST(request: Request) {
         }
 
         // 3. Retrieve Capital Account Credentials (optional - not required for login)
-        const [account] = await db.select().from(capitalAccounts).where(eq(capitalAccounts.user_id, user.id)).limit(1);
-
         // 4. Attempt Capital.com Session (non-blocking - failure should not block login)
-        if (account) {
-            try {
+        let account = null;
+        try {
+            const [acc] = await db.select().from(capitalAccounts).where(eq(capitalAccounts.user_id, user.id)).limit(1);
+            account = acc;
+
+            if (account) {
                 const apiKey = decrypt(account.encrypted_api_key);
                 const apiPassword = account.encrypted_api_password ? decrypt(account.encrypted_api_password) : password;
                 const isDemo = account.account_type === 'demo';
                 await createSession(email, apiPassword, apiKey, isDemo);
                 console.log(`[Login] Capital.com session established for ${email}`);
-            } catch (err: any) {
-                // Non-blocking: log but do NOT fail login
-                console.warn(`[Login] Capital.com session failed for ${email} (non-blocking): ${err.message}`);
+            } else {
+                console.log(`[Login] No Capital.com account linked for ${email} — will use master credentials for trading`);
             }
-        } else {
-            console.log(`[Login] No Capital.com account linked for ${email} — will use master credentials for trading`);
+        } catch (err: any) {
+            // Non-blocking catch-all for database or session initialization errors
+            console.error(`[Login] Non-blocking capital account failure for ${email}:`, err.message);
         }
 
         // 5. Update last login
