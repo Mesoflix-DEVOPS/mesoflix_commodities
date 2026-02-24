@@ -31,6 +31,7 @@ export default function SettingsPage() {
     const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
     const [setupStep, setSetupStep] = useState<'idle' | 'qr' | 'verify' | 'backup' | 'done'>('idle');
     const [qrUri, setQrUri] = useState("");
+    const [setupKey, setSetupKey] = useState("");
     const [verifyCode, setVerifyCode] = useState("");
     const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
     const [isProcessing, setIsProcessing] = useState(false);
@@ -57,6 +58,7 @@ export default function SettingsPage() {
             const data = await res.json();
             if (data.otpauthUrl) {
                 setQrUri(data.otpauthUrl);
+                setSetupKey(data.secret);
                 setSetupStep('qr');
             }
         } catch (e) {
@@ -229,13 +231,27 @@ export default function SettingsPage() {
                                     )}
                                 </div>
 
-                                {/* Step 1: Show QR Code */}
+                                {/* Step 1: Show QR Code & Manual Key */}
                                 {setupStep === 'qr' && (
                                     <div className="pt-6 border-t border-white/5 animate-in slide-in-from-top-4 duration-500">
-                                        <p className="text-sm font-bold text-white mb-4">1. Scan this QR Code with your Authenticator App</p>
-                                        <div className="bg-white p-4 inline-block rounded-2xl mb-6">
-                                            <QRCodeSVG value={qrUri} size={150} />
+                                        <p className="text-sm font-bold text-white mb-4">1. Scan QR Code or Enter Key</p>
+
+                                        <div className="flex flex-col md:flex-row gap-8 mb-6">
+                                            <div className="bg-white p-4 inline-block rounded-2xl w-fit">
+                                                <QRCodeSVG value={qrUri} size={150} />
+                                            </div>
+
+                                            <div className="flex-1 space-y-3">
+                                                <p className="text-xs text-gray-400 leading-relaxed">
+                                                    If you cannot scan the QR code, manually enter the setup key below into your authenticator app (e.g., Google Authenticator, Authy).
+                                                </p>
+                                                <div className="bg-white/5 border border-white/10 rounded-xl px-4 py-3">
+                                                    <p className="text-[10px] text-gray-500 font-black uppercase tracking-[0.25em] mb-1">Setup Key</p>
+                                                    <p className="text-white font-mono tracking-widest break-all select-all">{setupKey}</p>
+                                                </div>
+                                            </div>
                                         </div>
+
                                         <p className="text-sm font-bold text-white mb-4">2. Enter the 6-digit code</p>
                                         <div className="flex gap-4 max-w-xs">
                                             <input

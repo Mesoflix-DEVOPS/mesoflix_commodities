@@ -27,6 +27,7 @@ export async function GET() {
             email: users.email,
             full_name: users.full_name,
             role: users.role,
+            two_factor_enabled: users.two_factor_enabled,
         }).from(users).where(eq(users.id, payload.userId)).limit(1);
 
         if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
@@ -37,6 +38,7 @@ export async function GET() {
                 email: user.email,
                 fullName: user.full_name,
                 role: user.role,
+                two_factor_enabled: user.two_factor_enabled,
             }
         });
     } catch (err: any) {
