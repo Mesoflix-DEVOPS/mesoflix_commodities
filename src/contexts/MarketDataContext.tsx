@@ -25,14 +25,11 @@ export type BalanceData = {
     accountType?: string;
 };
 
-const EMPTY_BALANCE: BalanceData = {
-    balance: 0, deposit: 0, profitLoss: 0,
-    availableToWithdraw: 0, equity: 0, currency: 'USD',
-};
-
 interface MarketDataContextType {
     marketData: MarketData;
+    /** Balance for the currently active mode */
     balanceData: BalanceData | null;
+    /** Separate cached balances per mode */
     demoBalance: BalanceData | null;
     realBalance: BalanceData | null;
     connectionStatus: 'connecting' | 'connected' | 'disconnected' | 'error';
@@ -52,17 +49,19 @@ const MarketDataContext = createContext<MarketDataContextType>({
 
 export const useMarketData = () => useContext(MarketDataContext);
 
-const PRICE_POLL_MS = 5_000;    // live prices every 5 s
-const BALANCE_POLL_MS = 60_000; // balance every 60 s (well under the 9-min session TTL)
+// Polling intervals — generous to avoid hammering Capital.com while serverless
+// warm instances may not have a cached session yet.
+const PRICE_POLL_MS = 10_000;   // prices every 10 s
+const BALANCE_POLL_MS = 90_000; // balance every 90 s (well under 8-min session TTL)
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
 function parseBalance(data: any): BalanceData {
     return {
-        balance: data.balance ?? 0,
-        deposit: data.deposit ?? 0,
-        profitLoss: data.profitLoss ?? 0,
-        availableToWithdraw: data.available ?? data.availableToWithdraw ?? 0,
-        equity: data.equity ?? ((data.balance ?? 0) + (data.profitLoss ?? 0)),
+        balance: Number(data.balance ?? 0),
+        deposit: Number(data.deposit ?? 0),
+        profitLoss: Number(data.profitLoss ?? 0),
+        availableToWithdraw: Number(data.available ?? data.availableToWithdraw ?? 0),
+        equity: Number(data.equity ?? ((data.balance ?? 0) + (data.profitLoss ?? 0))),
         currency: data.currency || 'USD',
         accountId: data.accountId,
         accountName: data.accountName,
@@ -74,6 +73,7 @@ function parseBalance(data: any): BalanceData {
 export function MarketDataProvider({ children }: { children: ReactNode }) {
     const [mode, setModeState] = useState<'demo' | 'real'>('real');
     const [marketData, setMarketData] = useState<MarketData>({});
+    // Separate state for each mode's balance — never bleed between modes
     const [demoBalance, setDemoBalance] = useState<BalanceData | null>(null);
     const [realBalance, setRealBalance] = useState<BalanceData | null>(null);
     const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected' | 'error'>('connecting');
@@ -81,77 +81,97 @@ export function MarketDataProvider({ children }: { children: ReactNode }) {
     const modeRef = useRef(mode);
     const router = useRouter();
 
-    // ── Fetch one mode's balance ──────────────────────────────────────────────
+    // Flight locks — prevent concurrent requests for the same resource
+    const balanceFetchingRef = useRef<{ [key: string]: boolean }>({});
+    const priceFetchingRef = useRef(false);
+
+    // ── Fetch balance for a specific mode ─────────────────────────────────────
     const fetchBalance = useCallback(async (targetMode: 'demo' | 'real') => {
+        // Prevent overlapping requests for the same mode
+        if (balanceFetchingRef.current[targetMode]) return;
+        balanceFetchingRef.current[targetMode] = true;
+
         try {
             const res = await authedFetch(`/api/balance?mode=${targetMode}`, router);
 
-            // If we get a 503 or network error, DO NOT reset the balance to zero.
-            // Keep the last known good value so the user's screen doesn't blank out.
-            if (!res) {
-                console.warn('[MarketData] Balance fetch returned null (likely auth redirect)');
+            // 503: Capital.com temporarily unavailable — keep last known balance
+            if (!res || res.status === 503) {
+                console.warn(`[MarketData] Balance(${targetMode}) 503 — keeping last balance`);
                 return;
-            }
-
-            if (res.status === 503) {
-                console.warn('[MarketData] Capital.com unavailable (503) — keeping last balance');
-                return; // ← CRITICAL: don't update state, keep existing balance
             }
 
             if (!res.ok) {
-                console.warn(`[MarketData] Balance fetch failed: HTTP ${res.status}`);
-                return; // ← keep last balance
-            }
-
-            const data = await res.json();
-
-            // Sanity check: if the payload is all zeros and we already have a real
-            // balance, don't overwrite (this catches the old "zero on error" bug)
-            const parsed = parseBalance(data);
-            const isAllZero = parsed.balance === 0 && parsed.deposit === 0;
-            const hasPreviousBalance = targetMode === 'demo'
-                ? demoBalance && (demoBalance.balance > 0 || demoBalance.deposit > 0)
-                : realBalance && (realBalance.balance > 0 || realBalance.deposit > 0);
-
-            if (isAllZero && hasPreviousBalance) {
-                // Zero balance could mean Capital.com returned an empty response
-                // after a session error. Don't clear a known-good balance.
-                console.warn('[MarketData] Received zero balance — ignoring to preserve display');
+                console.warn(`[MarketData] Balance(${targetMode}) failed: HTTP ${res.status}`);
                 return;
             }
 
-            if (targetMode === 'demo') setDemoBalance(parsed);
-            else setRealBalance(parsed);
+            const data = await res.json();
+
+            // Only update if we got real data back
+            const parsed = parseBalance(data);
+
+            // Critical: only update the CORRECT mode's state
+            // Never let demo balance contaminate the real slot or vice versa
+            if (targetMode === 'demo') {
+                setDemoBalance(prev => {
+                    // If Capital.com returned all-zeros for a demo account we haven't
+                    // confirmed exists, don't overwrite a known-good non-zero balance
+                    if (parsed.balance === 0 && parsed.deposit === 0 &&
+                        prev && (prev.balance > 0 || prev.deposit > 0)) {
+                        return prev;
+                    }
+                    return parsed;
+                });
+            } else {
+                setRealBalance(prev => {
+                    if (parsed.balance === 0 && parsed.deposit === 0 &&
+                        prev && (prev.balance > 0 || prev.deposit > 0)) {
+                        return prev;
+                    }
+                    return parsed;
+                });
+            }
 
         } catch (error) {
-            console.error('[MarketData] Balance fetch threw:', error);
-            // Network error — keep last known value
+            console.error(`[MarketData] Balance(${targetMode}) fetch threw:`, error);
+        } finally {
+            balanceFetchingRef.current[targetMode] = false;
         }
-    }, [router, demoBalance, realBalance]);
+    }, [router]);
 
-    // ── Fetch prices for current mode ─────────────────────────────────────────
+    // ── Fetch prices for the current mode ─────────────────────────────────────
     const fetchPrices = useCallback(async (targetMode: 'demo' | 'real') => {
+        if (priceFetchingRef.current) return; // prevent overlapping requests
+        priceFetchingRef.current = true;
+
         try {
             const res = await authedFetch(`/api/prices?mode=${targetMode}`, router);
-            if (!res || !res.ok) { setConnectionStatus('error'); return; }
+            if (!res || !res.ok) {
+                setConnectionStatus('error');
+                return;
+            }
             const data = await res.json();
-            if (modeRef.current !== targetMode) return; // stale — mode switched mid-flight
+            // Guard against stale responses (mode changed during fetch)
+            if (modeRef.current !== targetMode) return;
             if (data.prices && Object.keys(data.prices).length > 0) {
                 setMarketData(data.prices);
                 setConnectionStatus('connected');
             } else {
-                setConnectionStatus('error'); // keep last prices
+                setConnectionStatus('error');
             }
         } catch (error) {
-            console.error('[MarketData] Price fetch failed:', error);
+            console.error('[MarketData] Price fetch threw:', error);
             setConnectionStatus('error');
+        } finally {
+            priceFetchingRef.current = false;
         }
     }, [router]);
 
-    // ── Bootstrap: fetch initial state ─────────────────
+    // ── Bootstrap: fetch initial data ──────────────────────────────────────────
     useEffect(() => {
-        fetchBalance(modeRef.current);
-        fetchPrices(modeRef.current);
+        // Initial fetch for the starting mode
+        fetchBalance('real');
+        fetchPrices('real');
 
         const balanceInterval = setInterval(() => {
             fetchBalance(modeRef.current);
@@ -167,15 +187,18 @@ export function MarketDataProvider({ children }: { children: ReactNode }) {
         };
     }, [fetchBalance, fetchPrices]);
 
-    // ── When mode changes — refetch balance and prices immediately ────────────
+    // ── On mode change: update ref, fetch the new mode's data ─────────────────
     useEffect(() => {
         modeRef.current = mode;
         setConnectionStatus('connecting');
-        // Fetch balance for the new mode immediately (don't wait for next poll)
+        // Fetch balance+prices for the new mode immediately
         fetchBalance(mode);
         fetchPrices(mode);
     }, [mode, fetchBalance, fetchPrices]);
 
+    // ── Active balance = only the current mode's balance ──────────────────────
+    // IMPORTANT: never fall back to the other mode's balance.
+    // If this mode has no data yet, return null (UI should show a loading state).
     const balanceData = mode === 'demo' ? demoBalance : realBalance;
 
     const setMode = useCallback((newMode: 'demo' | 'real') => {
