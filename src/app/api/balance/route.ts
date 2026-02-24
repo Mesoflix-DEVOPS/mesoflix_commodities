@@ -81,33 +81,26 @@ function pickBalance(data: any, isDemo: boolean, selectedAccountId?: string | nu
         return { balance: 0, deposit: 0, profitLoss: 0, available: 0, equity: 0, currency: 'USD', accounts: [] };
     }
 
-    // Filter accounts based on requested mode (Real vs Demo)
-    // Capital.com accountType: 'CFD' is common, but usually they distinguish by balance/demo flags
-    // or by the API endpoint they were fetched from.
-    // However, the payload usually contains an `accountType` or we can filter by demo status.
-    if (isDemo) {
-        // Filter for demo accounts
-        accounts = accounts.filter(a =>
-            a.accountType?.toUpperCase() === 'DEMO' ||
-            a.accountName?.toLowerCase().includes('demo')
-        );
-    } else {
-        // Filter for real accounts (anything not demo)
-        accounts = accounts.filter(a =>
-            a.accountType?.toUpperCase() !== 'DEMO' &&
-            !a.accountName?.toLowerCase().includes('demo')
-        );
-    }
+    // Do NOT filter the accounts list here anymore. We want a UNIFIED list.
+    // Instead, we just categorize them for selection priority.
+    const demoAccounts = accounts.filter(a =>
+        a.accountType?.toUpperCase() === 'DEMO' ||
+        a.accountName?.toLowerCase().includes('demo')
+    );
+    const realAccounts = accounts.filter(a =>
+        a.accountType?.toUpperCase() !== 'DEMO' &&
+        !a.accountName?.toLowerCase().includes('demo')
+    );
 
     // Log filtered results for internal investigation
     console.log(`[Balance API] Filtered (${isDemo ? 'DEMO' : 'REAL'}):`, accounts.map(a => `${a.accountName} (${a.accountType}) - ${a.balance?.balance}`).join(', '));
 
-    // Priority Selection:
-    // 1. Exact match for selected_capital_account_id (if provided by DB/API)
-    // 2. Preferred account in filtered set
-    // 3. First account in filtered set
+    // Priority Selection for the primary balance returned:
+    // 1. Exact match for selected_capital_account_id
+    // 2. Preference match based on requested mode (Real/Demo)
+    // 3. Fallback to first available
     let accToUse = (selectedAccountId && accounts.find(a => a.accountId === selectedAccountId)) ||
-        accounts.find(a => a.preferred) ||
+        (isDemo ? demoAccounts[0] : realAccounts[0]) ||
         accounts[0] ||
         null;
 
@@ -125,7 +118,8 @@ function pickBalance(data: any, isDemo: boolean, selectedAccountId?: string | nu
         available: b.available ?? 0,
         equity: (b.balance ?? 0) + (b.profitLoss ?? 0),
         currency: accToUse.currency || 'USD',
-        // Pass through raw accounts for dashboard consumption
-        accounts,
+        // Pass through ALL accounts for the unified selector
+        accounts: accounts,
+        selectedAccountId: accToUse.accountId,
     };
 }

@@ -94,13 +94,8 @@ export function MarketDataProvider({ children }: { children: React.ReactNode }) 
             // Extract accounts list and currently selected ID from the backend's perspective
             if (data.accounts) {
                 setAccounts(data.accounts);
-                // The backend tells us which one it targeted
-                const targeted = data.accounts.find((a: any) => a.accountId === data.selectedAccountId) || data.accounts[0];
-                if (targeted) {
-                    setSelectedAccountId(targeted.accountId);
-                    // Also sync the visual mode (Real/Demo) based on the account type
-                    const intendedMode = (targeted.accountType === 'DEMO' || targeted.accountName?.toLowerCase().includes('demo')) ? 'demo' : 'real';
-                    setModeState(intendedMode);
+                if (data.selectedAccountId) {
+                    setSelectedAccountId(data.selectedAccountId);
                 }
             }
 
@@ -129,16 +124,15 @@ export function MarketDataProvider({ children }: { children: React.ReactNode }) 
         }
     }, []);
 
-    // ── Bootstrap: fetch BOTH balances concurrently on mount ─────────────────
+    // ── Bootstrap: fetch initial state ─────────────────
     useEffect(() => {
-        // Pre-fetch both modes in parallel so switching is instant
-        Promise.all([fetchBalance('demo'), fetchBalance('real')]);
-        fetchPrices('demo'); // start with demo prices
+        // Initial fetch for the starting mode
+        fetchBalance(modeRef.current);
+        fetchPrices(modeRef.current);
 
-        // Poll balances for BOTH modes independently
+        // Poll balance for the ACTIVE mode only
         const balanceInterval = setInterval(() => {
-            fetchBalance('demo');
-            fetchBalance('real');
+            fetchBalance(modeRef.current);
         }, BALANCE_POLL_MS);
 
         // Poll prices for whichever mode is active
