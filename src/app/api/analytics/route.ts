@@ -40,7 +40,7 @@ export async function GET(request: Request) {
         // Always use LIVE endpoint; getValidSession handles sub-account switching internally
         // Calculate Date Range
         const now = new Date();
-        let fromDate = new Date(0); // Default to beginning of time
+        let fromDate: Date | null = null; // Default to null for ALL
 
         if (timeframe === '1W') {
             fromDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -52,13 +52,15 @@ export async function GET(request: Request) {
             fromDate = new Date(now.getFullYear(), 0, 1);
         }
 
+        const historyOptions: any = { max: 500 };
+        if (fromDate) {
+            historyOptions.from = fromDate.toISOString().split('.')[0];
+        }
+
         // Fetch History (up to 500 items for deeper analytics)
         let historyData;
         try {
-            historyData = await getHistory(session.cst, session.xSecurityToken, false, {
-                from: fromDate.toISOString().split('.')[0],
-                max: 500
-            });
+            historyData = await getHistory(session.cst, session.xSecurityToken, false, historyOptions);
         } catch (err: any) {
             console.error('[Analytics API] Error fetching history:', err);
             return NextResponse.json({
