@@ -8,6 +8,8 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useMarketData } from "@/contexts/MarketDataContext";
+import { useRouter } from "next/navigation";
+import { authedFetch } from "@/lib/fetch-utils";
 import {
     AreaChart, Area, XAxis, YAxis, CartesianGrid,
     Tooltip, ResponsiveContainer
@@ -41,20 +43,21 @@ function DetailModal({
     const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
     const [loading, setLoading] = useState(true);
     const [resolution, setResolution] = useState<'MINUTE_5' | 'MINUTE_30' | 'HOUR' | 'DAY'>('HOUR');
+    const router = useRouter();
 
     const fetchChart = useCallback(async () => {
         if (!item) return;
         setLoading(true);
         try {
-            const res = await fetch(`/api/chart/${item.epic}?mode=${mode}&resolution=${resolution}&max=50`);
-            if (res.ok) {
+            const res = await authedFetch(`/api/chart/${item.epic}?mode=${mode}&resolution=${resolution}&max=50`, router);
+            if (res && res.ok) {
                 const data = await res.json();
                 setChartData(data.chartData || []);
                 setSnapshot(data.snapshot);
             }
         } catch { /* keep last */ }
         finally { setLoading(false); }
-    }, [item, mode, resolution]);
+    }, [item, mode, resolution, router]);
 
     useEffect(() => {
         fetchChart();

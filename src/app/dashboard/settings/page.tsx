@@ -17,7 +17,9 @@ import {
     X
 } from "lucide-react";
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { authedFetch } from "@/lib/fetch-utils";
 import { QRCodeSVG } from "qrcode.react";
 import jsPDF from "jspdf";
 
@@ -31,6 +33,7 @@ const tabs = [
 export default function SettingsPage() {
     const [activeTab, setActiveTab] = useState("profile");
     const [userData, setUserData] = useState<any>(null);
+    const router = useRouter();
 
     // 2FA State
     const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
@@ -48,8 +51,8 @@ export default function SettingsPage() {
 
     useEffect(() => {
         let isMounted = true;
-        fetch('/api/user')
-            .then(res => res.json())
+        authedFetch('/api/user', router)
+            .then(res => res?.json())
             .then(data => {
                 if (isMounted && data?.user) {
                     setUserData(data.user);
@@ -62,12 +65,12 @@ export default function SettingsPage() {
         fetchCapitalAccounts();
 
         return () => { isMounted = false; };
-    }, []);
+    }, [router]);
 
     const fetchCapitalAccounts = async () => {
         try {
-            const res = await fetch('/api/capital/connect');
-            if (res.ok) {
+            const res = await authedFetch('/api/capital/connect', router);
+            if (res && res.ok) {
                 const data = await res.json();
                 setSavedTokens(data.accounts || []);
             }
@@ -78,18 +81,22 @@ export default function SettingsPage() {
         if (!newTokenForm.label || !newTokenForm.apiKey || !newTokenForm.password) return;
         setIsProcessing(true);
         try {
-            const res = await fetch('/api/capital/connect', {
+            const res = await authedFetch('/api/capital/connect', router, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(newTokenForm)
             });
-            if (res.ok) {
+            if (res && res.ok) {
                 setIsAddingToken(false);
                 setNewTokenForm({ label: '', login: '', password: '', apiKey: '' });
                 fetchCapitalAccounts();
+            } else {
+                const data = await res?.json();
+                alert(data?.message || "Failed to add token. Check your credentials.");
             }
         } catch (e) {
             console.error(e);
+            alert("Network error while adding token.");
         } finally {
             setIsProcessing(false);
         }
@@ -98,17 +105,21 @@ export default function SettingsPage() {
     const handleTokenAction = async (accountId: string, action: 'connect' | 'disconnect') => {
         setIsProcessing(true);
         try {
-            const res = await fetch('/api/capital/connect', {
+            const res = await authedFetch('/api/capital/connect', router, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ accountId, action })
             });
-            if (res.ok) {
+            if (res && res.ok) {
                 // Refresh to ensure all background streams and session caches are reset globally
                 window.location.reload();
+            } else {
+                const data = await res?.json();
+                alert(data?.message || `Failed to ${action} token.`);
             }
         } catch (e) {
             console.error(e);
+            alert(`Error trying to ${action} token.`);
         } finally {
             setIsProcessing(false);
         }
@@ -118,10 +129,16 @@ export default function SettingsPage() {
         if (!confirm("Are you sure you want to permanently delete this API Key?")) return;
         setIsProcessing(true);
         try {
-            const res = await fetch(`/api/capital/connect?id=${accountId}`, { method: 'DELETE' });
-            if (res.ok) fetchCapitalAccounts();
+            const res = await authedFetch(`/api/capital/connect?id=${accountId}`, router, { method: 'DELETE' });
+            if (res && res.ok) {
+                fetchCapitalAccounts();
+            } else {
+                const data = await res?.json();
+                alert(data?.message || "Failed to delete token.");
+            }
         } catch (e) {
             console.error(e);
+            alert("Error while deleting token.");
         } finally {
             setIsProcessing(false);
         }

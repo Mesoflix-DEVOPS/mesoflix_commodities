@@ -1,6 +1,8 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
+import { useRouter } from 'next/navigation';
+import { authedFetch } from '@/lib/fetch-utils';
 
 type PriceData = {
     bid: number;
@@ -55,6 +57,9 @@ const BALANCE_POLL_MS = 12_000; // balances every 12 s
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
 function parseBalance(data: any): BalanceData {
+    // data might be null if 401 or network error
+    if (!data) return { balance: 0, deposit: 0, profitLoss: 0, availableToWithdraw: 0, equity: 0, currency: 'USD' };
+
     return {
         balance: data.balance ?? 0,
         deposit: data.deposit ?? 0,
@@ -66,7 +71,7 @@ function parseBalance(data: any): BalanceData {
 }
 
 // ─── Provider ─────────────────────────────────────────────────────────────────
-export function MarketDataProvider({ children }: { children: React.ReactNode }) {
+export function MarketDataProvider({ children }: { children: ReactNode }) {
     const [mode, setModeState] = useState<'demo' | 'real'>('demo');
     const [marketData, setMarketData] = useState<MarketData>({});
     const [demoBalance, setDemoBalance] = useState<BalanceData | null>(null);
@@ -74,27 +79,29 @@ export function MarketDataProvider({ children }: { children: React.ReactNode }) 
     const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected' | 'error'>('connecting');
 
     const modeRef = useRef(mode);
+    const router = useRouter();
 
     // ── Fetch one mode's balance ──────────────────────────────────────────────
     const fetchBalance = useCallback(async (targetMode: 'demo' | 'real') => {
         try {
-            const res = await fetch(`/api/balance?mode=${targetMode}`);
-            if (!res.ok) return;
+            const res = await authedFetch(`/api/balance?mode=${targetMode}`, router);
+            if (!res || !res.ok) return;
             const data = await res.json();
             const parsed = parseBalance(data);
 
             if (targetMode === 'demo') setDemoBalance(parsed);
             else setRealBalance(parsed);
-        } catch {
+        } catch (error) {
+            console.error('[MarketData] Balance fetch failed:', error);
             // Network error — keep last known value, don't clear
         }
-    }, []);
+    }, [router]);
 
     // ── Fetch prices for current mode ─────────────────────────────────────────
     const fetchPrices = useCallback(async (targetMode: 'demo' | 'real') => {
         try {
-            const res = await fetch(`/api/prices?mode=${targetMode}`);
-            if (!res.ok) { setConnectionStatus('error'); return; }
+            const res = await authedFetch(`/api/prices?mode=${targetMode}`, router);
+            if (!res || !res.ok) { setConnectionStatus('error'); return; }
             const data = await res.json();
             if (modeRef.current !== targetMode) return; // stale — mode switched mid-flight
             if (data.prices && Object.keys(data.prices).length > 0) {
@@ -103,10 +110,11 @@ export function MarketDataProvider({ children }: { children: React.ReactNode }) 
             } else {
                 setConnectionStatus('error'); // keep last prices
             }
-        } catch {
+        } catch (error) {
+            console.error('[MarketData] Price fetch failed:', error);
             setConnectionStatus('error');
         }
-    }, []);
+    }, [router]);
 
     // ── Bootstrap: fetch initial state ─────────────────
     useEffect(() => {

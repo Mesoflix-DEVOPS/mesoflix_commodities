@@ -76,37 +76,29 @@ export async function GET(req: NextRequest) {
  * Capital.com accountType is always 'CFD' — the preferred account is the active one.
  */
 function pickBalance(data: any, isDemo: boolean, selectedAccountId?: string | null) {
-    let accounts: any[] = data?.accounts || [];
+    const accounts: any[] = data?.accounts || [];
     if (accounts.length === 0) {
         return { balance: 0, deposit: 0, profitLoss: 0, available: 0, equity: 0, currency: 'USD' };
     }
 
-    // Filter accounts strictly based on requested mode (Real vs Demo)
-    if (isDemo) {
-        accounts = accounts.filter(a =>
-            a.accountType?.toUpperCase() === 'DEMO' ||
-            a.accountName?.toLowerCase().includes('demo')
-        );
-    } else {
-        accounts = accounts.filter(a =>
-            a.accountType?.toUpperCase() !== 'DEMO' &&
-            !a.accountName?.toLowerCase().includes('demo')
-        );
+    // Capital.com already returns accounts filtered by the server environment (Demo vs Live).
+    // Attempt to find the specific account selected by the user, or default to the first one.
+    let account = accounts[0];
+    if (selectedAccountId) {
+        const found = accounts.find(a => a.accountId === selectedAccountId);
+        if (found) account = found;
     }
 
-    // Target the first matching account
-    let accToUse = accounts[0] || null;
-
-    if (!accToUse) return { balance: 0, deposit: 0, profitLoss: 0, available: 0, equity: 0, currency: 'USD' };
-
-    const b = accToUse.balance || {};
-
     return {
-        balance: b.balance ?? 0,
-        deposit: b.deposit ?? 0,
-        profitLoss: b.profitLoss ?? 0,
-        available: b.available ?? 0,
-        equity: (b.balance ?? 0) + (b.profitLoss ?? 0),
-        currency: accToUse.currency || 'USD',
+        balance: account.balance ?? 0,
+        deposit: account.deposit ?? 0,
+        profitLoss: account.profitLoss ?? 0,
+        available: account.availableToWithdraw ?? account.available ?? 0,
+        equity: account.balance + account.profitLoss,
+        currency: account.currency || 'USD',
+        // metadata for debugging
+        accountId: account.accountId,
+        accountName: account.accountName,
+        accountType: account.accountType
     };
 }

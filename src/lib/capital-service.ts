@@ -187,18 +187,24 @@ export async function getValidSession(
 export async function clearCachedSession(userId: string, isDemo: boolean = false): Promise<void> {
     const userAccounts = await db.select().from(capitalAccounts)
         .where(eq(capitalAccounts.user_id, userId));
-    const credAccount = userAccounts[0];
-    if (!credAccount) return;
 
-    const cacheKey = memKey(credAccount.id, isDemo);
-    memCache.delete(cacheKey);
+    if (userAccounts.length === 0) return;
 
-    // Only clear DB cache if it matches the mode being evicted
-    const dbCacheMode = (credAccount as any).session_mode;
-    const wantedMode = isDemo ? 'demo' : 'live';
-    if (!dbCacheMode || dbCacheMode === wantedMode) {
-        await db.update(capitalAccounts)
-            .set({ encrypted_session_tokens: null, session_updated_at: null })
-            .where(eq(capitalAccounts.id, credAccount.id));
+    for (const acc of userAccounts) {
+        // Clear memory cache
+        const cacheKey = memKey(acc.id, isDemo);
+        memCache.delete(cacheKey);
+
+        // Clear DB cache if it matches the mode being evicted
+        // We clear both if session_mode matches or if we're doing a global reset
+        if (!acc.session_mode || acc.session_mode === (isDemo ? 'demo' : 'live')) {
+            await db.update(capitalAccounts)
+                .set({
+                    encrypted_session_tokens: null,
+                    session_updated_at: null,
+                    session_mode: null // clear mode too to be certain
+                })
+                .where(eq(capitalAccounts.id, acc.id));
+        }
     }
 }
