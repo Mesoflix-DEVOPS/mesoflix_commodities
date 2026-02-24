@@ -196,14 +196,14 @@ export const placeOrder = async (
     epic: string,
     direction: 'BUY' | 'SELL',
     size: number,
-    accountIsDemo: boolean = false,
+    accountIsDemo: boolean = false, // Kept to satisfy type signature, but API_URL is fixed
     options?: {
         takeProfit?: number | null;
         stopLoss?: number | null;
         trailingStop?: boolean;
     }
 ) => {
-    const API_URL = getApiUrl(accountIsDemo);
+    const API_URL = LIVE_API_URL;
 
     const body: Record<string, any> = {
         epic,
@@ -242,7 +242,7 @@ export const closePosition = async (
     dealId: string,
     accountIsDemo: boolean = false
 ) => {
-    const API_URL = getApiUrl(accountIsDemo);
+    const API_URL = LIVE_API_URL;
 
     const response = await fetch(`${API_URL}/positions/${dealId}`, {
         method: 'DELETE',

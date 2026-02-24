@@ -57,12 +57,56 @@ async function debugCapitalCom() {
 
             const cst = sessRes.headers.get('CST');
             const xst = sessRes.headers.get('X-SECURITY-TOKEN');
-            const accRes = await fetch(`${url}/accounts`, {
-                headers: { 'CST': cst, 'X-SECURITY-TOKEN': xst }
+            const sessData = await sessRes.json();
+
+            // Find Demo Account
+            const accounts = sessData.accounts || [];
+            if (accounts.length === 0) return console.log('  No accounts found.');
+
+            let demoAccs = accounts.filter(a => a.accountType === 'SPREADBET' || (a.accountName || '').toLowerCase().includes('demo'));
+            let realAccs = accounts.filter(a => a.accountType !== 'SPREADBET' && !(a.accountName || '').toLowerCase().includes('demo'));
+
+            if (demoAccs.length === 0 && realAccs.length > 1) {
+                const gbpAcc = realAccs.find(a => a.currency === 'GBP');
+                if (gbpAcc) demoAccs = [gbpAcc];
+            }
+
+            const demoAcc = demoAccs[0] || accounts[1];
+            if (!demoAcc) return console.log('  Could not identify Demo account.');
+
+            console.log(`  Demo Account ID: ${demoAcc.accountId}`);
+
+            // Switch to Demo
+            const switchRes = await fetch(`${url}/session`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'CST': cst, 'X-SECURITY-TOKEN': xst },
+                body: JSON.stringify({ accountId: demoAcc.accountId })
             });
-            const accData = await accRes.json();
-            console.log(`\n  [GET /accounts] Full JSON:`);
-            console.log(JSON.stringify(accData, null, 2));
+
+            if (!switchRes.ok) {
+                console.log(`  [PUT /session] Failed: ${switchRes.status} ${await switchRes.text()}`);
+                return;
+            }
+            console.log(`  [PUT /session] Switched active account successfully.`);
+
+            // Try to place a trade
+            const epic = 'GOLD'; // Gold
+            console.log(`  [POST /positions] Attempting BUY 1 ${epic}...`);
+            const tradeRes = await fetch(`${url}/positions`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'CST': cst, 'X-SECURITY-TOKEN': xst },
+                body: JSON.stringify({
+                    epic,
+                    direction: 'BUY',
+                    size: 1,
+                    orderType: 'MARKET',
+                    guaranteedStop: false,
+                    forceOpen: true
+                })
+            });
+
+            console.log(`  Status: ${tradeRes.status}`);
+            console.log(`  Response: ${await tradeRes.text()}`);
         }
 
         await testServer('https://api-capital.backend-capital.com/api/v1', 'LIVE');
