@@ -29,7 +29,7 @@ const menuGroups = [
         items: [
             { name: "Dashboard", icon: LayoutDashboard, href: "/dashboard" },
             { name: "Trading", icon: BarChart3, href: "/dashboard/trading" },
-            { name: "Portfolio", icon: Briefcase, href: "/dashboard/portfolio" },
+            { name: "Automation", icon: Cpu, href: "/dashboard/automation" },
             { name: "Calendar", icon: CalendarIcon, href: "/dashboard/calendar" },
         ]
     },
@@ -38,7 +38,6 @@ const menuGroups = [
         items: [
             { name: "Analytics", icon: PieChart, href: "/dashboard/analytics" },
             { name: "Transactions", icon: History, href: "/dashboard/transactions" },
-            { name: "Automation", icon: Cpu, href: "/dashboard/automation" },
         ]
     }
 ];
