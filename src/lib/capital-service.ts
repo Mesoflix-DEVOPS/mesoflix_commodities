@@ -2,7 +2,7 @@ import { db } from './db';
 import { capitalAccounts, users } from './db/schema';
 import { encrypt, decrypt } from './crypto';
 import { createSession } from './capital';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 
 export interface SessionTokens {
     cst: string;
@@ -43,15 +43,29 @@ export async function getValidSession(
     forceRefresh: boolean = false,
 ): Promise<SessionTokens> {
     // 1. Find the best account for credentials
-    //    Priority: user's own account → any account in DB (master fallback)
-    const userAccounts = await db.select().from(capitalAccounts)
-        .where(eq(capitalAccounts.user_id, userId));
+    //    Priority: User's explicitly ACTIVE account -> Any user account (fallback) -> System master account
+    const activeAccount = await db.select().from(capitalAccounts)
+        .where(and(eq(capitalAccounts.user_id, userId), eq(capitalAccounts.is_active, true)))
+        .limit(1);
 
-    let credAccount = userAccounts[0] ?? null;
+    let credAccount = activeAccount[0] || null;
 
     if (!credAccount) {
-        const all = await db.select().from(capitalAccounts);
-        credAccount = all[0] ?? null;
+        const userAccounts = await db.select().from(capitalAccounts)
+            .where(eq(capitalAccounts.user_id, userId))
+            .limit(1);
+        credAccount = userAccounts[0] || null;
+    }
+
+    if (!credAccount) {
+        const master = await db.select().from(capitalAccounts)
+            .where(eq(capitalAccounts.label, 'MASTER')).limit(1);
+        credAccount = master[0] || null;
+    }
+
+    if (!credAccount) {
+        const all = await db.select().from(capitalAccounts).limit(1);
+        credAccount = all[0] || null;
     }
 
     if (!credAccount) {

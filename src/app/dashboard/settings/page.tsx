@@ -103,7 +103,10 @@ export default function SettingsPage() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ accountId, action })
             });
-            if (res.ok) fetchCapitalAccounts();
+            if (res.ok) {
+                // Refresh to ensure all background streams and session caches are reset globally
+                window.location.reload();
+            }
         } catch (e) {
             console.error(e);
         } finally {

@@ -52,7 +52,7 @@ export async function GET(req: NextRequest) {
                     });
                     if (retry.ok) {
                         const data = await retry.json();
-                        return NextResponse.json(pickBalance(data));
+                        return NextResponse.json(pickBalance(data, isDemo));
                     }
                 } catch (e) { /* fall through */ }
             }
@@ -62,7 +62,7 @@ export async function GET(req: NextRequest) {
 
         const data = await res.json();
         console.log('[Balance API] Raw accounts:', JSON.stringify(data).substring(0, 400));
-        return NextResponse.json(pickBalance(data));
+        return NextResponse.json(pickBalance(data, isDemo));
 
     } catch (err: any) {
         console.error('[Balance API] Error:', err.message);
@@ -74,15 +74,30 @@ export async function GET(req: NextRequest) {
  * Pick the preferred (or first) account and extract balance fields.
  * Capital.com accountType is always 'CFD' — the preferred account is the active one.
  */
-function pickBalance(data: any) {
-    const accounts: any[] = data?.accounts || [];
+function pickBalance(data: any, isDemo: boolean) {
+    let accounts: any[] = data?.accounts || [];
     if (accounts.length === 0) {
         return { balance: 0, deposit: 0, profitLoss: 0, available: 0, equity: 0, currency: 'USD', accounts: [] };
     }
 
-    // Prefer the account marked as preferred; fall back to first
-    const acc = accounts.find(a => a.preferred) || accounts[0];
-    const b = acc.balance || {};
+    // Filter accounts based on requested mode (Real vs Demo)
+    // Capital.com accountType: 'CFD' is common, but usually they distinguish by balance/demo flags
+    // or by the API endpoint they were fetched from.
+    // However, the payload usually contains an `accountType` or we can filter by demo status.
+    if (isDemo) {
+        accounts = accounts.filter(a => a.accountType === 'DEMO' || a.accountName?.toLowerCase().includes('demo'));
+    } else {
+        accounts = accounts.filter(a => a.accountType !== 'DEMO' && !a.accountName?.toLowerCase().includes('demo'));
+    }
+
+    // If no filtered accounts, fall back to what we have but with a warning
+    const accToUse = accounts.length > 0
+        ? (accounts.find(a => a.preferred) || accounts[0])
+        : (data.accounts?.[0] || null);
+
+    if (!accToUse) return { balance: 0, deposit: 0, profitLoss: 0, available: 0, equity: 0, currency: 'USD' };
+
+    const b = accToUse.balance || {};
 
     return {
         balance: b.balance ?? 0,
@@ -90,7 +105,7 @@ function pickBalance(data: any) {
         profitLoss: b.profitLoss ?? 0,
         available: b.available ?? 0,
         equity: (b.balance ?? 0) + (b.profitLoss ?? 0),
-        currency: acc.currency || 'USD',
+        currency: accToUse.currency || 'USD',
         // Pass through raw accounts for dashboard consumption
         accounts,
     };

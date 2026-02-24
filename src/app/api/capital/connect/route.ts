@@ -5,6 +5,7 @@ import { encrypt } from '@/lib/crypto';
 import { eq, and } from 'drizzle-orm';
 import { verifyAccessToken } from '@/lib/auth';
 import { cookies } from 'next/headers';
+import { clearCachedSession } from '@/lib/capital-service';
 
 // Helper to get authenticated user
 async function getUser() {
@@ -112,6 +113,10 @@ export async function PATCH(request: Request) {
             // Set targeted
             await db.update(capitalAccounts).set({ is_active: true, updated_at: new Date() }).where(eq(capitalAccounts.id, accountId));
 
+            // Force clear cached session so the next request uses fresh credentials
+            await clearCachedSession(userId, true); // clear demo cache
+            await clearCachedSession(userId, false); // clear live cache
+
             // Re-auth system will naturally trigger via stream restarts on the frontend.
             await db.insert(notifications).values({
                 user_id: userId,
@@ -121,6 +126,10 @@ export async function PATCH(request: Request) {
             });
         } else if (action === 'disconnect') {
             await db.update(capitalAccounts).set({ is_active: false, updated_at: new Date() }).where(eq(capitalAccounts.id, accountId));
+
+            // Force clear cached session
+            await clearCachedSession(userId, true);
+            await clearCachedSession(userId, false);
 
             await db.insert(notifications).values({
                 user_id: userId,
