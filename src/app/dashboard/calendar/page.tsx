@@ -7,26 +7,42 @@ export default function CalendarPage() {
 
     useEffect(() => {
         if (!container.current) return;
-        // Clean up previous script if re-rendering
-        container.current.innerHTML = '';
 
-        const script = document.createElement("script");
-        script.src = "https://s3.tradingview.com/external-embedding/embed-widget-events.js";
-        script.type = "text/javascript";
-        script.async = true;
-        // Dark theme configuration
-        script.innerHTML = `
-        {
-          "colorTheme": "dark",
-          "isTransparent": true,
-          "width": "100%",
-          "height": "100%",
-          "locale": "en",
-          "importanceFilter": "-1,0,1",
-          "countryFilter": "ar,au,br,ca,cn,fr,de,in,id,it,jp,kr,mx,ru,sa,za,tr,gb,us,eu"
-        }`;
+        let resizeTimer: NodeJS.Timeout;
 
-        container.current.appendChild(script);
+        const mountWidget = () => {
+            if (!container.current) return;
+            container.current.innerHTML = '';
+
+            const script = document.createElement("script");
+            script.src = "https://s3.tradingview.com/external-embedding/embed-widget-events.js";
+            script.type = "text/javascript";
+            script.async = true;
+            // Strict dark theme configuration
+            script.innerHTML = JSON.stringify({
+                colorTheme: "dark",
+                isTransparent: true,
+                width: "100%",
+                height: "100%",
+                locale: "en",
+                importanceFilter: "-1,0,1",
+                countryFilter: "ar,au,br,ca,cn,fr,de,in,id,it,jp,kr,mx,ru,sa,za,tr,gb,us,eu"
+            });
+
+            container.current.appendChild(script);
+        };
+
+        // Mount immediately
+        mountWidget();
+
+        // Remount on significant resize to prevent TV widget from breaking theme on mobile orientation shifts
+        const handleResize = () => {
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(() => mountWidget(), 300);
+        };
+
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
     }, []);
 
     return (
