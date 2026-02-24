@@ -23,6 +23,7 @@ export async function GET(req: NextRequest) {
         // Get session — accountIsDemo tells us which Capital.com server to use
         const session = await getValidSession(tokenPayload.userId, isDemo);
         const apiIsDemo = session.accountIsDemo ?? false; // default live if old cache
+        const selectedAccountId = session.selectedAccountId; // pass from service if stored in credAccount
         const API_URL = apiIsDemo ? DEMO_API : LIVE_API;
 
         console.log(`[Balance API] mode=${mode}, accountIsDemo=${apiIsDemo}, endpoint=${API_URL.includes('demo') ? 'DEMO' : 'LIVE'}`);
@@ -52,7 +53,7 @@ export async function GET(req: NextRequest) {
                     });
                     if (retry.ok) {
                         const data = await retry.json();
-                        return NextResponse.json(pickBalance(data, isDemo));
+                        return NextResponse.json(pickBalance(data, isDemo, fresh.selectedAccountId));
                     }
                 } catch (e) { /* fall through */ }
             }
@@ -62,7 +63,7 @@ export async function GET(req: NextRequest) {
 
         const data = await res.json();
         console.log('[Balance API] Raw accounts:', JSON.stringify(data).substring(0, 400));
-        return NextResponse.json(pickBalance(data, isDemo));
+        return NextResponse.json(pickBalance(data, isDemo, session.selectedAccountId));
 
     } catch (err: any) {
         console.error('[Balance API] Error:', err.message);
@@ -74,7 +75,7 @@ export async function GET(req: NextRequest) {
  * Pick the preferred (or first) account and extract balance fields.
  * Capital.com accountType is always 'CFD' — the preferred account is the active one.
  */
-function pickBalance(data: any, isDemo: boolean) {
+function pickBalance(data: any, isDemo: boolean, selectedAccountId?: string | null) {
     let accounts: any[] = data?.accounts || [];
     if (accounts.length === 0) {
         return { balance: 0, deposit: 0, profitLoss: 0, available: 0, equity: 0, currency: 'USD', accounts: [] };
@@ -101,11 +102,17 @@ function pickBalance(data: any, isDemo: boolean) {
     // Log filtered results for internal investigation
     console.log(`[Balance API] Filtered (${isDemo ? 'DEMO' : 'REAL'}):`, accounts.map(a => `${a.accountName} (${a.accountType}) - ${a.balance?.balance}`).join(', '));
 
-    // Priority: 1. Preferred account in filtered set, 2. First account in filtered set, 3. Blind fallback
-    const accToUse = accounts.find(a => a.preferred) ||
+    // Priority Selection:
+    // 1. Exact match for selected_capital_account_id (if provided by DB/API)
+    // 2. Preferred account in filtered set
+    // 3. First account in filtered set
+    let accToUse = (selectedAccountId && accounts.find(a => a.accountId === selectedAccountId)) ||
+        accounts.find(a => a.preferred) ||
         accounts[0] ||
-        data.accounts?.[0] ||
         null;
+
+    // Log selection trace
+    console.log(`[Balance API] Targeting Account: ${accToUse?.accountName} (${accToUse?.accountId})`);
 
     if (!accToUse) return { balance: 0, deposit: 0, profitLoss: 0, available: 0, equity: 0, currency: 'USD' };
 

@@ -7,7 +7,8 @@ import { eq, and } from 'drizzle-orm';
 export interface SessionTokens {
     cst: string;
     xSecurityToken: string;
-    accountIsDemo: boolean;
+    accountIsDemo?: boolean;
+    selectedAccountId?: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -78,7 +79,18 @@ export async function getValidSession(
     if (!forceRefresh) {
         const cached = memCache.get(cacheKey);
         if (cached && cached.expiresAt > Date.now()) {
-            return cached.tokens;
+            const tokens: SessionTokens = {
+                ...cached.tokens,
+                accountIsDemo: isDemo,
+            };
+            // Refresh selectedAccountId from DB even on memCache hit to ensure it's fresh
+            const activeRow = await db.select({ selectedId: capitalAccounts.selected_capital_account_id })
+                .from(capitalAccounts)
+                .where(and(eq(capitalAccounts.user_id, userId), eq(capitalAccounts.is_active, true)))
+                .limit(1);
+            tokens.selectedAccountId = activeRow[0]?.selectedId;
+
+            return tokens;
         }
     }
 
@@ -96,6 +108,7 @@ export async function getValidSession(
                     const tokens: SessionTokens = {
                         ...JSON.parse(decrypt(credAccount.encrypted_session_tokens)),
                         accountIsDemo: isDemo,
+                        selectedAccountId: credAccount.selected_capital_account_id,
                     };
                     memCache.set(cacheKey, { tokens, expiresAt: Date.now() + SESSION_TTL_MS });
                     return tokens;
@@ -134,6 +147,7 @@ export async function getValidSession(
                 cst: newSession.cst,
                 xSecurityToken: newSession.xSecurityToken,
                 accountIsDemo: false, // indicate we're using live endpoint
+                selectedAccountId: credAccount.selected_capital_account_id,
             };
             memCache.set(cacheKey, { tokens, expiresAt: Date.now() + SESSION_TTL_MS });
             return tokens;
@@ -145,6 +159,7 @@ export async function getValidSession(
         cst: newSession.cst,
         xSecurityToken: newSession.xSecurityToken,
         accountIsDemo: isDemo,
+        selectedAccountId: credAccount.selected_capital_account_id,
     };
 
     // 5. Persist to DB (tagged with mode so we know which endpoint it's for)

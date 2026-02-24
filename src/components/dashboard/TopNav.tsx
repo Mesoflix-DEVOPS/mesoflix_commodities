@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell, Search, Settings, User, TrendingUp, Menu, X, LogOut, Loader2, CheckCircle2, Info, AlertTriangle, AlertCircle } from "lucide-react";
+import { Bell, Search, Settings, User, TrendingUp, Menu, X, LogOut, Loader2, CheckCircle2, Info, AlertTriangle, AlertCircle, ChevronRight } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
@@ -25,7 +25,7 @@ export default function TopNav({
     const notificationRef = useRef<HTMLDivElement>(null);
 
     // Consume real-time context
-    const { mode, setMode, balanceData, connectionStatus } = useMarketData();
+    const { mode, setMode, balanceData, connectionStatus, accounts, selectedAccountId, selectAccount } = useMarketData();
 
     // Fetch Notifications
     const fetchNotifications = async () => {
@@ -94,32 +94,65 @@ export default function TopNav({
                     {isMobileOpen ? <X size={20} /> : <Menu size={20} />}
                 </button>
 
-                {/* Account Mode Switcher */}
-                <div className="flex items-center bg-black/20 p-1 rounded-xl border border-white/5 ml-2">
-                    <button
-                        onClick={() => setMode("demo")}
-                        className={cn(
-                            "px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-tighter transition-all flex items-center justify-center gap-2",
-                            mode === "demo"
-                                ? "bg-teal text-dark-blue shadow-lg"
-                                : "text-gray-500 hover:text-gray-300"
-                        )}
-                    >
-                        {mode === "demo" && connectionStatus === 'connecting' && <Loader2 size={10} className="animate-spin" />}
-                        Demo
+                {/* Unified Account Selector Dropdown */}
+                <div className="relative group/selector ml-2">
+                    <button className="flex items-center gap-2 bg-black/40 hover:bg-black/60 border border-white/10 rounded-xl px-3 py-1.5 transition-all">
+                        <div className={cn(
+                            "w-2 h-2 rounded-full",
+                            mode === 'real' ? "bg-amber-500 shadow-[0_0_8px_#F59E0B]" : "bg-teal shadow-[0_0_8px_#00BFA6]"
+                        )} />
+                        <div className="flex flex-col items-start leading-none">
+                            <span className="text-[10px] font-black uppercase text-gray-400 tracking-tighter">
+                                {mode === 'real' ? 'Real Account' : 'Demo Account'}
+                            </span>
+                            <span className="text-[11px] font-bold text-white font-mono">
+                                {accounts.find(a => a.accountId === selectedAccountId)?.accountName || 'Select Account'}
+                            </span>
+                        </div>
+                        <ChevronRight size={14} className="text-gray-500 group-hover/selector:rotate-90 transition-transform" />
                     </button>
-                    <button
-                        onClick={() => setMode("real")}
-                        className={cn(
-                            "px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-tighter transition-all flex items-center justify-center gap-2",
-                            mode === "real"
-                                ? "bg-amber-500 text-dark-blue shadow-lg"
-                                : "text-gray-500 hover:text-gray-300"
+
+                    {/* Dropdown Menu */}
+                    <div className="absolute top-full left-0 mt-2 w-64 bg-[#0E1B2A] border border-white/10 rounded-2xl shadow-2xl opacity-0 invisible group-hover/selector:opacity-100 group-hover/selector:visible transition-all z-50 p-2 space-y-1">
+                        <div className="px-3 py-2 border-b border-white/5 mb-1">
+                            <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest">Switch Trading Account</p>
+                        </div>
+                        {accounts.length === 0 && (
+                            <div className="p-4 text-center">
+                                <Loader2 size={16} className="animate-spin text-teal mx-auto mb-2" />
+                                <p className="text-[10px] text-gray-500 font-bold uppercase">Fetching accounts...</p>
+                            </div>
                         )}
-                    >
-                        {mode === "real" && connectionStatus === 'connecting' && <Loader2 size={10} className="animate-spin" />}
-                        Real
-                    </button>
+                        {accounts.map((acc) => {
+                            const isDemoAcc = acc.accountType === 'DEMO' || acc.accountName?.toLowerCase().includes('demo');
+                            const isActive = acc.accountId === selectedAccountId;
+                            return (
+                                <button
+                                    key={acc.accountId}
+                                    onClick={() => selectAccount(acc.accountId)}
+                                    className={cn(
+                                        "w-full flex items-center justify-between p-3 rounded-xl transition-all border",
+                                        isActive ? "bg-white/5 border-white/10" : "hover:bg-white/5 border-transparent"
+                                    )}
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <div className={cn(
+                                            "w-2 h-2 rounded-full",
+                                            isDemoAcc ? "bg-teal" : "bg-amber-500"
+                                        )} />
+                                        <div className="text-left">
+                                            <p className="text-xs font-bold text-white leading-none mb-1">{acc.accountName}</p>
+                                            <p className="text-[10px] text-gray-500 font-medium uppercase">{isDemoAcc ? 'Demo' : 'Real'}</p>
+                                        </div>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="text-xs font-mono font-bold text-white">${(acc.balance?.balance || 0).toLocaleString()}</p>
+                                        {isActive && <CheckCircle2 size={12} className="text-teal ml-auto mt-1" />}
+                                    </div>
+                                </button>
+                            );
+                        })}
+                    </div>
                 </div>
             </div>
 
