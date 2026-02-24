@@ -232,7 +232,11 @@ export default function TopNav({
                                     <ProfileLink href="/dashboard/settings" icon={User}>Profile Settings</ProfileLink>
                                     <ProfileLink href="/dashboard/settings?tab=security" icon={Settings}>Security</ProfileLink>
                                     <button
-                                        onClick={() => fetch("/api/auth/logout", { method: "POST" }).then(() => window.location.href = "/login")}
+                                        onClick={async () => {
+                                            await fetch("/api/auth/logout", { method: "POST" });
+                                            // Hard redirect to clear all SPA state and prevent back-nav caching issues
+                                            window.location.href = "/login?logged_out=true";
+                                        }}
                                         className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-400 hover:bg-red-400/10 rounded-xl transition-all mt-1"
                                     >
                                         <LogOut size={16} />

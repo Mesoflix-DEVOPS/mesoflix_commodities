@@ -37,10 +37,17 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
 
     const fetchUserData = useCallback(async () => {
         // Use a lightweight user endpoint — don't depend on Capital.com being up
-        const res = await authedFetch('/api/user', router);
-        if (res?.ok) {
-            const data = await res.json();
-            setUserData(data?.user);
+        try {
+            const res = await authedFetch('/api/user', router);
+            if (res && res.ok) {
+                const data = await res.json();
+                setUserData(data?.user);
+            } else if (res && res.status === 401) {
+                // Secondary defense: if API says unauthorized, we're definitely logged out
+                router.push('/login?reason=unauthorized');
+            }
+        } catch (e) {
+            console.error("Auth verification failed", e);
         }
     }, [router]);
 

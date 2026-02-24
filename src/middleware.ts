@@ -54,6 +54,13 @@ export async function middleware(request: NextRequest) {
         response.headers.set('x-user-role', payload.role || 'user');
     }
 
+    // CRITICAL: Prevent browser from caching dashboard pages.
+    // This ensures that when the user clicks 'Back' after logout, the browser
+    // must re-request the page and the middleware will redirect them to /login.
+    response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    response.headers.set('Pragma', 'no-cache');
+    response.headers.set('Expires', '0');
+
     return response;
 }
 
