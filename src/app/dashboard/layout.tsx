@@ -8,25 +8,7 @@ import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { Suspense } from "react";
 import { MarketDataProvider } from "@/contexts/MarketDataContext";
-
-// Only redirects to login when the token is genuinely invalid.
-// Capital.com data errors return 200+warning, so they won't trigger this.
-async function authedFetch(url: string, router: ReturnType<typeof useRouter>, options?: RequestInit): Promise<Response | null> {
-    let res = await fetch(url, options);
-    if (res.status === 401) {
-        // Try silent token refresh first
-        const refreshRes = await fetch('/api/auth/refresh', { method: 'POST' });
-        if (refreshRes.ok) {
-            res = await fetch(url, options);
-        } else {
-            // Refresh truly failed — user needs to log in again
-            router.push('/login?debug=session_expired');
-            return null;
-        }
-    }
-    // For everything else (200, 502, etc.) just return the response
-    return res;
-}
+import { authedFetch } from "@/lib/fetch-utils";
 
 
 function DashboardLayoutInner({ children }: { children: React.ReactNode }) {

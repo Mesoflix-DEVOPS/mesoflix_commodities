@@ -84,8 +84,13 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ prices: parseMarketDetails(data) });
 
     } catch (err: any) {
-        console.error('[Prices API] Error:', err.message);
-        return NextResponse.json({ error: err.message, prices: {} });
+        console.error('[Prices API] Fatal Error:', err);
+        return NextResponse.json({
+            error: 'Internal Server Error',
+            message: err.message,
+            stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
+            prices: {}
+        }, { status: 500 });
     }
 }
 

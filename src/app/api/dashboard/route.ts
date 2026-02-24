@@ -134,7 +134,11 @@ export async function GET(request: Request) {
         }
 
     } catch (error: any) {
-        console.error('Dashboard API Error:', error);
-        return NextResponse.json({ message: 'Internal Server Error' }, { status: 500 });
+        console.error('[Dashboard API] Fatal Error:', error);
+        return NextResponse.json({
+            message: 'Internal Server Error',
+            error: error.message,
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        }, { status: 500 });
     }
 }

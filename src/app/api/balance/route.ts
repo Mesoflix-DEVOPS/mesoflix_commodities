@@ -66,14 +66,17 @@ export async function GET(req: NextRequest) {
         return NextResponse.json(pickBalance(data, isDemo, session.selectedAccountId));
 
     } catch (err: any) {
-        console.error('[Balance API] Error:', err.message);
-        return NextResponse.json({ balance: 0, deposit: 0, profitLoss: 0, available: 0, equity: 0, currency: 'USD', warning: err.message });
+        console.error('[Balance API] Fatal Error:', err);
+        return NextResponse.json({
+            balance: 0, deposit: 0, profitLoss: 0, available: 0, equity: 0, currency: 'USD',
+            error: err.message || 'Internal Server Error',
+            stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+        }, { status: 500 });
     }
 }
 
 /**
  * Pick the preferred (or first) account and extract balance fields.
- * Capital.com accountType is always 'CFD' — the preferred account is the active one.
  */
 function pickBalance(data: any, isDemo: boolean, selectedAccountId?: string | null) {
     const accounts: any[] = data?.accounts || [];
@@ -81,22 +84,21 @@ function pickBalance(data: any, isDemo: boolean, selectedAccountId?: string | nu
         return { balance: 0, deposit: 0, profitLoss: 0, available: 0, equity: 0, currency: 'USD' };
     }
 
-    // Capital.com already returns accounts filtered by the server environment (Demo vs Live).
-    // Attempt to find the specific account selected by the user, or default to the first one.
     let account = accounts[0];
     if (selectedAccountId) {
         const found = accounts.find(a => a.accountId === selectedAccountId);
         if (found) account = found;
     }
 
+    const b = account.balance || {};
+
     return {
-        balance: account.balance ?? 0,
-        deposit: account.deposit ?? 0,
-        profitLoss: account.profitLoss ?? 0,
-        available: account.availableToWithdraw ?? account.available ?? 0,
-        equity: account.balance + account.profitLoss,
+        balance: b.balance ?? 0,
+        deposit: b.deposit ?? 0,
+        profitLoss: b.profitLoss ?? 0,
+        available: b.availableToWithdraw ?? b.available ?? 0,
+        equity: (b.balance ?? 0) + (b.profitLoss ?? 0),
         currency: account.currency || 'USD',
-        // metadata for debugging
         accountId: account.accountId,
         accountName: account.accountName,
         accountType: account.accountType

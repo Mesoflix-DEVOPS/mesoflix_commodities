@@ -42,7 +42,11 @@ export async function GET() {
             }
         });
     } catch (err: any) {
-        console.error('[User API] Error:', err.message);
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+        console.error('[User API] Fatal Error:', err);
+        return NextResponse.json({
+            error: 'Internal Server Error',
+            message: err.message,
+            stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+        }, { status: 500 });
     }
 }
