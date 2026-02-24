@@ -36,9 +36,6 @@ interface MarketDataContextType {
     connectionStatus: 'connecting' | 'connected' | 'disconnected' | 'error';
     setMode: (mode: 'demo' | 'real') => void;
     mode: 'demo' | 'real';
-    accounts: any[];
-    selectedAccountId: string | null;
-    selectAccount: (id: string) => Promise<void>;
 }
 
 const MarketDataContext = createContext<MarketDataContextType>({
@@ -49,9 +46,6 @@ const MarketDataContext = createContext<MarketDataContextType>({
     connectionStatus: 'disconnected',
     setMode: () => { },
     mode: 'demo',
-    accounts: [],
-    selectedAccountId: null,
-    selectAccount: async () => { },
 });
 
 export const useMarketData = () => useContext(MarketDataContext);
@@ -78,8 +72,6 @@ export function MarketDataProvider({ children }: { children: React.ReactNode }) 
     const [demoBalance, setDemoBalance] = useState<BalanceData | null>(null);
     const [realBalance, setRealBalance] = useState<BalanceData | null>(null);
     const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected' | 'error'>('connecting');
-    const [accounts, setAccounts] = useState<any[]>([]);
-    const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
 
     const modeRef = useRef(mode);
 
@@ -90,14 +82,6 @@ export function MarketDataProvider({ children }: { children: React.ReactNode }) 
             if (!res.ok) return;
             const data = await res.json();
             const parsed = parseBalance(data);
-
-            // Extract accounts list and currently selected ID from the backend's perspective
-            if (data.accounts) {
-                setAccounts(data.accounts);
-                if (data.selectedAccountId) {
-                    setSelectedAccountId(data.selectedAccountId);
-                }
-            }
 
             if (targetMode === 'demo') setDemoBalance(parsed);
             else setRealBalance(parsed);
@@ -160,22 +144,6 @@ export function MarketDataProvider({ children }: { children: React.ReactNode }) 
         setModeState(newMode);
     }, []);
 
-    const selectAccount = useCallback(async (accountId: string) => {
-        try {
-            const res = await fetch('/api/capital/select', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ accountId })
-            });
-            if (res.ok) {
-                // Refresh balances and state
-                fetchBalance(mode);
-            }
-        } catch (e) {
-            console.error('Failed to select account', e);
-        }
-    }, [fetchBalance, mode]);
-
     return (
         <MarketDataContext.Provider value={{
             marketData,
@@ -185,9 +153,6 @@ export function MarketDataProvider({ children }: { children: React.ReactNode }) 
             connectionStatus,
             setMode,
             mode,
-            accounts,
-            selectedAccountId,
-            selectAccount,
         }}>
             {children}
         </MarketDataContext.Provider>

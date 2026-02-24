@@ -78,34 +78,24 @@ export async function GET(req: NextRequest) {
 function pickBalance(data: any, isDemo: boolean, selectedAccountId?: string | null) {
     let accounts: any[] = data?.accounts || [];
     if (accounts.length === 0) {
-        return { balance: 0, deposit: 0, profitLoss: 0, available: 0, equity: 0, currency: 'USD', accounts: [] };
+        return { balance: 0, deposit: 0, profitLoss: 0, available: 0, equity: 0, currency: 'USD' };
     }
 
-    // Do NOT filter the accounts list here anymore. We want a UNIFIED list.
-    // Instead, we just categorize them for selection priority.
-    const demoAccounts = accounts.filter(a =>
-        a.accountType?.toUpperCase() === 'DEMO' ||
-        a.accountName?.toLowerCase().includes('demo')
-    );
-    const realAccounts = accounts.filter(a =>
-        a.accountType?.toUpperCase() !== 'DEMO' &&
-        !a.accountName?.toLowerCase().includes('demo')
-    );
+    // Filter accounts strictly based on requested mode (Real vs Demo)
+    if (isDemo) {
+        accounts = accounts.filter(a =>
+            a.accountType?.toUpperCase() === 'DEMO' ||
+            a.accountName?.toLowerCase().includes('demo')
+        );
+    } else {
+        accounts = accounts.filter(a =>
+            a.accountType?.toUpperCase() !== 'DEMO' &&
+            !a.accountName?.toLowerCase().includes('demo')
+        );
+    }
 
-    // Log filtered results for internal investigation
-    console.log(`[Balance API] Filtered (${isDemo ? 'DEMO' : 'REAL'}):`, accounts.map(a => `${a.accountName} (${a.accountType}) - ${a.balance?.balance}`).join(', '));
-
-    // Priority Selection for the primary balance returned:
-    // 1. Exact match for selected_capital_account_id
-    // 2. Preference match based on requested mode (Real/Demo)
-    // 3. Fallback to first available
-    let accToUse = (selectedAccountId && accounts.find(a => a.accountId === selectedAccountId)) ||
-        (isDemo ? demoAccounts[0] : realAccounts[0]) ||
-        accounts[0] ||
-        null;
-
-    // Log selection trace
-    console.log(`[Balance API] Targeting Account: ${accToUse?.accountName} (${accToUse?.accountId})`);
+    // Target the first matching account
+    let accToUse = accounts[0] || null;
 
     if (!accToUse) return { balance: 0, deposit: 0, profitLoss: 0, available: 0, equity: 0, currency: 'USD' };
 
@@ -118,8 +108,5 @@ function pickBalance(data: any, isDemo: boolean, selectedAccountId?: string | nu
         available: b.available ?? 0,
         equity: (b.balance ?? 0) + (b.profitLoss ?? 0),
         currency: accToUse.currency || 'USD',
-        // Pass through ALL accounts for the unified selector
-        accounts: accounts,
-        selectedAccountId: accToUse.accountId,
     };
 }
