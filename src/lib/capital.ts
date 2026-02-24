@@ -79,9 +79,30 @@ export const getPositions = async (cst: string, xSecurityToken: string, isDemo: 
     return response.json();
 };
 
-export const getHistory = async (cst: string, xSecurityToken: string, isDemo: boolean = false) => {
+export const getHistory = async (
+    cst: string,
+    xSecurityToken: string,
+    isDemo: boolean = false,
+    options?: { from?: string | Date; to?: string | Date; max?: number }
+) => {
     const API_URL = getApiUrl(isDemo);
-    const response = await fetch(`${API_URL}/history/activity`, {
+
+    const params = new URLSearchParams();
+    if (options?.from) {
+        const fromDate = typeof options.from === 'string' ? options.from : options.from.toISOString().split('.')[0];
+        params.append('from', fromDate);
+    }
+    if (options?.to) {
+        const toDate = typeof options.to === 'string' ? options.to : options.to.toISOString().split('.')[0];
+        params.append('to', toDate);
+    }
+    if (options?.max) {
+        params.append('max', options.max.toString());
+    }
+
+    const queryStr = params.toString() ? `?${params.toString()}` : '';
+
+    const response = await fetch(`${API_URL}/history/activity${queryStr}`, {
         headers: {
             'X-SECURITY-TOKEN': xSecurityToken,
             'CST': cst
