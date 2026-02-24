@@ -156,3 +156,27 @@ export const placeOrder = async (
 
     return response.json();
 };
+
+export const closePosition = async (
+    cst: string,
+    xSecurityToken: string,
+    dealId: string,
+    accountIsDemo: boolean = false
+) => {
+    const API_URL = getApiUrl(accountIsDemo);
+
+    const response = await fetch(`${API_URL}/positions/${dealId}`, {
+        method: 'DELETE',
+        headers: {
+            'X-SECURITY-TOKEN': xSecurityToken,
+            'CST': cst,
+        },
+    });
+
+    if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`Failed to close position: ${response.status} - ${text}`);
+    }
+
+    return response.json();
+};

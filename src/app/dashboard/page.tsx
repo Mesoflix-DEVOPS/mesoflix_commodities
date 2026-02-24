@@ -42,6 +42,8 @@ function DashboardPageInner() {
     const { mode, balanceData } = useMarketData();
     const [loading, setLoading] = useState(true);
     const [data, setData] = useState<any>(null);
+    const [selectedTrade, setSelectedTrade] = useState<any>(null);
+    const [closingTrade, setClosingTrade] = useState(false);
 
     const fetchData = useCallback((isSilent = false) => {
         if (!isSilent) setLoading(true);
@@ -63,6 +65,28 @@ function DashboardPageInner() {
         const interval = setInterval(() => fetchData(true), 15000);
         return () => clearInterval(interval);
     }, [fetchData]);
+
+    const handleCloseTrade = async () => {
+        if (!selectedTrade?.dealId) return;
+        setClosingTrade(true);
+        try {
+            const res = await fetch(`/api/trade?dealId=${selectedTrade.dealId}&mode=${mode}`, {
+                method: 'DELETE',
+            });
+            if (res.ok) {
+                // Refresh data immediately
+                fetchData(true);
+                setSelectedTrade(null);
+            } else {
+                const err = await res.json();
+                alert(`Failed to close trade: ${err.error || 'Unknown error'}`);
+            }
+        } catch (e: any) {
+            alert(`Error closing trade: ${e.message}`);
+        } finally {
+            setClosingTrade(false);
+        }
+    };
 
     // -----------------------------------------------------------------------
     // Account selection
@@ -92,6 +116,7 @@ function DashboardPageInner() {
     // -----------------------------------------------------------------------
     const rawPositions: any[] = data?.positions || [];
     const positions = rawPositions.map((p: any) => ({
+        dealId: p.position?.dealId || '',
         epic: p.market?.epic || p.position?.epic || '',
         name: p.market?.instrumentName || p.position?.epic || 'Unknown',
         direction: p.position?.direction || 'BUY',
@@ -126,6 +151,7 @@ function DashboardPageInner() {
         })
         : [
             { name: 'Open', equity: balance.balance },
+            { name: 'Mid', equity: balance.balance + ((balance.equity - balance.balance) / 2) }, // Interpolate an intermediate point so it curves
             { name: 'Now', equity: balance.equity },
         ];
 
@@ -377,10 +403,12 @@ function DashboardPageInner() {
                             </thead>
                             <tbody>
                                 {positions.map((pos, idx) => (
-                                    <tr key={idx} className="border-b border-white/5 hover:bg-white/[0.03] transition-colors">
+                                    <tr key={idx}
+                                        onClick={() => setSelectedTrade(pos)}
+                                        className="border-b border-white/5 hover:bg-white/[0.05] cursor-pointer transition-colors group">
                                         <td className="px-8 py-5">
                                             <div className="flex items-center gap-3">
-                                                <div className={cn("w-2 h-2 rounded-full shrink-0", pos.direction === 'BUY' ? 'bg-teal' : 'bg-red-500')} />
+                                                <div className={cn("w-2 h-2 rounded-full shrink-0 group-hover:scale-125 transition-transform", pos.direction === 'BUY' ? 'bg-teal' : 'bg-red-500')} />
                                                 <span className="font-bold text-white uppercase tracking-tight text-sm">{pos.name}</span>
                                             </div>
                                         </td>
@@ -391,9 +419,13 @@ function DashboardPageInner() {
                                         </td>
                                         <td className="px-8 py-5 text-gray-400 font-bold font-mono">{pos.size}</td>
                                         <td className="px-8 py-5 font-mono text-gray-300">{Number(pos.level).toFixed(4)}</td>
-                                        <td className="px-8 py-5 text-right">
+                                        <td className="px-8 py-5 text-right relative">
                                             <span className={cn("font-black font-mono text-base", pos.upl >= 0 ? "text-teal" : "text-red-500")}>
                                                 {pos.upl >= 0 ? "+" : ""}{Number(pos.upl).toFixed(2)}
+                                            </span>
+                                            {/* Hover indicator */}
+                                            <span className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <ChevronRight size={14} className="text-gray-500" />
                                             </span>
                                         </td>
                                     </tr>
@@ -460,6 +492,62 @@ function DashboardPageInner() {
                     )}
                 </div>
             </div>
+
+            {/* Trade Details Modal */}
+            {selectedTrade && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setSelectedTrade(null)}>
+                    <div className="bg-[#0A1622] border border-white/10 rounded-3xl p-8 max-w-sm w-full shadow-2xl relative" onClick={e => e.stopPropagation()}>
+                        <button onClick={() => setSelectedTrade(null)} className="absolute top-4 right-4 text-gray-500 hover:text-white transition-colors">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
+                        </button>
+
+                        <div className="flex items-center gap-3 mb-6">
+                            <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center border",
+                                selectedTrade.direction === 'BUY' ? 'bg-teal/10 border-teal/20 text-teal' : 'bg-red-500/10 border-red-500/20 text-red-400'
+                            )}>
+                                {selectedTrade.direction === 'BUY' ? <TrendingUp size={20} /> : <TrendingDown size={20} />}
+                            </div>
+                            <div>
+                                <h2 className="text-xl font-black text-white">{selectedTrade.name}</h2>
+                                <p className="text-[10px] text-gray-500 font-black uppercase tracking-widest">{selectedTrade.epic}</p>
+                            </div>
+                        </div>
+
+                        <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-5 space-y-4 mb-6">
+                            <div className="flex justify-between items-center">
+                                <span className="text-[10px] text-gray-500 font-black uppercase tracking-widest">Direction</span>
+                                <span className={cn("text-xs font-black uppercase tracking-widest px-2 py-1 rounded-md",
+                                    selectedTrade.direction === 'BUY' ? 'text-teal bg-teal/10' : 'text-red-400 bg-red-400/10'
+                                )}>{selectedTrade.direction}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                                <span className="text-[10px] text-gray-500 font-black uppercase tracking-widest">Size</span>
+                                <span className="text-sm font-mono font-bold text-white">{selectedTrade.size} Lots</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                                <span className="text-[10px] text-gray-500 font-black uppercase tracking-widest">Entry Price</span>
+                                <span className="text-sm font-mono font-bold text-gray-300">{Number(selectedTrade.level).toFixed(4)}</span>
+                            </div>
+                            <div className="pt-4 border-t border-white/5 flex justify-between items-center">
+                                <span className="text-[10px] text-gray-500 font-black uppercase tracking-widest">Live P/L</span>
+                                <span className={cn("text-xl font-mono font-black", selectedTrade.upl >= 0 ? "text-teal" : "text-red-500")}>
+                                    {selectedTrade.upl >= 0 ? "+" : ""}{Number(selectedTrade.upl).toFixed(2)}
+                                </span>
+                            </div>
+                        </div>
+
+                        <button
+                            onClick={handleCloseTrade}
+                            disabled={closingTrade}
+                            className={cn("w-full py-4 rounded-2xl font-black text-sm uppercase tracking-widest transition-all",
+                                closingTrade ? "bg-red-500/50 text-white cursor-not-allowed" : "bg-red-500 hover:bg-red-600 text-white shadow-[0_0_20px_rgba(239,68,68,0.3)]"
+                            )}
+                        >
+                            {closingTrade ? 'Closing...' : 'Close Trade Now'}
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

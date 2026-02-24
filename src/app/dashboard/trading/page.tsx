@@ -622,23 +622,31 @@ function ExecutionLogsTab({ mode }: { mode: string }) {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-white/5">
-                            {positions.map((pos: any, i: number) => (
-                                <tr key={i} className="hover:bg-white/[0.02] transition-colors">
-                                    <td className="px-6 py-4">
-                                        <span className={cn("px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest",
-                                            pos.direction === "BUY" ? "bg-teal/10 text-teal" : "bg-red-500/10 text-red-400")}>
-                                            {pos.direction || "—"}
-                                        </span>
-                                    </td>
-                                    <td className="px-6 py-4 text-[11px] font-bold text-gray-300 uppercase tracking-tight">{pos.epic || pos.symbol || "—"}</td>
-                                    <td className="px-6 py-4 text-[11px] font-mono text-gray-400">{pos.level?.toFixed(4) ?? "—"}</td>
-                                    <td className="px-6 py-4 text-[11px] font-mono text-gray-400">{pos.size ?? "—"}</td>
-                                    <td className={cn("px-6 py-4 text-right font-mono font-black text-sm",
-                                        (pos.upl ?? 0) >= 0 ? "text-teal" : "text-red-400")}>
-                                        {(pos.upl ?? 0) >= 0 ? "+" : ""}{(pos.upl ?? 0).toFixed(2)}
-                                    </td>
-                                </tr>
-                            ))}
+                            {positions.map((pos: any, i: number) => {
+                                const direction = pos.position?.direction || "—";
+                                const epic = pos.market?.instrumentName || pos.position?.epic || pos.epic || pos.symbol || "—";
+                                const level = pos.position?.level;
+                                const size = pos.position?.size;
+                                const upl = pos.position?.upl ?? 0;
+
+                                return (
+                                    <tr key={i} className="hover:bg-white/[0.02] transition-colors">
+                                        <td className="px-6 py-4">
+                                            <span className={cn("px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest",
+                                                direction === "BUY" ? "bg-teal/10 text-teal" : "bg-red-500/10 text-red-400")}>
+                                                {direction}
+                                            </span>
+                                        </td>
+                                        <td className="px-6 py-4 text-[11px] font-bold text-gray-300 uppercase tracking-tight">{epic}</td>
+                                        <td className="px-6 py-4 text-[11px] font-mono text-gray-400">{level?.toFixed(4) ?? "—"}</td>
+                                        <td className="px-6 py-4 text-[11px] font-mono text-gray-400">{size ?? "—"}</td>
+                                        <td className={cn("px-6 py-4 text-right font-mono font-black text-sm",
+                                            upl >= 0 ? "text-teal" : "text-red-400")}>
+                                            {upl >= 0 ? "+" : ""}{upl.toFixed(2)}
+                                        </td>
+                                    </tr>
+                                )
+                            })}
                             {positions.length === 0 && (
                                 <tr><td colSpan={5} className="px-6 py-10 text-center text-[10px] font-black text-gray-600 uppercase tracking-widest">No active positions in {mode} account</td></tr>
                             )}
