@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useMarketData } from "@/contexts/MarketDataContext";
 import { cn } from "@/lib/utils";
 import { History, Clock, RefreshCw, ChevronDown, ChevronUp, CheckCircle2 } from "lucide-react";

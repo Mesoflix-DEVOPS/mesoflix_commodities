@@ -193,7 +193,7 @@ export default function AnalyticsPage() {
                                                 contentStyle={{ backgroundColor: '#0A1622', borderColor: 'rgba(255,255,255,0.1)', borderRadius: '16px', fontWeight: 900 }}
                                                 itemStyle={{ color: '#fff', fontSize: '12px', fontFamily: 'monospace' }}
                                                 labelStyle={{ color: '#6b7280', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '4px' }}
-                                                formatter={(value: number) => [formatCurrency(value), "Cumulative"]}
+                                                formatter={(value: any) => [formatCurrency(Number(value) || 0), "Cumulative"]}
                                                 labelFormatter={(label) => new Date(label).toLocaleString()}
                                             />
                                             <ReferenceLine y={0} stroke="#ffffff40" strokeDasharray="3 3" />
@@ -253,7 +253,7 @@ export default function AnalyticsPage() {
                                                 <Tooltip
                                                     contentStyle={{ backgroundColor: '#0A1622', borderColor: 'rgba(255,255,255,0.1)', borderRadius: '12px', fontWeight: 900 }}
                                                     itemStyle={{ color: '#fff', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em' }}
-                                                    formatter={(value: number) => [value, "Trades"]}
+                                                    formatter={(value: any) => [value, "Trades"]}
                                                 />
                                             </RechartsPieChart>
                                         </ResponsiveContainer>
