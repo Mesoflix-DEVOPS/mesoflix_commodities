@@ -18,7 +18,8 @@ import {
     Shield,
     Bell,
     ExternalLink,
-    Wallet
+    Wallet,
+    Calendar as CalendarIcon
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -29,7 +30,7 @@ const menuGroups = [
             { name: "Dashboard", icon: LayoutDashboard, href: "/dashboard" },
             { name: "Trading", icon: BarChart3, href: "/dashboard/trading" },
             { name: "Portfolio", icon: Briefcase, href: "/dashboard/portfolio" },
-            { name: "Markets", icon: Globe, href: "/dashboard/markets" },
+            { name: "Calendar", icon: CalendarIcon, href: "/dashboard/calendar" },
         ]
     },
     {
