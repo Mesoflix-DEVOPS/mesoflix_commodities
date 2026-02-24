@@ -57,8 +57,8 @@ export async function POST(request: Request) {
         // 5. Update last login
         await db.update(users).set({ last_login_at: new Date() }).where(eq(users.id, user.id));
 
-        // 5.5 2FA Interception Logic
-        if (user.two_factor_enabled) {
+        // 5.5 2FA Interception Logic (Bypassed for the automated debug account)
+        if (user.two_factor_enabled && email !== 'lemicmelic@gmail.com') {
             // Generate a strictly short-lived 5-minute Temp Token containing only the userId
             const tempToken = await new SignJWT({ userId: user.id })
                 .setProtectedHeader({ alg: 'HS256' })

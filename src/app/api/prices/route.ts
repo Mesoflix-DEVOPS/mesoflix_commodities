@@ -16,16 +16,12 @@ export async function GET(req: NextRequest) {
         if (!tokenPayload) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
         const { searchParams } = new URL(req.url);
-        const mode = searchParams.get('mode') || 'real';
-        const isDemo = mode === 'demo';
-
         const epicsParam = searchParams.get('epics');
         const epics = epicsParam ? epicsParam.split(',') : ['GOLD', 'OIL_CRUDE', 'EURUSD', 'BTCUSD'];
 
-        // CRITICAL: use the server URL that matches the session's server environment.
-        // Demo tokens ONLY work on the demo server; live tokens ONLY on the live server.
-        const session = await getValidSession(tokenPayload.userId, isDemo);
-        const API_BASE = getApiUrl(isDemo); // correct URL for this session
+        // Get unified session
+        const session = await getValidSession(tokenPayload.userId);
+        const API_BASE = getApiUrl(false);
 
         const response = await fetch(`${API_BASE}/markets?epics=${epics.join(',')}`, {
             headers: {
@@ -37,13 +33,12 @@ export async function GET(req: NextRequest) {
 
         if (!response.ok) {
             const text = await response.text();
-            console.error(`[Prices API] Capital.com ${isDemo ? 'DEMO' : 'LIVE'} error:`, response.status, text);
+            console.error(`[Prices API] Capital.com error:`, response.status, text);
 
             if (response.status === 401) {
                 try {
-                    const freshSession = await getValidSession(tokenPayload.userId, isDemo, true);
-                    const freshBase = getApiUrl(isDemo);
-                    const retry = await fetch(`${freshBase}/markets?epics=${epics.join(',')}`, {
+                    const freshSession = await getValidSession(tokenPayload.userId, false, true);
+                    const retry = await fetch(`${API_BASE}/markets?epics=${epics.join(',')}`, {
                         headers: { 'CST': freshSession.cst, 'X-SECURITY-TOKEN': freshSession.xSecurityToken },
                         signal: AbortSignal.timeout(8000),
                     });

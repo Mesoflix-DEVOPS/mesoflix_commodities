@@ -1,14 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAccessToken } from '@/lib/auth';
-import { getValidSession } from '@/lib/capital-service';
+import { getValidSession, getApiUrl } from '@/lib/capital-service';
 import { cookies } from 'next/headers';
 
 export const dynamic = 'force-dynamic';
-
-// Capital.com has two completely separate server environments.
-// Live and Demo sessions are independent — you MUST use the correct URL for each.
-const LIVE_API = 'https://api-capital.backend-capital.com/api/v1';
-const DEMO_API = 'https://demo-api-capital.backend-capital.com/api/v1';
 
 export async function GET(req: NextRequest) {
     try {
@@ -19,30 +14,30 @@ export async function GET(req: NextRequest) {
         const tokenPayload = await verifyAccessToken(accessToken);
         if (!tokenPayload) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-        // Fetch BOTH sessions in parallel — live from live server, demo from demo server.
-        // Each uses the correct URL and has its own independent session token.
-        const [liveResult, demoResult] = await Promise.allSettled([
-            fetchAccountBalance(tokenPayload.userId, false, LIVE_API),
-            fetchAccountBalance(tokenPayload.userId, true, DEMO_API),
-        ]);
+        // Hit the unified LIVE server once.
+        const API_BASE = getApiUrl(false);
+        const session = await getValidSession(tokenPayload.userId);
 
-        const realBalance = liveResult.status === 'fulfilled' ? liveResult.value : null;
-        const demoBalance = demoResult.status === 'fulfilled' ? demoResult.value : null;
-
-        if (liveResult.status === 'rejected') {
-            console.error('[Balance API] Live fetch failed:', liveResult.reason?.message);
-        }
-        if (demoResult.status === 'rejected') {
-            console.error('[Balance API] Demo fetch failed:', demoResult.reason?.message);
-        }
-
-        // Return both balances — frontend populates both panels from one response
-        return NextResponse.json({
-            realBalance,
-            demoBalance,
-            hasLive: realBalance !== null,
-            hasDemo: demoBalance !== null,
+        const res = await fetch(`${API_BASE}/accounts`, {
+            headers: { 'CST': session.cst, 'X-SECURITY-TOKEN': session.xSecurityToken },
+            signal: AbortSignal.timeout(8000),
         });
+
+        if (!res.ok) {
+            if (res.status === 401) {
+                const fresh = await getValidSession(tokenPayload.userId, false, true);
+                const retry = await fetch(`${API_BASE}/accounts`, {
+                    headers: { 'CST': fresh.cst, 'X-SECURITY-TOKEN': fresh.xSecurityToken },
+                    signal: AbortSignal.timeout(8000),
+                });
+                if (retry.ok) {
+                    return NextResponse.json(splitAccounts(await retry.json()));
+                }
+            }
+            throw new Error(`Capital.com returned ${res.status}`);
+        }
+
+        return NextResponse.json(splitAccounts(await res.json()));
 
     } catch (err: any) {
         console.error('[Balance API] Fatal Error:', err.message);
@@ -50,87 +45,52 @@ export async function GET(req: NextRequest) {
     }
 }
 
-/**
- * Fetch the balance for one account type (live or demo) using the correct server.
- *
- * @param userId - the authenticated user
- * @param isDemo - true = use demo server, false = use live server
- * @param apiUrl - the Capital.com API base URL for this mode
- */
-async function fetchAccountBalance(
-    userId: string,
-    isDemo: boolean,
-    apiUrl: string,
-): Promise<BalancePayload> {
-    // Get (or create) a session on the correct server
-    const session = await getValidSession(userId, isDemo);
-
-    const res = await fetch(`${apiUrl}/accounts`, {
-        headers: {
-            'CST': session.cst,
-            'X-SECURITY-TOKEN': session.xSecurityToken,
-        },
-        signal: AbortSignal.timeout(8000),
-    });
-
-    if (!res.ok) {
-        // Try force-refreshing once on 401
-        if (res.status === 401) {
-            const fresh = await getValidSession(userId, isDemo, true);
-            const retry = await fetch(`${apiUrl}/accounts`, {
-                headers: { 'CST': fresh.cst, 'X-SECURITY-TOKEN': fresh.xSecurityToken },
-                signal: AbortSignal.timeout(8000),
-            });
-            if (retry.ok) {
-                const data = await retry.json();
-                return pickPreferredAccount(data, isDemo);
-            }
-            const errBody = await retry.text();
-            throw new Error(`Capital.com ${isDemo ? 'DEMO' : 'LIVE'} retry failed: ${retry.status} ${errBody.substring(0, 100)}`);
-        }
-        const errBody = await res.text();
-        throw new Error(`Capital.com ${isDemo ? 'DEMO' : 'LIVE'}: ${res.status} ${errBody.substring(0, 100)}`);
+function splitAccounts(data: any) {
+    const accounts = data?.accounts || [];
+    if (accounts.length === 0) {
+        return { realBalance: null, demoBalance: null, hasLive: false, hasDemo: false };
     }
 
-    const data = await res.json();
-    console.log(
-        `[Balance API] ${isDemo ? 'DEMO' : 'LIVE'} accounts:`,
-        (data?.accounts || []).map((a: any) => `${a.accountName}(${a.accountType})=${a.currency}${a.balance?.balance ?? 0}`).join(', ')
-    );
-    return pickPreferredAccount(data, isDemo);
+    // Try explicit names or types first
+    let demoAccs = accounts.filter((a: any) => a.accountType === 'SPREADBET' || (a.accountName || '').toLowerCase().includes('demo'));
+    let realAccs = accounts.filter((a: any) => a.accountType !== 'SPREADBET' && !(a.accountName || '').toLowerCase().includes('demo'));
+
+    // Fallback heuristic for unified CFD accounts (where Demo and Live look identical)
+    if (demoAccs.length === 0 && realAccs.length > 1) {
+        // Based on user configuration: GBP account is Demo, USD is Live.
+        const gbpAcc = realAccs.find((a: any) => a.currency === 'GBP');
+        const usdAcc = realAccs.find((a: any) => a.currency === 'USD');
+
+        if (gbpAcc && usdAcc) {
+            demoAccs = [gbpAcc];
+            realAccs = [usdAcc];
+        } else {
+            // Ultimate fallback: assign preferred to demo for testing
+            demoAccs = [realAccs.find((a: any) => a.preferred) || realAccs[1]];
+            realAccs = [realAccs.find((a: any) => !a.preferred) || realAccs[0]];
+        }
+    }
+
+    const rAcc = realAccs[0] || accounts[0];
+    const dAcc = demoAccs[0] || accounts[1] || accounts[0];
+
+    return {
+        realBalance: extractBalance(rAcc),
+        demoBalance: extractBalance(dAcc),
+        hasLive: !!rAcc,
+        hasDemo: !!dAcc,
+    };
 }
 
-interface BalancePayload {
-    balance: number;
-    deposit: number;
-    profitLoss: number;
-    available: number;
-    equity: number;
-    currency: string;
-    accountId: string;
-    accountName: string;
-    accountType: string;
-}
-
-/**
- * Pick the preferred account from a GET /accounts response and extract balance fields.
- * On the live server: returns the preferred live CFD account.
- * On the demo server: returns the preferred demo account.
- */
-function pickPreferredAccount(data: any, _isDemo: boolean): BalancePayload {
-    const accounts: any[] = data?.accounts || [];
-    if (accounts.length === 0) throw new Error('No accounts returned');
-
-    // Prefer account marked as preferred; fallback to first
-    const account = accounts.find(a => a.preferred) || accounts[0];
-    const b = account?.balance || {};
-
+function extractBalance(account: any) {
+    if (!account) return null;
+    const b = account.balance || {};
     return {
         balance: Number(b.balance ?? 0),
         deposit: Number(b.deposit ?? 0),
         profitLoss: Number(b.profitLoss ?? 0),
         available: Number(b.available ?? b.availableToWithdraw ?? 0),
-        equity: Number((b.balance ?? 0)) + Number((b.profitLoss ?? 0)),
+        equity: Number(b.balance ?? 0) + Number(b.profitLoss ?? 0),
         currency: account.currency || 'USD',
         accountId: account.accountId,
         accountName: account.accountName,

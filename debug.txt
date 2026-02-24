@@ -1,0 +1,8 @@
+
+========================================
+Testing Credential: "new trial api " (Active: false)
+Could not decrypt keys for new trial api 
+
+========================================
+Testing Credential: "lemic" (Active: true)
+Could not decrypt keys for lemic
