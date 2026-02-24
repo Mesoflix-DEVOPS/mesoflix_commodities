@@ -4,11 +4,20 @@ import { encrypt, decrypt } from './crypto';
 import { createSession } from './capital';
 import { eq } from 'drizzle-orm';
 
+const LIVE_API = 'https://api-capital.backend-capital.com/api/v1';
+const DEMO_API = 'https://demo-api-capital.backend-capital.com/api/v1';
+
+export function getApiUrl(isDemo: boolean): string {
+    return isDemo ? DEMO_API : LIVE_API;
+}
+
 export interface SessionTokens {
     cst: string;
     xSecurityToken: string;
     accountIsDemo: boolean;
     activeAccountId?: string | null;
+    /** Which Capital.com server these tokens belong to */
+    serverUrl: string;
 }
 
 interface CachedEntry {
@@ -16,12 +25,11 @@ interface CachedEntry {
     expiresAt: number;
 }
 
-// Two separate in-memory caches — one per server (live/demo)
-// Key format: `${credAccountId}-live` or `${credAccountId}-demo`
+// Two separate in-memory caches — one per server
+// Key: `${credAccountId}-live` or `${credAccountId}-demo`
 const memCache = new Map<string, CachedEntry>();
 
-// Capital.com sessions expire after 10 minutes of inactivity.
-// We cache for 8 minutes to give a safe 2-minute buffer.
+// Capital.com sessions expire after 10 min of inactivity — we cache for 8 min
 const SESSION_TTL_MS = 8 * 60 * 1000;
 
 function cacheKey(credAccountId: string, isDemo: boolean): string {
@@ -29,12 +37,15 @@ function cacheKey(credAccountId: string, isDemo: boolean): string {
 }
 
 /**
- * Try to restore a session from the database.
- * Stored sessions are shared across serverless function invocations.
+ * Try to restore a valid session from the database.
+ *
+ * IMPORTANT: We store the server URL inside the encrypted token.
+ * If the stored server URL doesn't match what we need (e.g., old code stored
+ * a demo session under session_mode='live'), we reject it and create a fresh one.
  */
 async function loadSessionFromDB(
     credAccountId: string,
-    isDemo: boolean
+    isDemo: boolean,
 ): Promise<SessionTokens | null> {
     try {
         const [row] = await db
@@ -50,25 +61,31 @@ async function loadSessionFromDB(
 
         if (!row?.encrypted_session_tokens || !row?.session_updated_at) return null;
 
-        // Only restore if the stored mode matches what we need
-        const storedMode = row.session_mode === 'demo';
-        if (storedMode !== isDemo) return null;
-
         const ageMs = Date.now() - row.session_updated_at.getTime();
-        if (ageMs > SESSION_TTL_MS) {
-            console.log(`[Service] DB session too old (${Math.round(ageMs / 1000)}s). Creating fresh.`);
-            return null;
-        }
+        if (ageMs > SESSION_TTL_MS) return null;
 
         const parsed = JSON.parse(decrypt(row.encrypted_session_tokens));
         if (!parsed?.cst || !parsed?.xSecurityToken) return null;
 
-        console.log(`[Service] Restored ${isDemo ? 'DEMO' : 'LIVE'} session from DB (age=${Math.round(ageMs / 1000)}s)`);
+        const expectedUrl = getApiUrl(isDemo);
+
+        // CRITICAL: Reject tokens if they were created for a different server.
+        // Old sessions without serverUrl stored are automatically rejected.
+        if (!parsed.serverUrl || parsed.serverUrl !== expectedUrl) {
+            console.log(
+                `[Service] DB session rejected — server mismatch.` +
+                ` stored="${parsed.serverUrl || 'none'}" expected="${expectedUrl}"`
+            );
+            return null;
+        }
+
+        console.log(`[Service] DB session OK for ${isDemo ? 'DEMO' : 'LIVE'} (age=${Math.round(ageMs / 1000)}s)`);
         return {
             cst: parsed.cst,
             xSecurityToken: parsed.xSecurityToken,
             accountIsDemo: isDemo,
             activeAccountId: row.selected_capital_account_id,
+            serverUrl: parsed.serverUrl,
         };
     } catch (e: any) {
         console.warn('[Service] Could not load DB session:', e.message);
@@ -77,18 +94,16 @@ async function loadSessionFromDB(
 }
 
 /**
- * Persist a session to the database for cross-serverless-instance sharing.
- * We store live and demo sessions separately using the session_mode column.
+ * Persist a session to the DB (shared across serverless invocations).
+ * The server URL is stored inside the encrypted payload so we can verify it on load.
  */
-async function saveSessionToDB(
-    credAccountId: string,
-    tokens: SessionTokens,
-): Promise<void> {
+async function saveSessionToDB(credAccountId: string, tokens: SessionTokens): Promise<void> {
     try {
         await db.update(capitalAccounts).set({
             encrypted_session_tokens: encrypt(JSON.stringify({
                 cst: tokens.cst,
                 xSecurityToken: tokens.xSecurityToken,
+                serverUrl: tokens.serverUrl, // ← stored so we can validate later
             })),
             session_updated_at: new Date(),
             session_mode: tokens.accountIsDemo ? 'demo' : 'live',
@@ -99,9 +114,6 @@ async function saveSessionToDB(
     }
 }
 
-/**
- * Find the best credential account for this user.
- */
 async function findCredAccount(userId: string) {
     const accounts = await db.select().from(capitalAccounts)
         .where(eq(capitalAccounts.user_id, userId));
@@ -118,46 +130,50 @@ async function findCredAccount(userId: string) {
 }
 
 /**
- * Get (or create) a valid Capital.com session.
+ * Get (or create) a valid Capital.com session for the correct server.
  *
- * KEY ARCHITECTURE INSIGHT:
- * Capital.com has two completely separate server environments:
+ * Capital.com has two entirely separate environments:
  *   LIVE: https://api-capital.backend-capital.com
  *   DEMO: https://demo-api-capital.backend-capital.com
  *
- * The same API key and credentials work on BOTH servers, but the sessions
- * are fully independent — you cannot use a live session on the demo server
- * or vice versa. You must maintain two separate sessions.
+ * The same API key + password works on BOTH servers, but sessions are independent.
+ * We maintain two separate sessions and NEVER mix tokens between servers.
  *
- * Caching strategy (serverless-safe):
- *   1. In-memory cache per mode (fast, lost on cold start)
- *   2. DB-persisted session per mode (survives serverless cold starts)
- *   3. Fresh POST /session on the correct server (last resort)
+ * Session lookup priority (serverless-safe):
+ *   1. In-memory cache (fast, warm instance only)
+ *   2. DB-persisted session with matching server URL (shared across instances)
+ *   3. Fresh POST /session on the correct server (rate-limited — last resort)
  */
 export async function getValidSession(
     userId: string,
     isDemo: boolean = false,
     forceRefresh: boolean = false,
 ): Promise<SessionTokens> {
-    console.log(`[Service] getValidSession: userId=${userId}, isDemo=${isDemo}, forceRefresh=${forceRefresh}`);
+    const serverUrl = getApiUrl(isDemo);
+    console.log(`[Service] getValidSession: userId=${userId}, server=${isDemo ? 'DEMO' : 'LIVE'}, forceRefresh=${forceRefresh}`);
 
     const credAccount = await findCredAccount(userId);
     if (!credAccount) {
-        throw new Error('No Capital.com account configured. Please set up credentials in Settings.');
+        throw new Error('No Capital.com account configured.');
     }
 
     const key = cacheKey(credAccount.id, isDemo);
 
-    // 1. Check in-memory cache
+    // 1. In-memory cache
     if (!forceRefresh) {
         const cached = memCache.get(key);
         if (cached && cached.expiresAt > Date.now()) {
-            console.log(`[Service] Memory cache HIT (${isDemo ? 'DEMO' : 'LIVE'})`);
-            return cached.tokens;
+            // Extra safety: verify the cached token belongs to the right server
+            if (cached.tokens.serverUrl === serverUrl) {
+                console.log(`[Service] Memory cache HIT (${isDemo ? 'DEMO' : 'LIVE'})`);
+                return cached.tokens;
+            }
+            console.warn('[Service] Memory cache has wrong serverUrl — evicting');
+            memCache.delete(key);
         }
     }
 
-    // 2. Check DB-persisted session (shared across serverless instances)
+    // 2. DB-persisted session (server URL validated inside loadSessionFromDB)
     if (!forceRefresh) {
         const dbSession = await loadSessionFromDB(credAccount.id, isDemo);
         if (dbSession) {
@@ -166,8 +182,8 @@ export async function getValidSession(
         }
     }
 
-    // 3. Create a fresh session on the correct server
-    console.log(`[Service] Cache MISS — creating fresh ${isDemo ? 'DEMO' : 'LIVE'} session...`);
+    // 3. Create a fresh session
+    console.log(`[Service] Creating fresh ${isDemo ? 'DEMO' : 'LIVE'} session on ${serverUrl}...`);
 
     const [owner] = await db.select().from(users)
         .where(eq(users.id, credAccount.user_id)).limit(1);
@@ -183,8 +199,6 @@ export async function getValidSession(
     }
     if (!password) throw new Error('API password not set.');
 
-    // Pass isDemo=true to createSession so it hits the DEMO server URL
-    console.log(`[Service] POST /session on ${isDemo ? 'DEMO' : 'LIVE'} server for ${owner.email}...`);
     const session = await createSession(owner.email, password, apiKey, isDemo);
     console.log(`[Service] ${isDemo ? 'DEMO' : 'LIVE'} session created. currentId=${session.currentAccountId}`);
 
@@ -193,9 +207,9 @@ export async function getValidSession(
         xSecurityToken: session.xSecurityToken,
         accountIsDemo: isDemo,
         activeAccountId: session.currentAccountId,
+        serverUrl, // ← always set correctly
     };
 
-    // Store in memory and DB
     memCache.set(key, { tokens, expiresAt: Date.now() + SESSION_TTL_MS });
     await saveSessionToDB(credAccount.id, tokens);
 
@@ -203,7 +217,7 @@ export async function getValidSession(
 }
 
 /**
- * Evict all cached sessions for a user (call after credential changes or 401 errors).
+ * Evict all cached sessions for a user.
  */
 export async function clearCachedSession(userId: string): Promise<void> {
     const userAccounts = await db.select().from(capitalAccounts)
