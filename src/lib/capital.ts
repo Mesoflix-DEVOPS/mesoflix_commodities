@@ -1,17 +1,46 @@
-import { NextResponse } from 'next/server';
-
 const LIVE_API_URL = 'https://api-capital.backend-capital.com/api/v1';
 const DEMO_API_URL = 'https://demo-api-capital.backend-capital.com/api/v1';
 
 const getApiUrl = (isDemo: boolean) => isDemo ? DEMO_API_URL : LIVE_API_URL;
 
-interface SessionResponse {
+export interface SessionResponse {
     cst: string;
     xSecurityToken: string;
+    /** The account currently active after session creation */
+    currentAccountId: string;
+    /** All accounts available (CFD = live, SPREADBET = demo — varies by region) */
+    accounts: Array<{
+        accountId: string;
+        accountName: string;
+        accountType: string;
+        preferred: boolean;
+        currency: string;
+        balance?: {
+            balance: number;
+            deposit: number;
+            profitLoss: number;
+            available: number;
+        };
+    }>;
+    hasActiveDemoAccounts: boolean;
+    hasActiveLiveAccounts: boolean;
+    /** Raw body for debugging */
     [key: string]: any;
 }
 
-export const createSession = async (identifier: string, password: string, apiKey: string, isDemo: boolean = false): Promise<SessionResponse> => {
+/**
+ * POST /api/v1/session — creates a new trading session.
+ * Returns the full body (accounts list + currentAccountId) PLUS
+ * the CST and X-SECURITY-TOKEN headers.
+ *
+ * Sessions expire after 10 minutes of inactivity.
+ */
+export const createSession = async (
+    identifier: string,
+    password: string,
+    apiKey: string,
+    isDemo: boolean = false
+): Promise<SessionResponse> => {
     const API_URL = getApiUrl(isDemo);
     const response = await fetch(`${API_URL}/session`, {
         method: 'POST',
@@ -19,11 +48,7 @@ export const createSession = async (identifier: string, password: string, apiKey
             'Content-Type': 'application/json',
             'X-CAP-API-KEY': apiKey,
         },
-        body: JSON.stringify({
-            identifier,
-            password,
-            encryptedPassword: false // sending plain password as allowed by API for simpler integration
-        }),
+        body: JSON.stringify({ identifier, password, encryptedPassword: false }),
     });
 
     if (!response.ok) {
@@ -41,8 +66,41 @@ export const createSession = async (identifier: string, password: string, apiKey
     return {
         ...data,
         cst,
-        xSecurityToken
+        xSecurityToken,
+        // Ensure accounts is always an array
+        accounts: data.accounts || [],
+        currentAccountId: data.currentAccountId || '',
     };
+};
+
+/**
+ * PUT /api/v1/session — switches the active account within the current session.
+ * This is the CORRECT way to toggle between Demo and Live sub-accounts.
+ *
+ * After calling this, the same CST/XST tokens remain valid but all subsequent
+ * API calls operate on the newly-switched account.
+ */
+export const switchActiveAccount = async (
+    cst: string,
+    xSecurityToken: string,
+    accountId: string,
+    isDemo: boolean = false
+): Promise<void> => {
+    const API_URL = getApiUrl(isDemo);
+    const response = await fetch(`${API_URL}/session`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+            'CST': cst,
+            'X-SECURITY-TOKEN': xSecurityToken,
+        },
+        body: JSON.stringify({ accountId }),
+    });
+
+    if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`Capital.com Account Switch Failed: ${response.status} - ${text}`);
+    }
 };
 
 export const getAccounts = async (cst: string, xSecurityToken: string, isDemo: boolean = false) => {
@@ -50,13 +108,13 @@ export const getAccounts = async (cst: string, xSecurityToken: string, isDemo: b
     const response = await fetch(`${API_URL}/accounts`, {
         headers: {
             'X-SECURITY-TOKEN': xSecurityToken,
-            'CST': cst
-        }
+            'CST': cst,
+        },
     });
 
     if (!response.ok) {
         const text = await response.text();
-        if (response.status === 401) throw new Error("Session Expired");
+        if (response.status === 401) throw new Error('Session Expired');
         throw new Error(`Failed to fetch accounts: ${response.status} - ${text}`);
     }
 
@@ -68,8 +126,8 @@ export const getPositions = async (cst: string, xSecurityToken: string, isDemo: 
     const response = await fetch(`${API_URL}/positions`, {
         headers: {
             'X-SECURITY-TOKEN': xSecurityToken,
-            'CST': cst
-        }
+            'CST': cst,
+        },
     });
 
     if (!response.ok) {
@@ -105,8 +163,8 @@ export const getHistory = async (
     const response = await fetch(`${API_URL}/history/activity${queryStr}`, {
         headers: {
             'X-SECURITY-TOKEN': xSecurityToken,
-            'CST': cst
-        }
+            'CST': cst,
+        },
     });
 
     if (!response.ok) {
@@ -121,8 +179,8 @@ export const getMarketTickers = async (cst: string, xSecurityToken: string, epic
     const marketResponse = await fetch(`${API_URL}/markets?epics=${epics.join(',')}`, {
         headers: {
             'X-SECURITY-TOKEN': xSecurityToken,
-            'CST': cst
-        }
+            'CST': cst,
+        },
     });
 
     if (!marketResponse.ok) {

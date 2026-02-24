@@ -37,8 +37,7 @@ export async function GET(request: Request) {
             return NextResponse.json({ error: 'Failed to retrieve trading session' }, { status: 500 });
         }
 
-        const apiIsDemo = session.accountIsDemo ?? isDemo;
-
+        // Always use LIVE endpoint; getValidSession handles account mode switching internally
         // Calculate Date Range
         const now = new Date();
         let fromDate = new Date(0); // Default to ALL
@@ -56,7 +55,7 @@ export async function GET(request: Request) {
         // Fetch History (up to 500 items to give the user enough data to dig through)
         let historyData;
         try {
-            historyData = await getHistory(session.cst, session.xSecurityToken, apiIsDemo, {
+            historyData = await getHistory(session.cst, session.xSecurityToken, false, {
                 from: fromDate.toISOString().split('.')[0],
                 max: 500
             });

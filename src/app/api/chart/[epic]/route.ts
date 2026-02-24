@@ -6,7 +6,6 @@ import { cookies } from 'next/headers';
 export const dynamic = 'force-dynamic';
 
 const LIVE_API = 'https://api-capital.backend-capital.com/api/v1';
-const DEMO_API = 'https://demo-api-capital.backend-capital.com/api/v1';
 
 export async function GET(
     req: NextRequest,
@@ -27,8 +26,8 @@ export async function GET(
         const max = searchParams.get('max') || '50';
 
         const session = await getValidSession(tokenPayload.userId, mode === 'demo');
-        const apiIsDemo = session.accountIsDemo ?? false;
-        const API_URL = apiIsDemo ? DEMO_API : LIVE_API;
+        // Always use LIVE endpoint; getValidSession handles sub-account switching internally
+        const API_URL = LIVE_API;
 
         // Capital.com price history: GET /prices/{epic}?resolution=HOUR&max=50
         const priceRes = await fetch(

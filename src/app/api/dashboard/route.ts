@@ -54,14 +54,13 @@ export async function GET(request: Request) {
         try {
             const isDemo = modeInput === 'demo';
             const session = await getValidSession(userId, isDemo);
-            // Use the account's actual endpoint, not just the frontend mode
-            const apiIsDemo = session.accountIsDemo ?? isDemo;
+            // Always use the LIVE endpoint — getValidSession handles
+            // account switching via PUT /session internally.
 
-            // 3. Get Data with session tokens
             const [accountsData, positionsData, historyData] = await Promise.all([
-                getAccounts(session.cst, session.xSecurityToken, apiIsDemo),
-                getPositions(session.cst, session.xSecurityToken, apiIsDemo),
-                getHistory(session.cst, session.xSecurityToken, apiIsDemo)
+                getAccounts(session.cst, session.xSecurityToken, false),
+                getPositions(session.cst, session.xSecurityToken, false),
+                getHistory(session.cst, session.xSecurityToken, false)
             ]);
 
             const accounts = (accountsData.accounts || []).map((a: any) => ({
@@ -96,11 +95,10 @@ export async function GET(request: Request) {
                 try {
                     const isDemo2 = modeInput === 'demo';
                     const session = await getValidSession(userId, isDemo2, true);
-                    const apiIsDemo2 = session.accountIsDemo ?? isDemo2;
                     const [accountsData, positionsData, historyData] = await Promise.all([
-                        getAccounts(session.cst, session.xSecurityToken, apiIsDemo2),
-                        getPositions(session.cst, session.xSecurityToken, apiIsDemo2),
-                        getHistory(session.cst, session.xSecurityToken, apiIsDemo2)
+                        getAccounts(session.cst, session.xSecurityToken, false),
+                        getPositions(session.cst, session.xSecurityToken, false),
+                        getHistory(session.cst, session.xSecurityToken, false)
                     ]);
                     const accounts = (accountsData.accounts || []).map((a: any) => ({
                         ...a,

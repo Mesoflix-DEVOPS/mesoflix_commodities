@@ -6,7 +6,6 @@ import { cookies } from 'next/headers';
 export const dynamic = 'force-dynamic';
 
 const LIVE_API = 'https://api-capital.backend-capital.com/api/v1';
-const DEMO_API = 'https://demo-api-capital.backend-capital.com/api/v1';
 
 const DEFAULT_EPICS = ['GOLD', 'OIL_CRUDE', 'EURUSD', 'BTCUSD', 'NATGAS', 'SILVER'];
 
@@ -33,8 +32,8 @@ export async function GET(req: NextRequest) {
         const isDemo = mode === 'demo';
 
         const session = await getValidSession(tokenPayload.userId, isDemo);
-        const apiIsDemo = session.accountIsDemo ?? false;
-        const API_URL = apiIsDemo ? DEMO_API : LIVE_API;
+        // Always use LIVE endpoint; getValidSession handles account switching internally
+        const API_URL = LIVE_API;
 
         const epicsParam = searchParams.get('epics');
         const epics = epicsParam ? epicsParam.split(',') : DEFAULT_EPICS;
@@ -47,8 +46,7 @@ export async function GET(req: NextRequest) {
             console.warn('[Sentiment API] Empty result from Capital.com, force-refreshing session...');
             try {
                 const fresh = await getValidSession(tokenPayload.userId, isDemo, true);
-                const freshApi = (fresh.accountIsDemo ?? false) ? DEMO_API : LIVE_API;
-                sentiments = await fetchCapitalSentiment(freshApi, fresh.cst, fresh.xSecurityToken, epics);
+                sentiments = await fetchCapitalSentiment(LIVE_API, fresh.cst, fresh.xSecurityToken, epics);
             } catch { /* fall through to synthetic */ }
         }
 
