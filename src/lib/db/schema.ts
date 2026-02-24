@@ -12,6 +12,17 @@ export const users = pgTable('users', {
     created_at: timestamp('created_at').defaultNow(),
     updated_at: timestamp('updated_at').defaultNow(),
     last_login_at: timestamp('last_login_at'),
+    two_factor_enabled: boolean('two_factor_enabled').default(false),
+    two_factor_secret: text('two_factor_secret'),
+});
+
+// Recovery Codes Table
+export const recoveryCodes = pgTable('recovery_codes', {
+    id: uuid('id').defaultRandom().primaryKey(),
+    user_id: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+    code_hash: text('code_hash').notNull(),
+    used: boolean('used').default(false),
+    created_at: timestamp('created_at').defaultNow(),
 });
 
 // Refresh Tokens Table

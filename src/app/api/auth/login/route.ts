@@ -5,6 +5,7 @@ import { comparePassword, decrypt } from '@/lib/crypto';
 import { signAccessToken, generateRefreshToken, setAuthCookies } from '@/lib/auth';
 import { createSession } from '@/lib/capital';
 import { eq } from 'drizzle-orm';
+import { SignJWT } from 'jose';
 
 export async function POST(request: Request) {
     try {
@@ -53,6 +54,22 @@ export async function POST(request: Request) {
 
         // 5. Update last login
         await db.update(users).set({ last_login_at: new Date() }).where(eq(users.id, user.id));
+
+        // 5.5 2FA Interception Logic
+        if (user.two_factor_enabled) {
+            // Generate a strictly short-lived 5-minute Temp Token containing only the userId
+            const tempToken = await new SignJWT({ userId: user.id })
+                .setProtectedHeader({ alg: 'HS256' })
+                .setIssuedAt()
+                .setExpirationTime('5m')
+                .sign(new TextEncoder().encode(process.env.JWT_SECRET || 'mesoflix-commodity-terminal-internal-fallback-v1'));
+
+            return NextResponse.json({
+                message: '2FA Verification Required',
+                requires2FA: true,
+                tempToken: tempToken
+            });
+        }
 
         // 6. Issue App Tokens (3-day persistence)
         const accessToken = await signAccessToken({
