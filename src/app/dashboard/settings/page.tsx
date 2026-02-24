@@ -11,7 +11,7 @@ import {
     Key,
     Save
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 
 const tabs = [
@@ -25,20 +25,18 @@ export default function SettingsPage() {
     const [activeTab, setActiveTab] = useState("profile");
     const [userData, setUserData] = useState<any>(null);
 
-    // Fetch user data from DB once mounted if checking profile tab
-    // (We actually can just fetch it globally since it's the default view)
-    import("react").then(({ useEffect }) => {
-        useEffect(() => {
-            fetch('/api/user')
-                .then(res => res.json())
-                .then(data => {
-                    if (data?.user) {
-                        setUserData(data.user);
-                    }
-                })
-                .catch(console.error);
-        }, []);
-    });
+    useEffect(() => {
+        let isMounted = true;
+        fetch('/api/user')
+            .then(res => res.json())
+            .then(data => {
+                if (isMounted && data?.user) {
+                    setUserData(data.user);
+                }
+            })
+            .catch(console.error);
+        return () => { isMounted = false; };
+    }, []);
 
     return (
         <div className="space-y-8 animate-in fade-in duration-700 max-w-5xl">
