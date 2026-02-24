@@ -87,7 +87,7 @@ export async function getValidSession(
     //    otherwise we always create a fresh session and only memCache it.
     if (!forceRefresh && credAccount.encrypted_session_tokens && credAccount.session_updated_at) {
         // Only reuse DB cache for the SAME mode it was created for
-        const dbCacheMode = (credAccount as any).session_mode;
+        const dbCacheMode = credAccount.session_mode;
         const wantedMode = isDemo ? 'demo' : 'live';
         if (dbCacheMode === wantedMode) {
             const lastUpdate = new Date(credAccount.session_updated_at);
@@ -153,7 +153,6 @@ export async function getValidSession(
             .set({
                 encrypted_session_tokens: encrypt(JSON.stringify(tokens)),
                 session_updated_at: new Date(),
-                // @ts-ignore — session_mode may not be in schema yet; stored safely
                 session_mode: isDemo ? 'demo' : 'live',
             })
             .where(eq(capitalAccounts.id, credAccount.id));

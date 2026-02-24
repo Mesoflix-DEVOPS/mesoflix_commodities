@@ -85,15 +85,27 @@ function pickBalance(data: any, isDemo: boolean) {
     // or by the API endpoint they were fetched from.
     // However, the payload usually contains an `accountType` or we can filter by demo status.
     if (isDemo) {
-        accounts = accounts.filter(a => a.accountType === 'DEMO' || a.accountName?.toLowerCase().includes('demo'));
+        // Filter for demo accounts
+        accounts = accounts.filter(a =>
+            a.accountType?.toUpperCase() === 'DEMO' ||
+            a.accountName?.toLowerCase().includes('demo')
+        );
     } else {
-        accounts = accounts.filter(a => a.accountType !== 'DEMO' && !a.accountName?.toLowerCase().includes('demo'));
+        // Filter for real accounts (anything not demo)
+        accounts = accounts.filter(a =>
+            a.accountType?.toUpperCase() !== 'DEMO' &&
+            !a.accountName?.toLowerCase().includes('demo')
+        );
     }
 
-    // If no filtered accounts, fall back to what we have but with a warning
-    const accToUse = accounts.length > 0
-        ? (accounts.find(a => a.preferred) || accounts[0])
-        : (data.accounts?.[0] || null);
+    // Log filtered results for internal investigation
+    console.log(`[Balance API] Filtered (${isDemo ? 'DEMO' : 'REAL'}):`, accounts.map(a => `${a.accountName} (${a.accountType}) - ${a.balance?.balance}`).join(', '));
+
+    // Priority: 1. Preferred account in filtered set, 2. First account in filtered set, 3. Blind fallback
+    const accToUse = accounts.find(a => a.preferred) ||
+        accounts[0] ||
+        data.accounts?.[0] ||
+        null;
 
     if (!accToUse) return { balance: 0, deposit: 0, profitLoss: 0, available: 0, equity: 0, currency: 'USD' };
 
