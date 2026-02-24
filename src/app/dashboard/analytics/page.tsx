@@ -13,7 +13,7 @@ import {
     Pie, Cell, Legend
 } from "recharts";
 
-type Timeframe = '1W' | '1M' | '3M' | 'YTD' | 'ALL';
+
 
 interface AnalyticsData {
     winRate: number;
@@ -28,14 +28,13 @@ interface AnalyticsData {
 
 export default function AnalyticsPage() {
     const { mode } = useMarketData();
-    const [timeframe, setTimeframe] = useState<Timeframe>('1M');
     const [loading, setLoading] = useState(true);
     const [data, setData] = useState<AnalyticsData | null>(null);
 
     const fetchAnalytics = useCallback(async () => {
         setLoading(true);
         try {
-            const res = await fetch(`/api/analytics?mode=${mode}&timeframe=${timeframe}`);
+            const res = await fetch(`/api/analytics?mode=${mode}`);
             if (res.ok) {
                 const d = await res.json();
                 setData(d);
@@ -43,7 +42,7 @@ export default function AnalyticsPage() {
         } finally {
             setLoading(false);
         }
-    }, [mode, timeframe]);
+    }, [mode]);
 
     useEffect(() => {
         fetchAnalytics();
@@ -72,21 +71,12 @@ export default function AnalyticsPage() {
                 </div>
 
                 <div className="flex bg-[#0A1622] p-1.5 rounded-2xl border border-white/5 self-start md:self-auto overflow-x-auto w-full md:w-auto scrollbar-hide">
-                    {(['1W', '1M', '3M', 'YTD', 'ALL'] as Timeframe[]).map(tf => (
-                        <button
-                            key={tf}
-                            onClick={() => setTimeframe(tf)}
-                            className={cn(
-                                "flex items-center gap-1.5 px-4 md:px-5 py-2 md:py-2.5 rounded-xl transition-all font-black text-[10px] uppercase tracking-widest whitespace-nowrapflex-shrink-0",
-                                timeframe === tf
-                                    ? "bg-teal text-dark-blue shadow-[0_0_15px_rgba(0,191,166,0.3)]"
-                                    : "text-gray-500 hover:text-white hover:bg-white/5"
-                            )}
-                        >
-                            <Clock size={12} className={timeframe === tf ? "text-dark-blue" : "text-gray-600"} />
-                            {tf}
-                        </button>
-                    ))}
+                    <button
+                        className="flex items-center gap-1.5 px-4 md:px-5 py-2 md:py-2.5 rounded-xl transition-all font-black text-[10px] uppercase tracking-widest whitespace-nowrap flex-shrink-0 bg-teal text-dark-blue shadow-[0_0_15px_rgba(0,191,166,0.3)] cursor-default"
+                    >
+                        <Clock size={12} className="text-dark-blue" />
+                        Last 24 Hours
+                    </button>
                     <button
                         onClick={fetchAnalytics}
                         className="ml-2 px-3 py-2 flex items-center justify-center text-gray-500 hover:text-white bg-white/5 rounded-xl transition-colors"
@@ -209,7 +199,7 @@ export default function AnalyticsPage() {
                                     </ResponsiveContainer>
                                 ) : (
                                     <div className="w-full h-full flex items-center justify-center">
-                                        <span className="text-[10px] font-black text-gray-600 uppercase tracking-widest">No trading activity in this timeframe</span>
+                                        <span className="text-[10px] font-black text-gray-600 uppercase tracking-widest">No trading activity in the last 24 hours</span>
                                     </div>
                                 )}
                             </div>

@@ -5,7 +5,7 @@ import { useMarketData } from "@/contexts/MarketDataContext";
 import { cn } from "@/lib/utils";
 import { History, Clock, RefreshCw, ChevronDown, ChevronUp, CheckCircle2 } from "lucide-react";
 
-type Timeframe = '1D' | '1W' | '1M' | 'YTD' | 'ALL';
+
 
 interface Transaction {
     id: string;
@@ -22,7 +22,6 @@ interface Transaction {
 
 export default function TransactionsPage() {
     const { mode } = useMarketData();
-    const [timeframe, setTimeframe] = useState<Timeframe>('1W');
     const [loading, setLoading] = useState(true);
     const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
@@ -30,7 +29,7 @@ export default function TransactionsPage() {
     const fetchTransactions = useCallback(async () => {
         setLoading(true);
         try {
-            const res = await fetch(`/api/transactions?mode=${mode}&timeframe=${timeframe}`);
+            const res = await fetch(`/api/transactions?mode=${mode}`);
             if (res.ok) {
                 const d = await res.json();
                 setTransactions(d.transactions || []);
@@ -38,7 +37,7 @@ export default function TransactionsPage() {
         } finally {
             setLoading(false);
         }
-    }, [mode, timeframe]);
+    }, [mode]);
 
     useEffect(() => {
         fetchTransactions();
@@ -67,21 +66,12 @@ export default function TransactionsPage() {
                 </div>
 
                 <div className="flex bg-[#0A1622] p-1.5 rounded-2xl border border-white/5 self-start overflow-x-auto w-full sm:w-auto scrollbar-hide">
-                    {(['1D', '1W', '1M', 'YTD', 'ALL'] as Timeframe[]).map(tf => (
-                        <button
-                            key={tf}
-                            onClick={() => setTimeframe(tf)}
-                            className={cn(
-                                "flex items-center gap-1.5 px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl transition-all font-black text-[10px] uppercase tracking-widest whitespace-nowrap flex-shrink-0",
-                                timeframe === tf
-                                    ? "bg-teal text-dark-blue shadow-[0_0_15px_rgba(0,191,166,0.3)]"
-                                    : "text-gray-500 hover:text-white hover:bg-white/5"
-                            )}
-                        >
-                            <Clock size={12} className={timeframe === tf ? "text-dark-blue" : "text-gray-600"} />
-                            {tf}
-                        </button>
-                    ))}
+                    <button
+                        className="flex items-center gap-1.5 px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl transition-all font-black text-[10px] uppercase tracking-widest whitespace-nowrap flex-shrink-0 bg-teal text-dark-blue shadow-[0_0_15px_rgba(0,191,166,0.3)] cursor-default"
+                    >
+                        <Clock size={12} className="text-dark-blue" />
+                        Last 24 Hours
+                    </button>
                     <button
                         onClick={fetchTransactions}
                         className="ml-2 px-3 py-2 flex items-center justify-center text-gray-500 hover:text-white bg-white/5 rounded-xl transition-colors"
@@ -191,7 +181,7 @@ export default function TransactionsPage() {
                                 })}
 
                                 {transactions.length === 0 && (
-                                    <tr><td colSpan={6} className="px-6 py-16 text-center text-[10px] font-black text-gray-600 uppercase tracking-widest">No closed trades found in timeframe</td></tr>
+                                    <tr><td colSpan={6} className="px-6 py-16 text-center text-[10px] font-black text-gray-600 uppercase tracking-widest">No closed trades found in the last 24 hours</td></tr>
                                 )}
                             </tbody>
                         </table>

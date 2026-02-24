@@ -27,7 +27,6 @@ export async function GET(request: Request) {
 
         const { searchParams } = new URL(request.url);
         const modeInput = searchParams.get('mode') || 'demo';
-        const timeframe = searchParams.get('timeframe') || 'ALL'; // 1D, 1W, 1M, YTD, ALL
 
         const isDemo = modeInput === 'demo';
         let session;
@@ -38,24 +37,15 @@ export async function GET(request: Request) {
         }
 
         // Always use LIVE endpoint; getValidSession handles account mode switching internally
-        // Calculate Date Range
+        // Calculate Date Range (Strictly set to rolling 24-hours to comply with Capital.com's endpoints)
         const now = new Date();
-        let fromDate: Date | null = null; // Default to ALL
+        const fromDate: Date = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
-        if (timeframe === '1D') {
-            fromDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-        } else if (timeframe === '1W') {
-            fromDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-        } else if (timeframe === '1M') {
-            fromDate = new Date(now.setMonth(now.getMonth() - 1));
-        } else if (timeframe === 'YTD') {
-            fromDate = new Date(now.getFullYear(), 0, 1);
-        }
-
-        const historyOptions: any = { max: 500 };
-        if (fromDate) {
-            historyOptions.from = fromDate.toISOString().split('.')[0];
-        }
+        const historyOptions: any = {
+            max: 500,
+            from: fromDate.toISOString().split('.')[0],
+            to: now.toISOString().split('.')[0]
+        };
 
         // Fetch History (up to 500 items to give the user enough data to dig through)
         let historyData;
