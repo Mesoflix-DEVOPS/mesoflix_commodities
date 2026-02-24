@@ -1,7 +1,7 @@
 "use client";
 
-import { Bell, Search, Settings, User, TrendingUp, Menu, X, LogOut, Loader2 } from "lucide-react";
-import { useState } from "react";
+import { Bell, Search, Settings, User, TrendingUp, Menu, X, LogOut, Loader2, CheckCircle2, Info, AlertTriangle, AlertCircle } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { useMarketData } from "@/contexts/MarketDataContext";
@@ -19,9 +19,70 @@ export default function TopNav({
     isMobileOpen,
 }: TopNavProps) {
     const [showProfile, setShowProfile] = useState(false);
+    const [showNotifications, setShowNotifications] = useState(false);
+    const [notifications, setNotifications] = useState<any[]>([]);
+    const [unreadCount, setUnreadCount] = useState(0);
+    const notificationRef = useRef<HTMLDivElement>(null);
 
     // Consume real-time context
     const { mode, setMode, balanceData, connectionStatus } = useMarketData();
+
+    // Fetch Notifications
+    const fetchNotifications = async () => {
+        try {
+            const res = await fetch('/api/notifications');
+            if (res.ok) {
+                const data = await res.json();
+                setNotifications(data.notifications || []);
+                setUnreadCount(data.unreadCount || 0);
+            }
+        } catch (e) { console.error("Error fetching notifications", e); }
+    };
+
+    // Poll every 15 seconds
+    useEffect(() => {
+        fetchNotifications();
+        const interval = setInterval(fetchNotifications, 15000);
+        return () => clearInterval(interval);
+    }, []);
+
+    // Handle outside click to close dropdowns
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (notificationRef.current && !notificationRef.current.contains(event.target as Node)) {
+                setShowNotifications(false);
+            }
+            // For profile we don't have a ref right now, could add one later.
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+
+    const markAsRead = async (id: string | null = null, markAll = false) => {
+        try {
+            const body: any = {};
+            if (markAll) body.markAll = true;
+            else if (id) body.ids = [id];
+
+            await fetch('/api/notifications', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            fetchNotifications(); // Refresh list immediately
+        } catch (e) {
+            console.error("Failed to mark as read", e);
+        }
+    };
+
+    const getIconForType = (type: string) => {
+        switch (type) {
+            case 'success': return <CheckCircle2 size={16} className="text-green-400" />;
+            case 'warning': return <AlertTriangle size={16} className="text-amber-400" />;
+            case 'error': return <AlertCircle size={16} className="text-red-400" />;
+            default: return <Info size={16} className="text-teal" />;
+        }
+    };
 
     return (
         <header className="h-[70px] bg-[#0A1622]/80 backdrop-blur-xl border-b border-white/5 sticky top-0 z-50 flex items-center justify-between px-6 md:px-12">
@@ -96,14 +157,63 @@ export default function TopNav({
                 <div className="h-8 w-px bg-white/5 hidden sm:block" />
 
                 <div className="flex items-center gap-2">
-                    <button className="p-2.5 text-gray-400 hover:text-white bg-white/5 hover:bg-white/10 rounded-xl border border-white/10 transition-all relative">
-                        <Bell size={20} />
-                        <div className="absolute top-2 right-2 w-2 h-2 bg-teal border-2 border-[#0A1622] rounded-full" />
-                    </button>
+                    <div className="relative" ref={notificationRef}>
+                        <button
+                            onClick={() => { setShowNotifications(!showNotifications); setShowProfile(false); }}
+                            className="p-2.5 text-gray-400 hover:text-white bg-white/5 hover:bg-white/10 rounded-xl border border-white/10 transition-all relative"
+                        >
+                            <Bell size={20} />
+                            {unreadCount > 0 && (
+                                <div className="absolute top-2 right-2 w-2 h-2 bg-teal border-2 border-[#0A1622] rounded-full animate-pulse" />
+                            )}
+                        </button>
+
+                        {/* Notifications Panel */}
+                        {showNotifications && (
+                            <div className="absolute right-0 mt-3 w-80 max-h-[400px] overflow-hidden flex flex-col bg-[#0E1B2A] border border-white/10 rounded-2xl shadow-2xl animate-in fade-in zoom-in-95 duration-200 z-50">
+                                <div className="px-4 py-3 border-b border-white/5 flex items-center justify-between z-10 bg-[#0E1B2A]">
+                                    <div>
+                                        <p className="text-xs text-gray-500 font-bold uppercase tracking-widest mb-1">Activity Log</p>
+                                        <p className="text-sm font-bold text-white leading-none">Notifications</p>
+                                    </div>
+                                    {unreadCount > 0 && (
+                                        <button onClick={() => markAsRead(null, true)} className="text-[10px] text-teal hover:underline font-semibold uppercase">
+                                            Mark All Read
+                                        </button>
+                                    )}
+                                </div>
+                                <div className="overflow-y-auto flex-1 p-2 space-y-1 custom-scrollbar">
+                                    {notifications.length === 0 ? (
+                                        <div className="p-4 text-center text-xs text-gray-500">No recent notifications.</div>
+                                    ) : (
+                                        notifications.map((notif: any) => (
+                                            <div
+                                                key={notif.id}
+                                                className={cn(
+                                                    "p-3 rounded-xl transition-all border flex gap-3 text-left",
+                                                    !notif.read ? "bg-teal/5 border-teal/10" : "bg-transparent border-transparent hover:bg-white/5"
+                                                )}
+                                                onClick={() => !notif.read && markAsRead(notif.id)}
+                                                style={{ cursor: !notif.read ? 'pointer' : 'default' }}
+                                            >
+                                                <div className="mt-0.5">{getIconForType(notif.type)}</div>
+                                                <div className="flex-1">
+                                                    <p className={cn("text-xs font-bold", !notif.read ? "text-white" : "text-gray-300")}>{notif.title}</p>
+                                                    <p className="text-[11px] text-gray-500 leading-snug mt-1">{notif.message}</p>
+                                                    <p className="text-[9px] text-gray-600 font-mono mt-2">{new Date(notif.created_at).toLocaleString()}</p>
+                                                </div>
+                                                {!notif.read && <div className="w-1.5 h-1.5 rounded-full bg-teal mt-1 flex-shrink-0" />}
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                    </div>
 
                     <div className="relative">
                         <button
-                            onClick={() => setShowProfile(!showProfile)}
+                            onClick={() => { setShowProfile(!showProfile); setShowNotifications(false); }}
                             className="flex items-center gap-3 pl-1 pr-3 py-1 bg-white/5 hover:bg-white/10 rounded-xl border border-white/10 transition-all group"
                         >
                             <div className="w-8 h-8 rounded-lg bg-teal/20 flex items-center justify-center border border-teal/30 text-teal font-bold text-xs group-hover:bg-teal group-hover:text-dark-blue transition-all">

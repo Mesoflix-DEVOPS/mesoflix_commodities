@@ -41,6 +41,8 @@ export const refreshTokens = pgTable('refresh_tokens', {
 export const capitalAccounts = pgTable('capital_accounts', {
     id: uuid('id').defaultRandom().primaryKey(),
     user_id: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+    label: text('label').default('Primary Account'),
+    is_active: boolean('is_active').default(false),
     encrypted_api_key: text('encrypted_api_key').notNull(),
     api_key_hash: text('api_key_hash').unique(),
     encrypted_api_password: text('encrypted_api_password'), // Stored Capital password
@@ -80,4 +82,15 @@ export const systemSettings = pgTable('system_settings', {
     key: text('key').primaryKey(),
     value: text('value').notNull(),
     updated_at: timestamp('updated_at').defaultNow(),
+});
+
+// Notifications Table
+export const notifications = pgTable('notifications', {
+    id: uuid('id').defaultRandom().primaryKey(),
+    user_id: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+    title: text('title').notNull(),
+    message: text('message').notNull(),
+    type: text('type').default('info'), // 'info', 'success', 'warning', 'error'
+    read: boolean('read').default(false),
+    created_at: timestamp('created_at').defaultNow(),
 });

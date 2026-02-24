@@ -1,5 +1,5 @@
 import { db } from '@/lib/db';
-import { users } from '@/lib/db/schema';
+import { users, notifications } from '@/lib/db/schema';
 import { getValidSession } from '@/lib/capital-service';
 import { placeOrder, closePosition } from '@/lib/capital';
 import { verifyAccessToken } from '@/lib/auth';
@@ -50,6 +50,15 @@ export async function POST(request: Request) {
 
         try {
             const result = await executeWithSession();
+
+            // Push notification
+            await db.insert(notifications).values({
+                user_id: userId,
+                title: 'Position Opened',
+                message: `Successfully executed a ${direction} block on ${epic} for ${size} units.`,
+                type: 'success'
+            });
+
             return NextResponse.json({ success: true, ...result });
         } catch (err: any) {
             console.error('[Trade API] First attempt failed:', err.message);
@@ -57,6 +66,14 @@ export async function POST(request: Request) {
             if (err.message.includes('401') || err.message.toLowerCase().includes('session') || err.message.toLowerCase().includes('unauthorized')) {
                 try {
                     const result = await executeWithSession(true);
+
+                    await db.insert(notifications).values({
+                        user_id: userId,
+                        title: 'Position Opened',
+                        message: `Successfully executed a ${direction} block on ${epic} for ${size} units (Auth Retry).`,
+                        type: 'success'
+                    });
+
                     return NextResponse.json({ success: true, ...result });
                 } catch (retryErr: any) {
                     return NextResponse.json({ error: `Trade failed after retry: ${retryErr.message}` }, { status: 502 });
@@ -99,12 +116,28 @@ export async function DELETE(request: Request) {
 
         try {
             const result = await executeClose();
+
+            await db.insert(notifications).values({
+                user_id: userId,
+                title: 'Position Closed',
+                message: `Successfully closed deal ${dealId}.`,
+                type: 'info'
+            });
+
             return NextResponse.json({ success: true, ...result });
         } catch (err: any) {
             console.error('[Trade API] First close attempt failed:', err.message);
             if (err.message.includes('401') || err.message.toLowerCase().includes('session') || err.message.toLowerCase().includes('unauthorized')) {
                 try {
                     const result = await executeClose(true);
+
+                    await db.insert(notifications).values({
+                        user_id: userId,
+                        title: 'Position Closed',
+                        message: `Successfully closed deal ${dealId} (Auth Retry).`,
+                        type: 'info'
+                    });
+
                     return NextResponse.json({ success: true, ...result });
                 } catch (retryErr: any) {
                     return NextResponse.json({ error: `Close failed after retry: ${retryErr.message}` }, { status: 502 });

@@ -9,7 +9,12 @@ import {
     Smartphone,
     CreditCard,
     Key,
-    Save
+    Save,
+    Plus,
+    Trash2,
+    CheckCircle2,
+    Power,
+    X
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
@@ -36,6 +41,11 @@ export default function SettingsPage() {
     const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
     const [isProcessing, setIsProcessing] = useState(false);
 
+    // Options State
+    const [savedTokens, setSavedTokens] = useState<any[]>([]);
+    const [isAddingToken, setIsAddingToken] = useState(false);
+    const [newTokenForm, setNewTokenForm] = useState({ label: '', login: '', password: '', apiKey: '' });
+
     useEffect(() => {
         let isMounted = true;
         fetch('/api/user')
@@ -48,8 +58,71 @@ export default function SettingsPage() {
                 }
             })
             .catch(console.error);
+
+        fetchCapitalAccounts();
+
         return () => { isMounted = false; };
     }, []);
+
+    const fetchCapitalAccounts = async () => {
+        try {
+            const res = await fetch('/api/capital/connect');
+            if (res.ok) {
+                const data = await res.json();
+                setSavedTokens(data.accounts || []);
+            }
+        } catch (e) { console.error("Error fetching capital accounts", e); }
+    };
+
+    const handleAddToken = async () => {
+        if (!newTokenForm.label || !newTokenForm.apiKey || !newTokenForm.password) return;
+        setIsProcessing(true);
+        try {
+            const res = await fetch('/api/capital/connect', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newTokenForm)
+            });
+            if (res.ok) {
+                setIsAddingToken(false);
+                setNewTokenForm({ label: '', login: '', password: '', apiKey: '' });
+                fetchCapitalAccounts();
+            }
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
+    const handleTokenAction = async (accountId: string, action: 'connect' | 'disconnect') => {
+        setIsProcessing(true);
+        try {
+            const res = await fetch('/api/capital/connect', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ accountId, action })
+            });
+            if (res.ok) fetchCapitalAccounts();
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
+    const handleDeleteToken = async (accountId: string) => {
+        if (!confirm("Are you sure you want to permanently delete this API Key?")) return;
+        setIsProcessing(true);
+        try {
+            const res = await fetch(`/api/capital/connect?id=${accountId}`, { method: 'DELETE' });
+            if (res.ok) fetchCapitalAccounts();
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setIsProcessing(false);
+        }
+    };
 
     const start2FASetup = async () => {
         setIsProcessing(true);
@@ -163,30 +236,133 @@ export default function SettingsPage() {
 
                     {activeTab === "capital" && (
                         <div className="space-y-10">
-                            <div>
-                                <h3 className="text-xl font-bold text-white mb-1">Capital.com Connection</h3>
-                                <p className="text-xs text-gray-500">Manage your primary trading bridge credentials</p>
+                            <div className="flex justify-between items-end">
+                                <div>
+                                    <h3 className="text-xl font-bold text-white mb-1">Capital.com API Vault</h3>
+                                    <p className="text-xs text-gray-500">Manage your active trading bridges. Only one token can be globally active at a time.</p>
+                                </div>
+                                <button
+                                    onClick={() => setIsAddingToken(!isAddingToken)}
+                                    className="flex items-center gap-2 px-4 py-2 bg-teal text-dark-blue font-black text-xs rounded-xl shadow-lg hover:bg-white hover:text-black transition-all"
+                                >
+                                    {isAddingToken ? <X size={16} /> : <Plus size={16} />}
+                                    <span>{isAddingToken ? "Cancel" : "Add Token"}</span>
+                                </button>
                             </div>
 
-                            <div className="p-4 sm:p-8 bg-black/20 rounded-3xl border border-white/5 space-y-6">
-                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-12 h-12 bg-teal/10 rounded-xl flex-shrink-0 flex items-center justify-center border border-teal/20">
-                                            <CreditCard className="text-teal" size={24} />
+                            {/* Token List */}
+                            <div className="space-y-4">
+                                {savedTokens.length === 0 && !isAddingToken && (
+                                    <div className="p-8 text-center bg-white/5 rounded-3xl border border-white/10 border-dashed">
+                                        <Key size={32} className="mx-auto text-gray-500 mb-3 opacity-50" />
+                                        <p className="text-sm font-bold text-gray-400">No API Tokens Saved</p>
+                                        <p className="text-xs text-gray-600 mt-1">Add a Capital.com API key to enable live institutional trading.</p>
+                                    </div>
+                                )}
+
+                                {savedTokens.map(token => (
+                                    <div key={token.id} className={cn(
+                                        "p-5 rounded-2xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4",
+                                        token.is_active ? "bg-teal/5 border-teal/20" : "bg-black/20 border-white/5 opacity-70 hover:opacity-100"
+                                    )}>
+                                        <div className="flex items-center gap-4">
+                                            <div className={cn("w-12 h-12 rounded-xl flex-shrink-0 flex items-center justify-center border",
+                                                token.is_active ? "bg-teal/20 text-teal border-teal/30" : "bg-white/5 text-gray-500 border-white/10"
+                                            )}>
+                                                {token.is_active ? <CheckCircle2 size={24} /> : <Key size={24} />}
+                                            </div>
+                                            <div>
+                                                <p className="text-sm font-bold text-white flex items-center gap-2">
+                                                    {token.label}
+                                                    {token.is_active && <span className="px-2 py-0.5 rounded-md bg-teal text-[#0A1622] text-[9px] uppercase tracking-widest font-black">Active Stream</span>}
+                                                </p>
+                                                <p className="text-[10px] text-gray-500 uppercase font-black tracking-widest mt-1">Configured: {new Date(token.created_at).toLocaleDateString()}</p>
+                                            </div>
                                         </div>
-                                        <div>
-                                            <p className="text-sm font-bold text-white">Live Trading Bridge</p>
-                                            <p className="text-[10px] text-gray-500 uppercase font-black tracking-widest mt-1">Status: Active & Secure</p>
+
+                                        <div className="flex items-center gap-2">
+                                            {token.is_active ? (
+                                                <button
+                                                    onClick={() => handleTokenAction(token.id, 'disconnect')}
+                                                    disabled={isProcessing}
+                                                    className="flex items-center gap-2 px-4 py-2 bg-red-500/10 text-red-500 hover:bg-red-500/20 font-bold text-xs rounded-lg transition-all"
+                                                >
+                                                    <Power size={14} /> Disconnect
+                                                </button>
+                                            ) : (
+                                                <button
+                                                    onClick={() => handleTokenAction(token.id, 'connect')}
+                                                    disabled={isProcessing}
+                                                    className="flex items-center gap-2 px-4 py-2 bg-white/10 text-white hover:bg-white/20 font-bold text-xs rounded-lg transition-all"
+                                                >
+                                                    <LinkIcon size={14} /> Connect
+                                                </button>
+                                            )}
+
+                                            <button
+                                                onClick={() => handleDeleteToken(token.id)}
+                                                disabled={isProcessing || token.is_active}
+                                                title={token.is_active ? "Disconnect to delete" : "Delete token"}
+                                                className="p-2 text-gray-500 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-all disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-gray-500"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
                                         </div>
                                     </div>
-                                    <button className="text-[10px] text-red-400 font-bold uppercase border border-red-400/20 px-3 py-2 sm:py-1.5 rounded-lg hover:bg-red-400/10 transition-all text-center">Disconnect</button>
-                                </div>
+                                ))}
                             </div>
 
-                            <div className="grid grid-cols-1 gap-8">
-                                <InputGroup label="Capital API Key" type="password" value="••••••••••••••••" />
-                                <InputGroup label="Trading Password" type="password" value="••••••••••••••••" />
-                            </div>
+                            {/* Add Token Form */}
+                            {isAddingToken && (
+                                <div className="p-8 bg-[#0A1622] rounded-3xl border border-teal/20 shadow-2xl animate-in slide-in-from-top-4 duration-500">
+                                    <h4 className="text-teal font-black mb-6 flex items-center gap-2"><Plus size={18} /> DOCK NEW TOKEN</h4>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                                        <InputGroup
+                                            label="Identifier Label"
+                                            placeholder="e.g., Main EUR, SubAccount 2"
+                                            value={newTokenForm.label}
+                                            onChange={(e: any) => setNewTokenForm({ ...newTokenForm, label: e.target.value })}
+                                        />
+                                        <InputGroup
+                                            label="Capital Login (Email) - Optional"
+                                            placeholder="investor@domain.com"
+                                            value={newTokenForm.login}
+                                            onChange={(e: any) => setNewTokenForm({ ...newTokenForm, login: e.target.value })}
+                                        />
+                                        <InputGroup
+                                            label="Capital API Key"
+                                            type="password"
+                                            placeholder="Paste API Key String"
+                                            value={newTokenForm.apiKey}
+                                            onChange={(e: any) => setNewTokenForm({ ...newTokenForm, apiKey: e.target.value })}
+                                        />
+                                        <InputGroup
+                                            label="Capital Password"
+                                            type="password"
+                                            placeholder="Account Password"
+                                            value={newTokenForm.password}
+                                            onChange={(e: any) => setNewTokenForm({ ...newTokenForm, password: e.target.value })}
+                                        />
+                                    </div>
+
+                                    <div className="flex justify-end gap-3 pt-6 border-t border-white/5">
+                                        <button
+                                            onClick={() => setIsAddingToken(false)}
+                                            className="px-6 py-2 rounded-xl text-gray-400 hover:text-white font-bold text-xs"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            onClick={handleAddToken}
+                                            disabled={!newTokenForm.label || !newTokenForm.apiKey || !newTokenForm.password || isProcessing}
+                                            className="flex items-center gap-2 px-8 py-2 bg-teal text-dark-blue font-black text-xs rounded-xl hover:bg-teal/90 transition-all disabled:opacity-50"
+                                        >
+                                            <Save size={16} /> Save Token
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
 
@@ -318,14 +494,15 @@ export default function SettingsPage() {
     );
 }
 
-function InputGroup({ label, placeholder, disabled, type = "text", value }: any) {
+function InputGroup({ label, placeholder, disabled, type = "text", value, onChange }: any) {
     return (
         <div className="space-y-3">
             <label className="text-[10px] text-gray-500 font-black uppercase tracking-[0.25em] px-1">{label}</label>
             <input
                 type={type}
                 placeholder={placeholder}
-                defaultValue={value}
+                value={value}
+                onChange={onChange}
                 disabled={disabled}
                 className={cn(
                     "w-full bg-white/5 border border-white/10 rounded-2xl py-3 px-5 text-sm text-white focus:outline-none focus:border-teal/30 focus:bg-white/10 transition-all font-medium",
