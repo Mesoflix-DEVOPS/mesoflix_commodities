@@ -16,10 +16,11 @@ export async function middleware(request: NextRequest) {
         return NextResponse.next();
     }
 
-    // 2. Get Access Token
+    // 2. Get Tokens
     const accessToken = request.cookies.get('access_token')?.value;
+    const refreshToken = request.cookies.get('refresh_token')?.value;
 
-    if (!accessToken) {
+    if (!accessToken && !refreshToken) {
         // Build login URL with return path
         const loginUrl = new URL('/login', request.url);
         loginUrl.searchParams.set('from', pathname);
@@ -28,9 +29,12 @@ export async function middleware(request: NextRequest) {
     }
 
     // 3. Verify Token
-    const payload = await verifyAccessToken(accessToken);
+    let payload = null;
+    if (accessToken) {
+        payload = await verifyAccessToken(accessToken);
+    }
 
-    if (!payload) {
+    if (!payload && !refreshToken) {
         // Token invalid/expired - Redirect to login
         if (pathname.startsWith('/api/')) {
             return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
@@ -43,10 +47,12 @@ export async function middleware(request: NextRequest) {
         return NextResponse.redirect(loginUrl);
     }
 
-    // 4. Token valid - Proceed
+    // 4. Token valid or defer to client - Proceed
     const response = NextResponse.next();
-    response.headers.set('x-user-id', payload.userId);
-    response.headers.set('x-user-role', payload.role || 'user');
+    if (payload) {
+        response.headers.set('x-user-id', payload.userId);
+        response.headers.set('x-user-role', payload.role || 'user');
+    }
 
     return response;
 }

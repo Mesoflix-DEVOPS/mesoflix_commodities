@@ -26,7 +26,7 @@ export async function signAccessToken(payload: JWTPayload) {
     return new SignJWT({ ...payload })
         .setProtectedHeader({ alg: 'HS256' })
         .setIssuedAt()
-        .setExpirationTime('1h') // Increased to 1 hour to prevent clock-drift issues
+        .setExpirationTime('3d') // Matched to refresh token duration to prevent soft navigation logouts
         .sign(getJwtSecret());
 }
 
@@ -62,7 +62,7 @@ export async function setAuthCookies(accessToken: string, refreshToken: string) 
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
-        maxAge: 60 * 60, // Increased to 1 hour to match JWT
+        maxAge: 3 * 24 * 60 * 60, // 3 days
         path: '/',
     });
 
