@@ -613,7 +613,7 @@ function ExecutionLogsTab({ mode }: { mode: string }) {
                     </button>
                 </div>
                 <div className="overflow-x-auto">
-                    <table className="w-full text-left">
+                    <table className="w-full text-left whitespace-nowrap">
                         <thead>
                             <tr className="text-[9px] text-gray-600 uppercase tracking-widest bg-black/10">
                                 {["Position", "Instrument", "Entry Price", "Size", "Unrealised P/L"].map(h => (
@@ -671,7 +671,7 @@ function ExecutionLogsTab({ mode }: { mode: string }) {
                     )}
                 </div>
                 <div className="overflow-x-auto">
-                    <table className="w-full text-left">
+                    <table className="w-full text-left whitespace-nowrap">
                         <thead>
                             <tr className="text-[9px] text-gray-600 uppercase tracking-widest bg-black/10">
                                 {["Time", "Status", "Instrument", "Description", "Channel", "P/L"].map(h => (
