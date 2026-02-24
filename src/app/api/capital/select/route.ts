@@ -31,8 +31,7 @@ export async function POST(req: NextRequest) {
             .where(and(eq(capitalAccounts.user_id, userId), eq(capitalAccounts.is_active, true)));
 
         // Invalidate session cache to ensure the next request picks up the fresh account preference
-        await clearCachedSession(userId, true);
-        await clearCachedSession(userId, false);
+        await clearCachedSession(userId);
 
         return NextResponse.json({ success: true, accountId });
 

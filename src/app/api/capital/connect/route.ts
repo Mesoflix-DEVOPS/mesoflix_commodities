@@ -114,8 +114,7 @@ export async function PATCH(request: Request) {
             await db.update(capitalAccounts).set({ is_active: true, updated_at: new Date() }).where(eq(capitalAccounts.id, accountId));
 
             // Force clear cached session so the next request uses fresh credentials
-            await clearCachedSession(userId, true); // clear demo cache
-            await clearCachedSession(userId, false); // clear live cache
+            await clearCachedSession(userId);
 
             // Re-auth system will naturally trigger via stream restarts on the frontend.
             await db.insert(notifications).values({
@@ -128,8 +127,7 @@ export async function PATCH(request: Request) {
             await db.update(capitalAccounts).set({ is_active: false, updated_at: new Date() }).where(eq(capitalAccounts.id, accountId));
 
             // Force clear cached session
-            await clearCachedSession(userId, true);
-            await clearCachedSession(userId, false);
+            await clearCachedSession(userId);
 
             await db.insert(notifications).values({
                 user_id: userId,
