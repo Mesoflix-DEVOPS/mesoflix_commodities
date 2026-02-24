@@ -5,8 +5,8 @@ import { cookies } from 'next/headers';
 
 export const dynamic = 'force-dynamic';
 
-// Capital.com uses the LIVE endpoint for all authenticated requests,
-// including when the active sub-account is a Demo account.
+// All authenticated requests go to the LIVE API endpoint regardless of account mode.
+// The /accounts endpoint returns BOTH live and demo sub-accounts in one call.
 const LIVE_API = 'https://api-capital.backend-capital.com/api/v1';
 
 export async function GET(req: NextRequest) {
@@ -18,15 +18,10 @@ export async function GET(req: NextRequest) {
         const tokenPayload = await verifyAccessToken(accessToken);
         if (!tokenPayload) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-        const mode = new URL(req.url).searchParams.get('mode') || 'real';
-        const isDemo = mode === 'demo';
+        // Get a session (always live mode — we don't need to switch accounts to read balances)
+        // The /accounts endpoint returns ALL sub-accounts in one shot.
+        const session = await getValidSession(tokenPayload.userId, false);
 
-        // Get session (handles demo/live switch internally via PUT /session)
-        const session = await getValidSession(tokenPayload.userId, isDemo);
-        console.log(`[Balance API] mode=${mode}, accountIsDemo=${session.accountIsDemo}, activeId=${session.activeAccountId}`);
-
-        // All authenticated calls use the LIVE endpoint URL regardless of mode.
-        // The active sub-account is already switched by getValidSession.
         const res = await fetch(`${LIVE_API}/accounts`, {
             headers: {
                 'CST': session.cst,
@@ -40,101 +35,89 @@ export async function GET(req: NextRequest) {
             console.error('[Balance API] Capital.com accounts error:', res.status, txt);
 
             if (res.status === 401) {
-                // Session is truly stale — force-refresh once
+                // Force-refresh and retry once
                 try {
-                    const fresh = await getValidSession(tokenPayload.userId, isDemo, true);
+                    const fresh = await getValidSession(tokenPayload.userId, false, true);
                     const retry = await fetch(`${LIVE_API}/accounts`, {
                         headers: { 'CST': fresh.cst, 'X-SECURITY-TOKEN': fresh.xSecurityToken },
                         signal: AbortSignal.timeout(8000),
                     });
                     if (retry.ok) {
                         const data = await retry.json();
-                        return NextResponse.json(pickBalance(data, isDemo, fresh.activeAccountId));
+                        return NextResponse.json(splitBalances(data));
                     }
-                } catch (refreshErr: any) {
-                    console.error('[Balance API] Force-refresh failed:', refreshErr.message);
+                } catch (e: any) {
+                    console.error('[Balance API] Refresh retry failed:', e.message);
                 }
             }
 
-            // Capital.com unavailable — return 503, NOT 200 with zeros.
-            // The frontend must NOT replace the displayed balance with zeros on 503.
             return NextResponse.json(
-                { error: `Capital.com error ${res.status}`, capitalStatus: res.status },
+                { error: `Capital.com error ${res.status}` },
                 { status: 503 }
             );
         }
 
         const data = await res.json();
-        console.log('[Balance API] Raw accounts count:', data?.accounts?.length);
-        return NextResponse.json(pickBalance(data, isDemo, session.activeAccountId));
+        console.log('[Balance API] Accounts:', (data?.accounts || []).map((a: any) =>
+            `${a.accountName}(${a.accountType})=$${a.balance?.balance}`
+        ).join(', '));
+
+        return NextResponse.json(splitBalances(data));
 
     } catch (err: any) {
         console.error('[Balance API] Fatal Error:', err.message);
-        // 503 — Capital.com unavailable, NOT a 200 with zeros.
-        return NextResponse.json(
-            { error: 'Service Unavailable', message: err.message },
-            { status: 503 }
-        );
+        return NextResponse.json({ error: 'Service Unavailable', message: err.message }, { status: 503 });
     }
 }
 
 /**
- * Pick the correct account from the Capital.com /accounts response.
+ * Split the Capital.com accounts list into separate real and demo balance objects.
  *
- * Capital.com returns ALL accounts (live + demo) in a single array.
- * Demo accounts are typically accountType "SPREADBET" or have "Demo" in their name.
- * Live accounts are typically accountType "CFD" or "PHYSICAL".
+ * Capital returns ALL accounts (live + demo) in one array:
+ *  - CFD / "Physical" accounts → REAL/LIVE money
+ *  - SPREADBET accounts OR accounts with "demo" in the name → DEMO money
  *
- * We prefer to match by activeAccountId (what the service switched to).
- * If that fails we fall back to type-based matching.
+ * We return BOTH so the frontend can populate both panels from one request —
+ * no mode switching required.
  */
-function isDemoAccount(account: any): boolean {
-    const name = (account.accountName || '').toLowerCase();
-    const type = (account.accountType || '').toLowerCase();
+function isDemoAccount(a: any): boolean {
+    const name = (a.accountName || '').toLowerCase();
+    const type = (a.accountType || '').toLowerCase();
     return type === 'spreadbet' || name.includes('demo');
 }
 
-function pickBalance(
-    data: any,
-    isDemo: boolean,
-    activeAccountId?: string | null
-) {
-    const accounts: any[] = data?.accounts || [];
-    if (accounts.length === 0) {
-        return {
-            balance: 0, deposit: 0, profitLoss: 0,
-            available: 0, equity: 0, currency: 'USD',
-            accountCount: 0,
-        };
-    }
-
-    // 1st priority: match by the accountId that was switched to
-    let account = activeAccountId
-        ? accounts.find(a => a.accountId === activeAccountId)
-        : null;
-
-    // 2nd priority: match by account type (demo vs live)
-    if (!account) {
-        account = isDemo
-            ? accounts.find(isDemoAccount)
-            : accounts.find(a => !isDemoAccount(a) && a.preferred) || accounts.find(a => !isDemoAccount(a));
-    }
-
-    // Fallback: first account
-    if (!account) account = accounts[0];
-
-    const b = account.balance || {};
-
+function pickBalance(account: any) {
+    const b = account?.balance || {};
     return {
-        balance: b.balance ?? 0,
-        deposit: b.deposit ?? 0,
-        profitLoss: b.profitLoss ?? 0,
-        available: b.available ?? b.availableToWithdraw ?? 0,
-        equity: (b.balance ?? 0) + (b.profitLoss ?? 0),
+        balance: Number(b.balance ?? 0),
+        deposit: Number(b.deposit ?? 0),
+        profitLoss: Number(b.profitLoss ?? 0),
+        available: Number(b.available ?? b.availableToWithdraw ?? 0),
+        equity: Number((b.balance ?? 0)) + Number((b.profitLoss ?? 0)),
         currency: account.currency || 'USD',
         accountId: account.accountId,
         accountName: account.accountName,
         accountType: account.accountType,
+    };
+}
+
+function splitBalances(data: any) {
+    const accounts: any[] = data?.accounts || [];
+
+    const demoAccounts = accounts.filter(isDemoAccount);
+    const realAccounts = accounts.filter(a => !isDemoAccount(a));
+
+    // Prefer the preferred/first live account; fallback to first in list
+    const realAcc = realAccounts.find(a => a.preferred) || realAccounts[0] || null;
+    const demoAcc = demoAccounts.find(a => a.preferred) || demoAccounts[0] || null;
+
+    return {
+        realBalance: realAcc ? pickBalance(realAcc) : null,
+        demoBalance: demoAcc ? pickBalance(demoAcc) : null,
+        // Legacy field for compatibility — returns the preferred/first account
+        ...(realAcc ? pickBalance(realAcc) : {}),
         accountCount: accounts.length,
+        hasDemo: demoAccounts.length > 0,
+        hasLive: realAccounts.length > 0,
     };
 }
