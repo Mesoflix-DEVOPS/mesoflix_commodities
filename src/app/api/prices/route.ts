@@ -2,17 +2,24 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getValidSession } from '@/lib/capital-service';
 import { verifyAccessToken } from '@/lib/auth';
 import { cookies } from 'next/headers';
+import { appendFileSync } from 'fs';
+import { join } from 'path';
 
 export const dynamic = 'force-dynamic';
-
-// Capital.com REST endpoint for market prices (snapshots)
-// GET /api/v1/markets?epics=GOLD,OIL_CRUDE,EURUSD,BTCUSD
-// Returns: { marketDetails: [{ instrument, snapshot: { bid, offer, ... } }] }
 
 const LIVE_API = 'https://api-capital.backend-capital.com/api/v1';
 const DEMO_API = 'https://demo-api-capital.backend-capital.com/api/v1';
 
+const LOG_FILE = join(process.cwd(), 'api-debug.log');
+function log(msg: string) {
+    const timestamp = new Date().toISOString();
+    try {
+        appendFileSync(LOG_FILE, `[${timestamp}] ${msg}\n`);
+    } catch { /* ignore log errors */ }
+}
+
 export async function GET(req: NextRequest) {
+    log(`GET /api/prices?${new URL(req.url).searchParams.toString()}`);
     try {
         const cookieStore = await cookies();
         const accessToken = cookieStore.get('access_token')?.value;
@@ -35,20 +42,21 @@ export async function GET(req: NextRequest) {
         const epics = epicsParam ? epicsParam.split(',') : ['GOLD', 'OIL_CRUDE', 'EURUSD', 'BTCUSD'];
 
         const session = await getValidSession(tokenPayload.userId, isDemo);
-        // CRITICAL: use the account's actual endpoint — live keys must go to live endpoint.
-        // Even if user clicked 'demo' mode, the master account in our DB is 'live'.
+        log(`Session acquired. accountIsDemo=${session.accountIsDemo}, cst=${session.cst.substring(0, 5)}...`);
+
         const apiIsDemo = session.accountIsDemo ?? isDemo;
         const API_URL = apiIsDemo ? DEMO_API : LIVE_API;
 
-        // Fetch market snapshots via REST (no websocket, Netlify compatible)
+        log(`Fetching from ${API_URL}/markets?epics=${epics.join(',')}`);
         const response = await fetch(`${API_URL}/markets?epics=${epics.join(',')}`, {
             headers: {
                 'CST': session.cst,
                 'X-SECURITY-TOKEN': session.xSecurityToken,
             },
-            // Short timeout - we're in a serverless function
             signal: AbortSignal.timeout(8000),
         });
+
+        log(`Response status: ${response.status}`);
 
         if (!response.ok) {
             const text = await response.text();
@@ -80,10 +88,17 @@ export async function GET(req: NextRequest) {
             return NextResponse.json({ prices: {}, warning: `Capital.com returned ${response.status}` });
         }
 
+        log(`Parsing JSON...`);
         const data = await response.json();
-        return NextResponse.json({ prices: parseMarketDetails(data) });
+        log(`Data acquired. marketDetails length=${data?.marketDetails?.length}`);
+
+        const parsed = parseMarketDetails(data);
+        log(`Parsing complete. Returning JSON...`);
+        return NextResponse.json({ prices: parsed });
 
     } catch (err: any) {
+        log(`FATAL ERROR: ${err.message}`);
+        log(`STACK: ${err.stack}`);
         console.error('[Prices API] Fatal Error:', err);
         return NextResponse.json({
             error: 'Internal Server Error',

@@ -64,19 +64,21 @@ export async function GET(request: Request) {
                 getHistory(session.cst, session.xSecurityToken, apiIsDemo)
             ]);
 
-            const activities = historyData.activities || [];
+            const accounts = (accountsData.accounts || []).map((a: any) => ({
+                ...a,
+                balance: {
+                    ...(a.balance || {}),
+                    availableToWithdraw: a.balance?.available ?? a.balance?.availableToWithdraw ?? 0,
+                    equity: (a.balance?.balance ?? 0) + (a.balance?.profitLoss ?? 0),
+                }
+            }));
+
+            const activities = historyData?.activities || [];
             return NextResponse.json({
                 ...accountsData,
-                accounts: (accountsData.accounts || []).map((a: any) => ({
-                    ...a,
-                    balance: {
-                        ...a.balance,
-                        availableToWithdraw: a.balance?.available,
-                        equity: (a.balance?.balance ?? 0) + (a.balance?.profitLoss ?? 0),
-                    }
-                })),
-                positions: positionsData.positions || [],
-                history: activities,  // Capital.com: { activities: [...] }
+                accounts,
+                positions: positionsData?.positions || [],
+                history: activities,
                 user: userData
             });
 
@@ -100,18 +102,19 @@ export async function GET(request: Request) {
                         getPositions(session.cst, session.xSecurityToken, apiIsDemo2),
                         getHistory(session.cst, session.xSecurityToken, apiIsDemo2)
                     ]);
-                    const activities = historyData.activities || [];
+                    const accounts = (accountsData.accounts || []).map((a: any) => ({
+                        ...a,
+                        balance: {
+                            ...(a.balance || {}),
+                            availableToWithdraw: a.balance?.available ?? a.balance?.availableToWithdraw ?? 0,
+                            equity: (a.balance?.balance ?? 0) + (a.balance?.profitLoss ?? 0),
+                        }
+                    }));
+                    const activities = historyData?.activities || [];
                     return NextResponse.json({
                         ...accountsData,
-                        accounts: (accountsData.accounts || []).map((a: any) => ({
-                            ...a,
-                            balance: {
-                                ...a.balance,
-                                availableToWithdraw: a.balance?.available,
-                                equity: (a.balance?.balance ?? 0) + (a.balance?.profitLoss ?? 0),
-                            }
-                        })),
-                        positions: positionsData.positions || [],
+                        accounts,
+                        positions: positionsData?.positions || [],
                         history: activities,
                         user: userData
                     });

@@ -1,0 +1,977 @@
+[2026-02-24T08:22:35.097Z] GET /api/prices?mode=demo
+[2026-02-24T08:22:41.228Z] GET /api/prices?mode=demo
+[2026-02-24T08:22:46.451Z] GET /api/prices?mode=demo
+[2026-02-24T08:22:56.886Z] GET /api/prices?mode=demo
+[2026-02-24T08:22:59.916Z] GET /api/prices?mode=demo
+[2026-02-24T08:23:01.325Z] GET /api/prices?mode=demo
+[2026-02-24T08:23:08.418Z] GET /api/prices?mode=demo
+[2026-02-24T08:23:12.257Z] GET /api/prices?mode=demo
+[2026-02-24T08:23:16.194Z] GET /api/prices?mode=demo
+[2026-02-24T08:23:24.671Z] GET /api/prices?mode=demo
+[2026-02-24T08:23:26.368Z] GET /api/prices?mode=demo
+[2026-02-24T08:23:30.783Z] GET /api/prices?mode=demo
+[2026-02-24T08:23:35.746Z] GET /api/prices?mode=demo
+[2026-02-24T08:23:40.734Z] GET /api/prices?mode=demo
+[2026-02-24T08:23:45.774Z] GET /api/prices?mode=demo
+[2026-02-24T08:23:50.874Z] GET /api/prices?mode=demo
+[2026-02-24T08:23:56.583Z] GET /api/prices?mode=demo
+[2026-02-24T08:24:00.734Z] GET /api/prices?mode=demo
+[2026-02-24T08:24:05.869Z] GET /api/prices?mode=demo
+[2026-02-24T08:24:13.497Z] GET /api/prices?mode=demo
+[2026-02-24T08:24:14.229Z] [Service] Creating fresh session. Fetching owner...
+[2026-02-24T08:24:14.871Z] [Service] Decrypting credentials...
+[2026-02-24T08:24:14.872Z] [Service] Calling createSession(identifier=lemicmelic@gmail.com, isDemo=true)...
+[2026-02-24T08:24:16.079Z] [Service] Creating fresh session. Fetching owner...
+[2026-02-24T08:24:16.294Z] [Service] Decrypting credentials...
+[2026-02-24T08:24:16.295Z] [Service] Calling createSession(identifier=lemicmelic@gmail.com, isDemo=true)...
+[2026-02-24T08:24:18.823Z] GET /api/prices?mode=demo
+[2026-02-24T08:24:20.405Z] [Service] Creating fresh session. Fetching owner...
+[2026-02-24T08:24:20.620Z] [Service] Decrypting credentials...
+[2026-02-24T08:24:20.622Z] [Service] Calling createSession(identifier=lemicmelic@gmail.com, isDemo=true)...
+[2026-02-24T08:24:20.766Z] GET /api/prices?mode=demo
+[2026-02-24T08:24:22.238Z] [Service] Creating fresh session. Fetching owner...
+[2026-02-24T08:24:22.454Z] [Service] Decrypting credentials...
+[2026-02-24T08:24:22.455Z] [Service] Calling createSession(identifier=lemicmelic@gmail.com, isDemo=true)...
+[2026-02-24T08:24:25.733Z] GET /api/prices?mode=demo
+[2026-02-24T08:24:28.256Z] [Service] Creating fresh session. Fetching owner...
+[2026-02-24T08:24:30.759Z] GET /api/prices?mode=demo
+[2026-02-24T08:24:31.868Z] [Service] Decrypting credentials...
+[2026-02-24T08:24:31.869Z] [Service] Calling createSession(identifier=lemicmelic@gmail.com, isDemo=true)...
+[2026-02-24T08:24:35.729Z] GET /api/prices?mode=demo
+[2026-02-24T08:24:40.728Z] GET /api/prices?mode=demo
+[2026-02-24T08:24:45.731Z] GET /api/prices?mode=demo
+[2026-02-24T08:24:50.626Z] [Service] Creating fresh session. Fetching owner...
+[2026-02-24T08:24:50.839Z] [Service] Decrypting credentials...
+[2026-02-24T08:24:50.840Z] [Service] Calling createSession(identifier=lemicmelic@gmail.com, isDemo=true)...
+[2026-02-24T08:24:51.010Z] GET /api/prices?mode=demo
+[2026-02-24T08:24:55.725Z] GET /api/prices?mode=demo
+[2026-02-24T08:25:00.728Z] GET /api/prices?mode=demo
+[2026-02-24T08:25:05.716Z] GET /api/prices?mode=demo
+[2026-02-24T08:25:10.749Z] GET /api/prices?mode=demo
+[2026-02-24T08:25:15.971Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:25:16.599Z] GET /api/prices?mode=demo
+[2026-02-24T08:25:16.615Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:25:17.261Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:25:17.262Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:25:17.262Z] [Service] Creating fresh session. Fetching owner (userId=abac82fa-165e-4b57-9a6e-c903967a16d5)...
+[2026-02-24T08:25:17.273Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:25:17.274Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:25:17.274Z] [Service] Creating fresh session. Fetching owner (userId=abac82fa-165e-4b57-9a6e-c903967a16d5)...
+[2026-02-24T08:25:17.494Z] [Service] Decrypting credentials...
+[2026-02-24T08:25:17.496Z] [Service] Calling createSession for lemicmelic@gmail.com (isDemo=true)...
+[2026-02-24T08:25:17.933Z] [Service] Decrypting credentials...
+[2026-02-24T08:25:17.934Z] [Service] Calling createSession for lemicmelic@gmail.com (isDemo=true)...
+[2026-02-24T08:25:18.313Z] [Service] Demo session failed: Capital.com Session Failed: 401 . Falling back to live...
+[2026-02-24T08:25:20.065Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:25:20.082Z] [Service] Demo session failed: Capital.com Session Failed: 401 . Falling back to live...
+[2026-02-24T08:25:20.298Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:25:20.299Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:25:20.299Z] [Service] Creating fresh session. Fetching owner (userId=abac82fa-165e-4b57-9a6e-c903967a16d5)...
+[2026-02-24T08:25:20.513Z] [Service] Decrypting credentials...
+[2026-02-24T08:25:20.514Z] [Service] Calling createSession for lemicmelic@gmail.com (isDemo=true)...
+[2026-02-24T08:25:20.751Z] [Service] Demo session failed: Capital.com Session Failed: 401 . Falling back to live...
+[2026-02-24T08:25:21.139Z] GET /api/prices?mode=demo
+[2026-02-24T08:25:21.143Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:25:21.333Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:25:21.362Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:25:21.363Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:25:21.363Z] [Service] Using memory cache.
+[2026-02-24T08:25:21.546Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:25:21.547Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:25:21.548Z] [Service] Creating fresh session. Fetching owner (userId=abac82fa-165e-4b57-9a6e-c903967a16d5)...
+[2026-02-24T08:25:21.766Z] [Service] Decrypting credentials...
+[2026-02-24T08:25:21.767Z] [Service] Calling createSession for lemicmelic@gmail.com (isDemo=true)...
+[2026-02-24T08:25:22.019Z] [Service] Demo session failed: Capital.com Session Failed: 401 . Falling back to live...
+[2026-02-24T08:25:26.533Z] GET /api/prices?mode=demo
+[2026-02-24T08:25:26.536Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:25:28.466Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:25:28.467Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:25:28.467Z] [Service] Using memory cache.
+[2026-02-24T08:25:32.836Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:25:32.911Z] GET /api/prices?mode=demo
+[2026-02-24T08:25:32.914Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:25:33.597Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:25:33.597Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:25:33.598Z] [Service] Using memory cache.
+[2026-02-24T08:25:34.453Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:25:34.461Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:25:34.464Z] [Service] Using memory cache.
+[2026-02-24T08:25:36.632Z] GET /api/prices?mode=demo
+[2026-02-24T08:25:36.635Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:25:36.849Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:25:36.850Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:25:36.850Z] [Service] Using memory cache.
+[2026-02-24T08:25:39.089Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:25:39.306Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:25:39.306Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:25:39.307Z] [Service] Using memory cache.
+[2026-02-24T08:25:40.748Z] GET /api/prices?mode=demo
+[2026-02-24T08:25:40.750Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:25:40.984Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:25:40.985Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:25:40.986Z] [Service] Using memory cache.
+[2026-02-24T08:25:45.781Z] GET /api/prices?mode=demo
+[2026-02-24T08:25:45.784Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:25:46.433Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:25:46.434Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:25:46.435Z] [Service] Using memory cache.
+[2026-02-24T08:25:51.795Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:25:51.949Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:25:52.096Z] GET /api/prices?mode=demo
+[2026-02-24T08:25:52.099Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:25:52.449Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:25:52.449Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:25:52.450Z] [Service] Using memory cache.
+[2026-02-24T08:25:52.613Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:25:52.614Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:25:52.614Z] [Service] Using memory cache.
+[2026-02-24T08:25:52.765Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:25:52.766Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:25:52.766Z] [Service] Using memory cache.
+[2026-02-24T08:25:53.856Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:25:54.076Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:25:54.077Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:25:54.077Z] [Service] Creating fresh session. Fetching owner (userId=abac82fa-165e-4b57-9a6e-c903967a16d5)...
+[2026-02-24T08:25:54.293Z] [Service] Decrypting credentials...
+[2026-02-24T08:25:54.296Z] [Service] Calling createSession for lemicmelic@gmail.com (isDemo=true)...
+[2026-02-24T08:25:54.927Z] [Service] Demo session failed: Capital.com Session Failed: 401 . Falling back to live...
+[2026-02-24T08:25:55.753Z] GET /api/prices?mode=demo
+[2026-02-24T08:25:55.757Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:25:56.008Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:25:56.008Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:25:56.008Z] [Service] Using memory cache.
+[2026-02-24T08:26:01.105Z] GET /api/prices?mode=demo
+[2026-02-24T08:26:01.111Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:26:01.761Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:26:01.762Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:26:01.762Z] [Service] Using memory cache.
+[2026-02-24T08:26:08.182Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:26:09.046Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:26:09.046Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:26:09.046Z] [Service] Using memory cache.
+[2026-02-24T08:26:11.629Z] GET /api/prices?mode=demo
+[2026-02-24T08:26:11.663Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:26:11.945Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:26:11.946Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:26:11.946Z] [Service] Creating fresh session. Fetching owner (userId=abac82fa-165e-4b57-9a6e-c903967a16d5)...
+[2026-02-24T08:26:12.170Z] [Service] Decrypting credentials...
+[2026-02-24T08:26:12.172Z] [Service] Calling createSession for lemicmelic@gmail.com (isDemo=true)...
+[2026-02-24T08:26:12.811Z] [Service] Demo session failed: Capital.com Session Failed: 401 . Falling back to live...
+[2026-02-24T08:26:13.229Z] Session acquired. accountIsDemo=false, cst=X0nqb...
+[2026-02-24T08:26:13.230Z] Fetching from https://api-capital.backend-capital.com/api/v1/markets?epics=GOLD,OIL_CRUDE,EURUSD,BTCUSD
+[2026-02-24T08:26:13.521Z] Response status: 200
+[2026-02-24T08:26:13.570Z] GET /api/prices?mode=demo
+[2026-02-24T08:26:13.574Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:26:13.795Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:26:13.796Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:26:13.797Z] [Service] Using memory cache.
+[2026-02-24T08:26:13.798Z] Session acquired. accountIsDemo=false, cst=X0nqb...
+[2026-02-24T08:26:13.798Z] Fetching from https://api-capital.backend-capital.com/api/v1/markets?epics=GOLD,OIL_CRUDE,EURUSD,BTCUSD
+[2026-02-24T08:26:14.050Z] Response status: 200
+[2026-02-24T08:26:14.758Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:26:14.979Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:26:14.980Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:26:14.981Z] [Service] Using memory cache.
+[2026-02-24T08:26:15.948Z] GET /api/prices?mode=demo
+[2026-02-24T08:26:15.952Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:26:16.170Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:26:16.171Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:26:16.171Z] [Service] Using memory cache.
+[2026-02-24T08:26:16.171Z] Session acquired. accountIsDemo=false, cst=X0nqb...
+[2026-02-24T08:26:16.172Z] Fetching from https://api-capital.backend-capital.com/api/v1/markets?epics=GOLD,OIL_CRUDE,EURUSD,BTCUSD
+[2026-02-24T08:26:16.415Z] Response status: 200
+[2026-02-24T08:26:20.016Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:26:20.244Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:26:20.244Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:26:20.245Z] [Service] Using memory cache.
+[2026-02-24T08:26:20.841Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:26:21.065Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:26:21.066Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:26:21.066Z] [Service] Creating fresh session. Fetching owner (userId=abac82fa-165e-4b57-9a6e-c903967a16d5)...
+[2026-02-24T08:26:21.387Z] GET /api/prices?mode=demo
+[2026-02-24T08:26:21.389Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:26:21.608Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:26:21.609Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:26:21.610Z] [Service] Using memory cache.
+[2026-02-24T08:26:21.611Z] Session acquired. accountIsDemo=false, cst=X0nqb...
+[2026-02-24T08:26:21.611Z] Fetching from https://api-capital.backend-capital.com/api/v1/markets?epics=GOLD,OIL_CRUDE,EURUSD,BTCUSD
+[2026-02-24T08:26:21.704Z] [Service] Decrypting credentials...
+[2026-02-24T08:26:21.704Z] [Service] Calling createSession for lemicmelic@gmail.com (isDemo=true)...
+[2026-02-24T08:26:21.853Z] Response status: 200
+[2026-02-24T08:26:22.278Z] [Service] Demo session failed: Capital.com Session Failed: 401 . Falling back to live...
+[2026-02-24T08:26:25.755Z] GET /api/prices?mode=demo
+[2026-02-24T08:26:25.758Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:26:28.074Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:26:28.074Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:26:28.075Z] [Service] Using memory cache.
+[2026-02-24T08:26:28.075Z] Session acquired. accountIsDemo=false, cst=X0nqb...
+[2026-02-24T08:26:28.075Z] Fetching from https://api-capital.backend-capital.com/api/v1/markets?epics=GOLD,OIL_CRUDE,EURUSD,BTCUSD
+[2026-02-24T08:26:28.642Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:26:28.861Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:26:28.861Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:26:28.862Z] [Service] Using memory cache.
+[2026-02-24T08:26:29.262Z] Response status: 200
+[2026-02-24T08:26:30.761Z] GET /api/prices?mode=demo
+[2026-02-24T08:26:30.764Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:26:32.327Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:26:32.328Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:26:32.328Z] [Service] Using memory cache.
+[2026-02-24T08:26:32.329Z] Session acquired. accountIsDemo=false, cst=X0nqb...
+[2026-02-24T08:26:32.330Z] Fetching from https://api-capital.backend-capital.com/api/v1/markets?epics=GOLD,OIL_CRUDE,EURUSD,BTCUSD
+[2026-02-24T08:26:32.639Z] Response status: 200
+[2026-02-24T08:26:36.101Z] GET /api/prices?mode=demo
+[2026-02-24T08:26:36.104Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:26:36.537Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:26:36.538Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:26:36.538Z] [Service] Using memory cache.
+[2026-02-24T08:26:36.539Z] Session acquired. accountIsDemo=false, cst=X0nqb...
+[2026-02-24T08:26:36.539Z] Fetching from https://api-capital.backend-capital.com/api/v1/markets?epics=GOLD,OIL_CRUDE,EURUSD,BTCUSD
+[2026-02-24T08:26:36.786Z] Response status: 200
+[2026-02-24T08:26:38.841Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:26:39.772Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:26:39.773Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:26:39.774Z] [Service] Using memory cache.
+[2026-02-24T08:26:41.362Z] GET /api/prices?mode=demo
+[2026-02-24T08:26:41.383Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:26:41.624Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:26:41.624Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:26:41.625Z] [Service] Creating fresh session. Fetching owner (userId=abac82fa-165e-4b57-9a6e-c903967a16d5)...
+[2026-02-24T08:26:42.274Z] [Service] Decrypting credentials...
+[2026-02-24T08:26:42.276Z] [Service] Calling createSession for lemicmelic@gmail.com (isDemo=true)...
+[2026-02-24T08:26:42.842Z] [Service] Demo session failed: Capital.com Session Failed: 401 . Falling back to live...
+[2026-02-24T08:26:43.206Z] Session acquired. accountIsDemo=false, cst=0hhrQ...
+[2026-02-24T08:26:43.207Z] Fetching from https://api-capital.backend-capital.com/api/v1/markets?epics=GOLD,OIL_CRUDE,EURUSD,BTCUSD
+[2026-02-24T08:26:43.446Z] Response status: 200
+[2026-02-24T08:26:43.447Z] Parsing JSON...
+[2026-02-24T08:26:43.453Z] Data acquired. marketDetails length=4
+[2026-02-24T08:26:43.455Z] Parsing complete. Returning JSON...
+[2026-02-24T08:26:45.766Z] GET /api/prices?mode=demo
+[2026-02-24T08:26:45.769Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:26:46.423Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:26:46.424Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:26:46.424Z] [Service] Using memory cache.
+[2026-02-24T08:26:46.425Z] Session acquired. accountIsDemo=false, cst=0hhrQ...
+[2026-02-24T08:26:46.425Z] Fetching from https://api-capital.backend-capital.com/api/v1/markets?epics=GOLD,OIL_CRUDE,EURUSD,BTCUSD
+[2026-02-24T08:26:46.664Z] Response status: 200
+[2026-02-24T08:26:46.666Z] Parsing JSON...
+[2026-02-24T08:26:46.672Z] Data acquired. marketDetails length=4
+[2026-02-24T08:26:46.672Z] Parsing complete. Returning JSON...
+[2026-02-24T08:26:49.332Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:26:50.732Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:26:50.787Z] GET /api/prices?mode=demo
+[2026-02-24T08:26:50.791Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:26:50.952Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:26:50.952Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:26:50.953Z] [Service] Using memory cache.
+[2026-02-24T08:26:51.450Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:26:51.450Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:26:51.451Z] [Service] Using memory cache.
+[2026-02-24T08:26:51.451Z] Session acquired. accountIsDemo=false, cst=0hhrQ...
+[2026-02-24T08:26:51.451Z] Fetching from https://api-capital.backend-capital.com/api/v1/markets?epics=GOLD,OIL_CRUDE,EURUSD,BTCUSD
+[2026-02-24T08:26:51.633Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:26:51.633Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:26:51.634Z] [Service] Using memory cache.
+[2026-02-24T08:26:52.106Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:26:52.164Z] Response status: 200
+[2026-02-24T08:26:52.164Z] Parsing JSON...
+[2026-02-24T08:26:52.168Z] Data acquired. marketDetails length=4
+[2026-02-24T08:26:52.168Z] Parsing complete. Returning JSON...
+[2026-02-24T08:26:52.325Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:26:52.326Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:26:52.326Z] [Service] Creating fresh session. Fetching owner (userId=abac82fa-165e-4b57-9a6e-c903967a16d5)...
+[2026-02-24T08:26:52.550Z] [Service] Decrypting credentials...
+[2026-02-24T08:26:52.551Z] [Service] Calling createSession for lemicmelic@gmail.com (isDemo=true)...
+[2026-02-24T08:26:53.429Z] [Service] Demo session failed: Capital.com Session Failed: 401 . Falling back to live...
+[2026-02-24T08:26:55.737Z] GET /api/prices?mode=demo
+[2026-02-24T08:26:55.741Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:26:55.981Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:26:55.982Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:26:55.982Z] [Service] Using memory cache.
+[2026-02-24T08:26:55.983Z] Session acquired. accountIsDemo=false, cst=0hhrQ...
+[2026-02-24T08:26:55.984Z] Fetching from https://api-capital.backend-capital.com/api/v1/markets?epics=GOLD,OIL_CRUDE,EURUSD,BTCUSD
+[2026-02-24T08:26:56.913Z] Response status: 200
+[2026-02-24T08:26:56.914Z] Parsing JSON...
+[2026-02-24T08:26:56.918Z] Data acquired. marketDetails length=4
+[2026-02-24T08:26:56.919Z] Parsing complete. Returning JSON...
+[2026-02-24T08:27:00.745Z] GET /api/prices?mode=demo
+[2026-02-24T08:27:00.754Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:27:01.625Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:27:01.626Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:27:01.626Z] [Service] Using memory cache.
+[2026-02-24T08:27:01.627Z] Session acquired. accountIsDemo=false, cst=0hhrQ...
+[2026-02-24T08:27:01.627Z] Fetching from https://api-capital.backend-capital.com/api/v1/markets?epics=GOLD,OIL_CRUDE,EURUSD,BTCUSD
+[2026-02-24T08:27:02.110Z] Response status: 200
+[2026-02-24T08:27:02.110Z] Parsing JSON...
+[2026-02-24T08:27:02.114Z] Data acquired. marketDetails length=4
+[2026-02-24T08:27:02.114Z] Parsing complete. Returning JSON...
+[2026-02-24T08:27:03.021Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:27:03.239Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:27:03.240Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:27:03.241Z] [Service] Using memory cache.
+[2026-02-24T08:27:08.192Z] GET /api/prices?mode=demo
+[2026-02-24T08:27:08.196Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:27:10.918Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:27:10.918Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:27:10.919Z] [Service] Using memory cache.
+[2026-02-24T08:27:10.919Z] Session acquired. accountIsDemo=false, cst=0hhrQ...
+[2026-02-24T08:27:10.920Z] Fetching from https://api-capital.backend-capital.com/api/v1/markets?epics=GOLD,OIL_CRUDE,EURUSD,BTCUSD
+[2026-02-24T08:27:11.356Z] Response status: 200
+[2026-02-24T08:27:11.357Z] Parsing JSON...
+[2026-02-24T08:27:11.361Z] Data acquired. marketDetails length=4
+[2026-02-24T08:27:11.361Z] Parsing complete. Returning JSON...
+[2026-02-24T08:27:11.405Z] GET /api/prices?mode=demo
+[2026-02-24T08:27:11.407Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:27:11.624Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:27:11.625Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:27:11.627Z] [Service] Using memory cache.
+[2026-02-24T08:27:11.627Z] Session acquired. accountIsDemo=false, cst=0hhrQ...
+[2026-02-24T08:27:11.628Z] Fetching from https://api-capital.backend-capital.com/api/v1/markets?epics=GOLD,OIL_CRUDE,EURUSD,BTCUSD
+[2026-02-24T08:27:11.895Z] Response status: 200
+[2026-02-24T08:27:11.895Z] Parsing JSON...
+[2026-02-24T08:27:11.898Z] Data acquired. marketDetails length=4
+[2026-02-24T08:27:11.898Z] Parsing complete. Returning JSON...
+[2026-02-24T08:27:14.731Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:27:14.957Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:27:14.957Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:27:14.959Z] [Service] Using memory cache.
+[2026-02-24T08:27:15.753Z] GET /api/prices?mode=demo
+[2026-02-24T08:27:15.754Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:27:15.993Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:27:15.993Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:27:15.993Z] [Service] Using memory cache.
+[2026-02-24T08:27:15.994Z] Session acquired. accountIsDemo=false, cst=0hhrQ...
+[2026-02-24T08:27:15.994Z] Fetching from https://api-capital.backend-capital.com/api/v1/markets?epics=GOLD,OIL_CRUDE,EURUSD,BTCUSD
+[2026-02-24T08:27:16.238Z] Response status: 200
+[2026-02-24T08:27:16.238Z] Parsing JSON...
+[2026-02-24T08:27:16.241Z] Data acquired. marketDetails length=4
+[2026-02-24T08:27:16.241Z] Parsing complete. Returning JSON...
+[2026-02-24T08:27:19.330Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:27:20.557Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:27:20.557Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:27:20.558Z] [Service] Using memory cache.
+[2026-02-24T08:27:20.733Z] GET /api/prices?mode=demo
+[2026-02-24T08:27:20.738Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:27:20.958Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:27:20.959Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:27:20.960Z] [Service] Using memory cache.
+[2026-02-24T08:27:20.961Z] Session acquired. accountIsDemo=false, cst=0hhrQ...
+[2026-02-24T08:27:20.962Z] Fetching from https://api-capital.backend-capital.com/api/v1/markets?epics=GOLD,OIL_CRUDE,EURUSD,BTCUSD
+[2026-02-24T08:27:21.002Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:27:21.219Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:27:21.219Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:27:21.220Z] [Service] Creating fresh session. Fetching owner (userId=abac82fa-165e-4b57-9a6e-c903967a16d5)...
+[2026-02-24T08:27:21.866Z] [Service] Decrypting credentials...
+[2026-02-24T08:27:21.867Z] [Service] Calling createSession for lemicmelic@gmail.com (isDemo=true)...
+[2026-02-24T08:27:21.971Z] Response status: 200
+[2026-02-24T08:27:21.971Z] Parsing JSON...
+[2026-02-24T08:27:21.976Z] Data acquired. marketDetails length=4
+[2026-02-24T08:27:21.978Z] Parsing complete. Returning JSON...
+[2026-02-24T08:27:22.488Z] [Service] Demo session failed: Capital.com Session Failed: 401 . Falling back to live...
+[2026-02-24T08:27:22.717Z] [Service] FATAL getValidSession error: Capital.com Session Failed: 429 
+[2026-02-24T08:27:25.728Z] GET /api/prices?mode=demo
+[2026-02-24T08:27:25.731Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:27:26.389Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:27:26.390Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:27:26.391Z] [Service] Using memory cache.
+[2026-02-24T08:27:26.392Z] Session acquired. accountIsDemo=false, cst=0hhrQ...
+[2026-02-24T08:27:26.392Z] Fetching from https://api-capital.backend-capital.com/api/v1/markets?epics=GOLD,OIL_CRUDE,EURUSD,BTCUSD
+[2026-02-24T08:27:26.637Z] Response status: 200
+[2026-02-24T08:27:26.638Z] Parsing JSON...
+[2026-02-24T08:27:26.644Z] Data acquired. marketDetails length=4
+[2026-02-24T08:27:26.644Z] Parsing complete. Returning JSON...
+[2026-02-24T08:27:26.823Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:27:27.039Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:27:27.040Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:27:27.040Z] [Service] Using memory cache.
+[2026-02-24T08:27:30.727Z] GET /api/prices?mode=demo
+[2026-02-24T08:27:30.729Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:27:30.962Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:27:30.962Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:27:30.963Z] [Service] Using memory cache.
+[2026-02-24T08:27:30.963Z] Session acquired. accountIsDemo=false, cst=0hhrQ...
+[2026-02-24T08:27:30.964Z] Fetching from https://api-capital.backend-capital.com/api/v1/markets?epics=GOLD,OIL_CRUDE,EURUSD,BTCUSD
+[2026-02-24T08:27:31.209Z] Response status: 200
+[2026-02-24T08:27:31.209Z] Parsing JSON...
+[2026-02-24T08:27:31.214Z] Data acquired. marketDetails length=4
+[2026-02-24T08:27:31.215Z] Parsing complete. Returning JSON...
+[2026-02-24T08:27:35.788Z] GET /api/prices?mode=demo
+[2026-02-24T08:27:35.791Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:27:36.006Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:27:36.007Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:27:36.007Z] [Service] Using memory cache.
+[2026-02-24T08:27:36.007Z] Session acquired. accountIsDemo=false, cst=0hhrQ...
+[2026-02-24T08:27:36.008Z] Fetching from https://api-capital.backend-capital.com/api/v1/markets?epics=GOLD,OIL_CRUDE,EURUSD,BTCUSD
+[2026-02-24T08:27:36.498Z] Response status: 200
+[2026-02-24T08:27:36.499Z] Parsing JSON...
+[2026-02-24T08:27:36.504Z] Data acquired. marketDetails length=4
+[2026-02-24T08:27:36.504Z] Parsing complete. Returning JSON...
+[2026-02-24T08:27:38.725Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:27:38.939Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:27:38.940Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:27:38.941Z] [Service] Using memory cache.
+[2026-02-24T08:27:40.741Z] GET /api/prices?mode=demo
+[2026-02-24T08:27:40.743Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:27:41.668Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:27:41.668Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:27:41.669Z] [Service] Using memory cache.
+[2026-02-24T08:27:41.669Z] Session acquired. accountIsDemo=false, cst=0hhrQ...
+[2026-02-24T08:27:41.670Z] Fetching from https://api-capital.backend-capital.com/api/v1/markets?epics=GOLD,OIL_CRUDE,EURUSD,BTCUSD
+[2026-02-24T08:27:41.932Z] Response status: 200
+[2026-02-24T08:27:41.932Z] Parsing JSON...
+[2026-02-24T08:27:41.951Z] Data acquired. marketDetails length=4
+[2026-02-24T08:27:41.952Z] Parsing complete. Returning JSON...
+[2026-02-24T08:27:45.803Z] GET /api/prices?mode=demo
+[2026-02-24T08:27:45.807Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:27:46.464Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:27:46.464Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:27:46.465Z] [Service] Using memory cache.
+[2026-02-24T08:27:46.466Z] Session acquired. accountIsDemo=false, cst=0hhrQ...
+[2026-02-24T08:27:46.466Z] Fetching from https://api-capital.backend-capital.com/api/v1/markets?epics=GOLD,OIL_CRUDE,EURUSD,BTCUSD
+[2026-02-24T08:27:46.889Z] Response status: 200
+[2026-02-24T08:27:46.890Z] Parsing JSON...
+[2026-02-24T08:27:46.906Z] Data acquired. marketDetails length=4
+[2026-02-24T08:27:46.907Z] Parsing complete. Returning JSON...
+[2026-02-24T08:27:49.302Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:27:49.522Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:27:49.523Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:27:49.523Z] [Service] Using memory cache.
+[2026-02-24T08:27:49.788Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:27:50.005Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:27:50.006Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:27:50.006Z] [Service] Creating fresh session. Fetching owner (userId=abac82fa-165e-4b57-9a6e-c903967a16d5)...
+[2026-02-24T08:27:50.742Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:27:51.102Z] GET /api/prices?mode=demo
+[2026-02-24T08:27:51.105Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:27:51.706Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:27:51.707Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:27:51.707Z] [Service] Using memory cache.
+[2026-02-24T08:27:51.813Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:27:51.815Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:27:51.816Z] [Service] Using memory cache.
+[2026-02-24T08:27:51.817Z] Session acquired. accountIsDemo=false, cst=0hhrQ...
+[2026-02-24T08:27:51.818Z] Fetching from https://api-capital.backend-capital.com/api/v1/markets?epics=GOLD,OIL_CRUDE,EURUSD,BTCUSD
+[2026-02-24T08:27:52.567Z] Response status: 200
+[2026-02-24T08:27:52.568Z] Parsing JSON...
+[2026-02-24T08:27:52.570Z] Data acquired. marketDetails length=4
+[2026-02-24T08:27:52.571Z] Parsing complete. Returning JSON...
+[2026-02-24T08:27:53.055Z] [Service] Decrypting credentials...
+[2026-02-24T08:27:53.057Z] [Service] Calling createSession for lemicmelic@gmail.com (isDemo=true)...
+[2026-02-24T08:27:53.819Z] [Service] Demo session failed: Capital.com Session Failed: 401 . Falling back to live...
+[2026-02-24T08:27:55.727Z] GET /api/prices?mode=demo
+[2026-02-24T08:27:55.731Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:27:56.380Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:27:56.380Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:27:56.381Z] [Service] Using memory cache.
+[2026-02-24T08:27:56.382Z] Session acquired. accountIsDemo=false, cst=0hhrQ...
+[2026-02-24T08:27:56.382Z] Fetching from https://api-capital.backend-capital.com/api/v1/markets?epics=GOLD,OIL_CRUDE,EURUSD,BTCUSD
+[2026-02-24T08:27:56.629Z] Response status: 200
+[2026-02-24T08:27:56.630Z] Parsing JSON...
+[2026-02-24T08:27:56.633Z] Data acquired. marketDetails length=4
+[2026-02-24T08:27:56.633Z] Parsing complete. Returning JSON...
+[2026-02-24T08:28:00.758Z] GET /api/prices?mode=demo
+[2026-02-24T08:28:00.764Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:28:02.743Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:28:03.234Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:28:03.235Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:28:03.236Z] [Service] Using memory cache.
+[2026-02-24T08:28:03.237Z] Session acquired. accountIsDemo=false, cst=0hhrQ...
+[2026-02-24T08:28:03.238Z] Fetching from https://api-capital.backend-capital.com/api/v1/markets?epics=GOLD,OIL_CRUDE,EURUSD,BTCUSD
+[2026-02-24T08:28:03.445Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:28:03.445Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:28:03.446Z] [Service] Using memory cache.
+[2026-02-24T08:28:04.382Z] Response status: 200
+[2026-02-24T08:28:04.383Z] Parsing JSON...
+[2026-02-24T08:28:04.399Z] Data acquired. marketDetails length=4
+[2026-02-24T08:28:04.400Z] Parsing complete. Returning JSON...
+[2026-02-24T08:28:05.720Z] GET /api/prices?mode=demo
+[2026-02-24T08:28:05.723Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:28:05.948Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:28:05.949Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:28:05.950Z] [Service] Using memory cache.
+[2026-02-24T08:28:05.951Z] Session acquired. accountIsDemo=false, cst=0hhrQ...
+[2026-02-24T08:28:05.951Z] Fetching from https://api-capital.backend-capital.com/api/v1/markets?epics=GOLD,OIL_CRUDE,EURUSD,BTCUSD
+[2026-02-24T08:28:06.199Z] Response status: 200
+[2026-02-24T08:28:06.200Z] Parsing JSON...
+[2026-02-24T08:28:06.205Z] Data acquired. marketDetails length=4
+[2026-02-24T08:28:06.205Z] Parsing complete. Returning JSON...
+[2026-02-24T08:28:10.722Z] GET /api/prices?mode=demo
+[2026-02-24T08:28:10.729Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:28:11.384Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:28:11.385Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:28:11.385Z] [Service] Using memory cache.
+[2026-02-24T08:28:11.386Z] Session acquired. accountIsDemo=false, cst=0hhrQ...
+[2026-02-24T08:28:11.386Z] Fetching from https://api-capital.backend-capital.com/api/v1/markets?epics=GOLD,OIL_CRUDE,EURUSD,BTCUSD
+[2026-02-24T08:28:11.964Z] Response status: 200
+[2026-02-24T08:28:11.965Z] Parsing JSON...
+[2026-02-24T08:28:12.000Z] Data acquired. marketDetails length=4
+[2026-02-24T08:28:12.001Z] Parsing complete. Returning JSON...
+[2026-02-24T08:28:14.734Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:28:14.953Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:28:14.955Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:28:14.955Z] [Service] Using memory cache.
+[2026-02-24T08:28:15.734Z] GET /api/prices?mode=demo
+[2026-02-24T08:28:15.738Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:28:15.960Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:28:15.960Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:28:15.961Z] [Service] Using memory cache.
+[2026-02-24T08:28:15.961Z] Session acquired. accountIsDemo=false, cst=0hhrQ...
+[2026-02-24T08:28:15.962Z] Fetching from https://api-capital.backend-capital.com/api/v1/markets?epics=GOLD,OIL_CRUDE,EURUSD,BTCUSD
+[2026-02-24T08:28:16.210Z] Response status: 200
+[2026-02-24T08:28:16.211Z] Parsing JSON...
+[2026-02-24T08:28:16.213Z] Data acquired. marketDetails length=4
+[2026-02-24T08:28:16.214Z] Parsing complete. Returning JSON...
+[2026-02-24T08:28:19.326Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:28:19.544Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:28:19.545Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:28:19.546Z] [Service] Using memory cache.
+[2026-02-24T08:28:19.807Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:28:20.028Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:28:20.029Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:28:20.029Z] [Service] Creating fresh session. Fetching owner (userId=abac82fa-165e-4b57-9a6e-c903967a16d5)...
+[2026-02-24T08:28:20.698Z] [Service] Decrypting credentials...
+[2026-02-24T08:28:20.699Z] [Service] Calling createSession for lemicmelic@gmail.com (isDemo=true)...
+[2026-02-24T08:28:20.748Z] GET /api/prices?mode=demo
+[2026-02-24T08:28:20.751Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:28:20.972Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:28:20.973Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:28:20.973Z] [Service] Using memory cache.
+[2026-02-24T08:28:20.974Z] Session acquired. accountIsDemo=false, cst=0hhrQ...
+[2026-02-24T08:28:20.975Z] Fetching from https://api-capital.backend-capital.com/api/v1/markets?epics=GOLD,OIL_CRUDE,EURUSD,BTCUSD
+[2026-02-24T08:28:21.220Z] Response status: 200
+[2026-02-24T08:28:21.220Z] Parsing JSON...
+[2026-02-24T08:28:21.223Z] Data acquired. marketDetails length=4
+[2026-02-24T08:28:21.224Z] Parsing complete. Returning JSON...
+[2026-02-24T08:28:21.266Z] [Service] Demo session failed: Capital.com Session Failed: 401 . Falling back to live...
+[2026-02-24T08:28:25.724Z] GET /api/prices?mode=demo
+[2026-02-24T08:28:25.727Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:28:26.383Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:28:26.384Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:28:26.384Z] [Service] Using memory cache.
+[2026-02-24T08:28:26.385Z] Session acquired. accountIsDemo=false, cst=0hhrQ...
+[2026-02-24T08:28:26.386Z] Fetching from https://api-capital.backend-capital.com/api/v1/markets?epics=GOLD,OIL_CRUDE,EURUSD,BTCUSD
+[2026-02-24T08:28:26.727Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:28:26.818Z] Response status: 200
+[2026-02-24T08:28:26.818Z] Parsing JSON...
+[2026-02-24T08:28:26.828Z] Data acquired. marketDetails length=4
+[2026-02-24T08:28:26.829Z] Parsing complete. Returning JSON...
+[2026-02-24T08:28:26.947Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:28:26.947Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:28:26.948Z] [Service] Using memory cache.
+[2026-02-24T08:28:30.723Z] GET /api/prices?mode=demo
+[2026-02-24T08:28:30.729Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:28:31.708Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:28:31.709Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:28:31.709Z] [Service] Using memory cache.
+[2026-02-24T08:28:31.710Z] Session acquired. accountIsDemo=false, cst=0hhrQ...
+[2026-02-24T08:28:31.711Z] Fetching from https://api-capital.backend-capital.com/api/v1/markets?epics=GOLD,OIL_CRUDE,EURUSD,BTCUSD
+[2026-02-24T08:28:32.129Z] Response status: 200
+[2026-02-24T08:28:32.129Z] Parsing JSON...
+[2026-02-24T08:28:32.131Z] Data acquired. marketDetails length=4
+[2026-02-24T08:28:32.132Z] Parsing complete. Returning JSON...
+[2026-02-24T08:28:35.763Z] GET /api/prices?mode=demo
+[2026-02-24T08:28:35.767Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:28:35.990Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:28:35.991Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:28:35.991Z] [Service] Using memory cache.
+[2026-02-24T08:28:35.991Z] Session acquired. accountIsDemo=false, cst=0hhrQ...
+[2026-02-24T08:28:35.992Z] Fetching from https://api-capital.backend-capital.com/api/v1/markets?epics=GOLD,OIL_CRUDE,EURUSD,BTCUSD
+[2026-02-24T08:28:36.237Z] Response status: 200
+[2026-02-24T08:28:36.239Z] Parsing JSON...
+[2026-02-24T08:28:36.242Z] Data acquired. marketDetails length=4
+[2026-02-24T08:28:36.242Z] Parsing complete. Returning JSON...
+[2026-02-24T08:28:38.743Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:28:38.982Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:28:38.983Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:28:38.984Z] [Service] Using memory cache.
+[2026-02-24T08:28:40.759Z] GET /api/prices?mode=demo
+[2026-02-24T08:28:40.762Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:28:40.979Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:28:40.981Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:28:40.981Z] [Service] Using memory cache.
+[2026-02-24T08:28:40.982Z] Session acquired. accountIsDemo=false, cst=0hhrQ...
+[2026-02-24T08:28:40.983Z] Fetching from https://api-capital.backend-capital.com/api/v1/markets?epics=GOLD,OIL_CRUDE,EURUSD,BTCUSD
+[2026-02-24T08:28:41.234Z] Response status: 200
+[2026-02-24T08:28:41.235Z] Parsing JSON...
+[2026-02-24T08:28:41.237Z] Data acquired. marketDetails length=4
+[2026-02-24T08:28:41.237Z] Parsing complete. Returning JSON...
+[2026-02-24T08:28:45.726Z] GET /api/prices?mode=demo
+[2026-02-24T08:28:45.730Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:28:47.638Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:28:47.639Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:28:47.640Z] [Service] Using memory cache.
+[2026-02-24T08:28:47.641Z] Session acquired. accountIsDemo=false, cst=0hhrQ...
+[2026-02-24T08:28:47.642Z] Fetching from https://api-capital.backend-capital.com/api/v1/markets?epics=GOLD,OIL_CRUDE,EURUSD,BTCUSD
+[2026-02-24T08:28:48.413Z] Response status: 200
+[2026-02-24T08:28:48.414Z] Parsing JSON...
+[2026-02-24T08:28:48.417Z] Data acquired. marketDetails length=4
+[2026-02-24T08:28:48.418Z] Parsing complete. Returning JSON...
+[2026-02-24T08:28:49.311Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:28:50.041Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:28:50.042Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:28:50.042Z] [Service] Using memory cache.
+[2026-02-24T08:28:50.746Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:28:50.761Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:28:50.892Z] GET /api/prices?mode=demo
+[2026-02-24T08:28:50.895Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:28:50.973Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:28:50.974Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:28:50.974Z] [Service] Creating fresh session. Fetching owner (userId=abac82fa-165e-4b57-9a6e-c903967a16d5)...
+[2026-02-24T08:28:51.172Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:28:51.173Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:28:51.173Z] [Service] Using memory cache.
+[2026-02-24T08:28:51.543Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:28:51.544Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:28:51.544Z] [Service] Using memory cache.
+[2026-02-24T08:28:51.545Z] Session acquired. accountIsDemo=false, cst=0hhrQ...
+[2026-02-24T08:28:51.545Z] Fetching from https://api-capital.backend-capital.com/api/v1/markets?epics=GOLD,OIL_CRUDE,EURUSD,BTCUSD
+[2026-02-24T08:28:51.614Z] [Service] Decrypting credentials...
+[2026-02-24T08:28:51.615Z] [Service] Calling createSession for lemicmelic@gmail.com (isDemo=true)...
+[2026-02-24T08:28:51.787Z] Response status: 200
+[2026-02-24T08:28:51.788Z] Parsing JSON...
+[2026-02-24T08:28:51.792Z] Data acquired. marketDetails length=4
+[2026-02-24T08:28:51.793Z] Parsing complete. Returning JSON...
+[2026-02-24T08:28:52.254Z] [Service] Demo session failed: Capital.com Session Failed: 401 . Falling back to live...
+[2026-02-24T08:28:55.774Z] GET /api/prices?mode=demo
+[2026-02-24T08:28:55.779Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:28:56.472Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:28:56.473Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:28:56.473Z] [Service] Using memory cache.
+[2026-02-24T08:28:56.474Z] Session acquired. accountIsDemo=false, cst=0hhrQ...
+[2026-02-24T08:28:56.474Z] Fetching from https://api-capital.backend-capital.com/api/v1/markets?epics=GOLD,OIL_CRUDE,EURUSD,BTCUSD
+[2026-02-24T08:28:56.717Z] Response status: 200
+[2026-02-24T08:28:56.719Z] Parsing JSON...
+[2026-02-24T08:28:56.739Z] Data acquired. marketDetails length=4
+[2026-02-24T08:28:56.740Z] Parsing complete. Returning JSON...
+[2026-02-24T08:29:00.731Z] GET /api/prices?mode=demo
+[2026-02-24T08:29:00.738Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:29:01.406Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:29:01.406Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:29:01.407Z] [Service] Using memory cache.
+[2026-02-24T08:29:01.408Z] Session acquired. accountIsDemo=false, cst=0hhrQ...
+[2026-02-24T08:29:01.408Z] Fetching from https://api-capital.backend-capital.com/api/v1/markets?epics=GOLD,OIL_CRUDE,EURUSD,BTCUSD
+[2026-02-24T08:29:01.826Z] Response status: 200
+[2026-02-24T08:29:01.828Z] Parsing JSON...
+[2026-02-24T08:29:01.832Z] Data acquired. marketDetails length=4
+[2026-02-24T08:29:01.833Z] Parsing complete. Returning JSON...
+[2026-02-24T08:29:02.743Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:29:02.960Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:29:02.961Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:29:02.962Z] [Service] Using memory cache.
+[2026-02-24T08:29:05.740Z] GET /api/prices?mode=demo
+[2026-02-24T08:29:05.743Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:29:07.136Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:29:07.136Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:29:07.137Z] [Service] Using memory cache.
+[2026-02-24T08:29:07.137Z] Session acquired. accountIsDemo=false, cst=0hhrQ...
+[2026-02-24T08:29:07.137Z] Fetching from https://api-capital.backend-capital.com/api/v1/markets?epics=GOLD,OIL_CRUDE,EURUSD,BTCUSD
+[2026-02-24T08:29:07.400Z] Response status: 200
+[2026-02-24T08:29:07.400Z] Parsing JSON...
+[2026-02-24T08:29:07.407Z] Data acquired. marketDetails length=4
+[2026-02-24T08:29:07.408Z] Parsing complete. Returning JSON...
+[2026-02-24T08:29:10.753Z] GET /api/prices?mode=demo
+[2026-02-24T08:29:10.756Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:29:10.984Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:29:10.985Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:29:10.986Z] [Service] Using memory cache.
+[2026-02-24T08:29:10.986Z] Session acquired. accountIsDemo=false, cst=0hhrQ...
+[2026-02-24T08:29:10.987Z] Fetching from https://api-capital.backend-capital.com/api/v1/markets?epics=GOLD,OIL_CRUDE,EURUSD,BTCUSD
+[2026-02-24T08:29:11.251Z] Response status: 200
+[2026-02-24T08:29:11.251Z] Parsing JSON...
+[2026-02-24T08:29:11.254Z] Data acquired. marketDetails length=4
+[2026-02-24T08:29:11.255Z] Parsing complete. Returning JSON...
+[2026-02-24T08:29:14.725Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:29:14.939Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:29:14.940Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:29:14.941Z] [Service] Using memory cache.
+[2026-02-24T08:29:15.720Z] GET /api/prices?mode=demo
+[2026-02-24T08:29:15.725Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:29:15.943Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:29:15.944Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:29:15.945Z] [Service] Using memory cache.
+[2026-02-24T08:29:15.946Z] Session acquired. accountIsDemo=false, cst=0hhrQ...
+[2026-02-24T08:29:15.947Z] Fetching from https://api-capital.backend-capital.com/api/v1/markets?epics=GOLD,OIL_CRUDE,EURUSD,BTCUSD
+[2026-02-24T08:29:16.197Z] Response status: 200
+[2026-02-24T08:29:16.198Z] Parsing JSON...
+[2026-02-24T08:29:16.200Z] Data acquired. marketDetails length=4
+[2026-02-24T08:29:16.200Z] Parsing complete. Returning JSON...
+[2026-02-24T08:29:19.317Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:29:20.231Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:29:20.231Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:29:20.232Z] [Service] Using memory cache.
+[2026-02-24T08:29:20.720Z] GET /api/prices?mode=demo
+[2026-02-24T08:29:20.723Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:29:20.937Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:29:20.939Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:29:20.940Z] [Service] Using memory cache.
+[2026-02-24T08:29:20.941Z] Session acquired. accountIsDemo=false, cst=0hhrQ...
+[2026-02-24T08:29:20.942Z] Fetching from https://api-capital.backend-capital.com/api/v1/markets?epics=GOLD,OIL_CRUDE,EURUSD,BTCUSD
+[2026-02-24T08:29:21.053Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:29:21.269Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:29:21.269Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:29:21.270Z] [Service] Creating fresh session. Fetching owner (userId=abac82fa-165e-4b57-9a6e-c903967a16d5)...
+[2026-02-24T08:29:21.737Z] Response status: 200
+[2026-02-24T08:29:21.738Z] Parsing JSON...
+[2026-02-24T08:29:21.742Z] Data acquired. marketDetails length=4
+[2026-02-24T08:29:21.743Z] Parsing complete. Returning JSON...
+[2026-02-24T08:29:21.910Z] [Service] Decrypting credentials...
+[2026-02-24T08:29:21.911Z] [Service] Calling createSession for lemicmelic@gmail.com (isDemo=true)...
+[2026-02-24T08:29:22.539Z] [Service] Demo session failed: Capital.com Session Failed: 401 . Falling back to live...
+[2026-02-24T08:29:25.759Z] GET /api/prices?mode=demo
+[2026-02-24T08:29:25.761Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:29:26.418Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:29:26.419Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:29:26.420Z] [Service] Using memory cache.
+[2026-02-24T08:29:26.421Z] Session acquired. accountIsDemo=false, cst=0hhrQ...
+[2026-02-24T08:29:26.421Z] Fetching from https://api-capital.backend-capital.com/api/v1/markets?epics=GOLD,OIL_CRUDE,EURUSD,BTCUSD
+[2026-02-24T08:29:26.664Z] Response status: 200
+[2026-02-24T08:29:26.664Z] Parsing JSON...
+[2026-02-24T08:29:26.669Z] Data acquired. marketDetails length=4
+[2026-02-24T08:29:26.670Z] Parsing complete. Returning JSON...
+[2026-02-24T08:29:26.757Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:29:26.974Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:29:26.974Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:29:26.975Z] [Service] Using memory cache.
+[2026-02-24T08:29:30.713Z] GET /api/prices?mode=demo
+[2026-02-24T08:29:30.716Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:29:31.914Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:29:31.915Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:29:31.915Z] [Service] Using memory cache.
+[2026-02-24T08:29:31.916Z] Session acquired. accountIsDemo=false, cst=0hhrQ...
+[2026-02-24T08:29:31.916Z] Fetching from https://api-capital.backend-capital.com/api/v1/markets?epics=GOLD,OIL_CRUDE,EURUSD,BTCUSD
+[2026-02-24T08:29:32.352Z] Response status: 200
+[2026-02-24T08:29:32.353Z] Parsing JSON...
+[2026-02-24T08:29:32.355Z] Data acquired. marketDetails length=4
+[2026-02-24T08:29:32.356Z] Parsing complete. Returning JSON...
+[2026-02-24T08:29:35.716Z] GET /api/prices?mode=demo
+[2026-02-24T08:29:35.719Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:29:35.942Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:29:35.942Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:29:35.943Z] [Service] Using memory cache.
+[2026-02-24T08:29:35.944Z] Session acquired. accountIsDemo=false, cst=0hhrQ...
+[2026-02-24T08:29:35.944Z] Fetching from https://api-capital.backend-capital.com/api/v1/markets?epics=GOLD,OIL_CRUDE,EURUSD,BTCUSD
+[2026-02-24T08:29:36.187Z] Response status: 200
+[2026-02-24T08:29:36.188Z] Parsing JSON...
+[2026-02-24T08:29:36.193Z] Data acquired. marketDetails length=4
+[2026-02-24T08:29:36.193Z] Parsing complete. Returning JSON...
+[2026-02-24T08:29:38.738Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:29:38.957Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:29:38.958Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:29:38.959Z] [Service] Using memory cache.
+[2026-02-24T08:29:40.735Z] GET /api/prices?mode=demo
+[2026-02-24T08:29:40.738Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:29:40.982Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:29:40.982Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:29:40.983Z] [Service] Using memory cache.
+[2026-02-24T08:29:40.984Z] Session acquired. accountIsDemo=false, cst=0hhrQ...
+[2026-02-24T08:29:40.985Z] Fetching from https://api-capital.backend-capital.com/api/v1/markets?epics=GOLD,OIL_CRUDE,EURUSD,BTCUSD
+[2026-02-24T08:29:41.241Z] Response status: 200
+[2026-02-24T08:29:41.241Z] Parsing JSON...
+[2026-02-24T08:29:41.717Z] Data acquired. marketDetails length=4
+[2026-02-24T08:29:41.718Z] Parsing complete. Returning JSON...
+[2026-02-24T08:29:45.726Z] GET /api/prices?mode=demo
+[2026-02-24T08:29:45.729Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:29:46.372Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:29:46.373Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:29:46.373Z] [Service] Using memory cache.
+[2026-02-24T08:29:46.373Z] Session acquired. accountIsDemo=false, cst=0hhrQ...
+[2026-02-24T08:29:46.374Z] Fetching from https://api-capital.backend-capital.com/api/v1/markets?epics=GOLD,OIL_CRUDE,EURUSD,BTCUSD
+[2026-02-24T08:29:47.080Z] Response status: 200
+[2026-02-24T08:29:47.081Z] Parsing JSON...
+[2026-02-24T08:29:47.086Z] Data acquired. marketDetails length=4
+[2026-02-24T08:29:47.086Z] Parsing complete. Returning JSON...
+[2026-02-24T08:29:49.302Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:29:49.539Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:29:49.540Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:29:49.540Z] [Service] Using memory cache.
+[2026-02-24T08:29:49.816Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:29:50.040Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:29:50.041Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:29:50.041Z] [Service] Creating fresh session. Fetching owner (userId=abac82fa-165e-4b57-9a6e-c903967a16d5)...
+[2026-02-24T08:29:50.698Z] [Service] Decrypting credentials...
+[2026-02-24T08:29:50.699Z] [Service] Calling createSession for lemicmelic@gmail.com (isDemo=true)...
+[2026-02-24T08:29:50.743Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:29:50.808Z] GET /api/prices?mode=demo
+[2026-02-24T08:29:50.813Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:29:50.956Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:29:50.957Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:29:50.958Z] [Service] Using memory cache.
+[2026-02-24T08:29:51.032Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:29:51.033Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:29:51.033Z] [Service] Using memory cache.
+[2026-02-24T08:29:51.034Z] Session acquired. accountIsDemo=false, cst=0hhrQ...
+[2026-02-24T08:29:51.034Z] Fetching from https://api-capital.backend-capital.com/api/v1/markets?epics=GOLD,OIL_CRUDE,EURUSD,BTCUSD
+[2026-02-24T08:29:51.251Z] [Service] Demo session failed: Capital.com Session Failed: 401 . Falling back to live...
+[2026-02-24T08:29:51.831Z] Response status: 200
+[2026-02-24T08:29:51.832Z] Parsing JSON...
+[2026-02-24T08:29:51.835Z] Data acquired. marketDetails length=4
+[2026-02-24T08:29:51.836Z] Parsing complete. Returning JSON...
+[2026-02-24T08:29:55.733Z] GET /api/prices?mode=demo
+[2026-02-24T08:29:55.736Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:29:56.383Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:29:56.384Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:29:56.385Z] [Service] Using memory cache.
+[2026-02-24T08:29:56.386Z] Session acquired. accountIsDemo=false, cst=0hhrQ...
+[2026-02-24T08:29:56.387Z] Fetching from https://api-capital.backend-capital.com/api/v1/markets?epics=GOLD,OIL_CRUDE,EURUSD,BTCUSD
+[2026-02-24T08:29:56.808Z] Response status: 200
+[2026-02-24T08:29:56.808Z] Parsing JSON...
+[2026-02-24T08:29:56.811Z] Data acquired. marketDetails length=4
+[2026-02-24T08:29:56.811Z] Parsing complete. Returning JSON...
+[2026-02-24T08:30:00.913Z] GET /api/prices?mode=demo
+[2026-02-24T08:30:00.916Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:30:01.884Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:30:01.885Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:30:01.885Z] [Service] Using memory cache.
+[2026-02-24T08:30:01.886Z] Session acquired. accountIsDemo=false, cst=0hhrQ...
+[2026-02-24T08:30:01.886Z] Fetching from https://api-capital.backend-capital.com/api/v1/markets?epics=GOLD,OIL_CRUDE,EURUSD,BTCUSD
+[2026-02-24T08:30:02.355Z] Response status: 200
+[2026-02-24T08:30:02.355Z] Parsing JSON...
+[2026-02-24T08:30:02.358Z] Data acquired. marketDetails length=4
+[2026-02-24T08:30:02.359Z] Parsing complete. Returning JSON...
+[2026-02-24T08:30:02.735Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:30:02.965Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:30:02.966Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:30:02.966Z] [Service] Using memory cache.
+[2026-02-24T08:30:05.725Z] GET /api/prices?mode=demo
+[2026-02-24T08:30:05.730Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:30:05.943Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:30:05.943Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:30:05.944Z] [Service] Using memory cache.
+[2026-02-24T08:30:05.944Z] Session acquired. accountIsDemo=false, cst=0hhrQ...
+[2026-02-24T08:30:05.945Z] Fetching from https://api-capital.backend-capital.com/api/v1/markets?epics=GOLD,OIL_CRUDE,EURUSD,BTCUSD
+[2026-02-24T08:30:06.193Z] Response status: 200
+[2026-02-24T08:30:06.194Z] Parsing JSON...
+[2026-02-24T08:30:06.199Z] Data acquired. marketDetails length=4
+[2026-02-24T08:30:06.200Z] Parsing complete. Returning JSON...
+[2026-02-24T08:30:10.749Z] GET /api/prices?mode=demo
+[2026-02-24T08:30:10.754Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:30:12.316Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:30:12.317Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:30:12.319Z] [Service] Using memory cache.
+[2026-02-24T08:30:12.320Z] Session acquired. accountIsDemo=false, cst=0hhrQ...
+[2026-02-24T08:30:12.321Z] Fetching from https://api-capital.backend-capital.com/api/v1/markets?epics=GOLD,OIL_CRUDE,EURUSD,BTCUSD
+[2026-02-24T08:30:13.042Z] Response status: 200
+[2026-02-24T08:30:13.042Z] Parsing JSON...
+[2026-02-24T08:30:13.045Z] Data acquired. marketDetails length=4
+[2026-02-24T08:30:13.045Z] Parsing complete. Returning JSON...
+[2026-02-24T08:30:14.721Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:30:14.936Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:30:14.936Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:30:14.937Z] [Service] Using memory cache.
+[2026-02-24T08:30:15.725Z] GET /api/prices?mode=demo
+[2026-02-24T08:30:15.728Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:30:15.941Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:30:15.942Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:30:15.942Z] [Service] Using memory cache.
+[2026-02-24T08:30:15.943Z] Session acquired. accountIsDemo=false, cst=0hhrQ...
+[2026-02-24T08:30:15.944Z] Fetching from https://api-capital.backend-capital.com/api/v1/markets?epics=GOLD,OIL_CRUDE,EURUSD,BTCUSD
+[2026-02-24T08:30:16.188Z] Response status: 200
+[2026-02-24T08:30:16.188Z] Parsing JSON...
+[2026-02-24T08:30:16.194Z] Data acquired. marketDetails length=4
+[2026-02-24T08:30:16.194Z] Parsing complete. Returning JSON...
+[2026-02-24T08:30:19.311Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:30:20.253Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:30:20.253Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:30:20.254Z] [Service] Using memory cache.
+[2026-02-24T08:30:20.767Z] GET /api/prices?mode=demo
+[2026-02-24T08:30:20.770Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:30:20.969Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:30:20.982Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:30:20.983Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:30:20.984Z] [Service] Using memory cache.
+[2026-02-24T08:30:20.984Z] Session acquired. accountIsDemo=false, cst=0hhrQ...
+[2026-02-24T08:30:20.985Z] Fetching from https://api-capital.backend-capital.com/api/v1/markets?epics=GOLD,OIL_CRUDE,EURUSD,BTCUSD
+[2026-02-24T08:30:21.229Z] Response status: 200
+[2026-02-24T08:30:21.229Z] Parsing JSON...
+[2026-02-24T08:30:21.233Z] Data acquired. marketDetails length=4
+[2026-02-24T08:30:21.234Z] Parsing complete. Returning JSON...
+[2026-02-24T08:30:21.618Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:30:21.618Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:30:21.619Z] [Service] Creating fresh session. Fetching owner (userId=abac82fa-165e-4b57-9a6e-c903967a16d5)...
+[2026-02-24T08:30:21.831Z] [Service] Decrypting credentials...
+[2026-02-24T08:30:21.832Z] [Service] Calling createSession for lemicmelic@gmail.com (isDemo=true)...
+[2026-02-24T08:30:22.415Z] [Service] Demo session failed: Capital.com Session Failed: 401 . Falling back to live...
+[2026-02-24T08:30:25.724Z] GET /api/prices?mode=demo
+[2026-02-24T08:30:25.727Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:30:25.941Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:30:25.942Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:30:25.942Z] [Service] Using memory cache.
+[2026-02-24T08:30:25.942Z] Session acquired. accountIsDemo=false, cst=0hhrQ...
+[2026-02-24T08:30:25.943Z] Fetching from https://api-capital.backend-capital.com/api/v1/markets?epics=GOLD,OIL_CRUDE,EURUSD,BTCUSD
+[2026-02-24T08:30:26.188Z] Response status: 200
+[2026-02-24T08:30:26.188Z] Parsing JSON...
+[2026-02-24T08:30:26.192Z] Data acquired. marketDetails length=4
+[2026-02-24T08:30:26.193Z] Parsing complete. Returning JSON...
+[2026-02-24T08:30:27.324Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:30:27.545Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:30:27.545Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:30:27.546Z] [Service] Using memory cache.
+[2026-02-24T08:30:30.727Z] GET /api/prices?mode=demo
+[2026-02-24T08:30:30.730Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:30:31.918Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:30:31.919Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:30:31.920Z] [Service] Using memory cache.
+[2026-02-24T08:30:31.921Z] Session acquired. accountIsDemo=false, cst=0hhrQ...
+[2026-02-24T08:30:31.922Z] Fetching from https://api-capital.backend-capital.com/api/v1/markets?epics=GOLD,OIL_CRUDE,EURUSD,BTCUSD
+[2026-02-24T08:30:32.439Z] Response status: 200
+[2026-02-24T08:30:32.439Z] Parsing JSON...
+[2026-02-24T08:30:32.462Z] Data acquired. marketDetails length=4
+[2026-02-24T08:30:32.463Z] Parsing complete. Returning JSON...
+[2026-02-24T08:30:35.724Z] GET /api/prices?mode=demo
+[2026-02-24T08:30:35.727Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:30:36.127Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:30:36.128Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:30:36.129Z] [Service] Using memory cache.
+[2026-02-24T08:30:36.130Z] Session acquired. accountIsDemo=false, cst=0hhrQ...
+[2026-02-24T08:30:36.131Z] Fetching from https://api-capital.backend-capital.com/api/v1/markets?epics=GOLD,OIL_CRUDE,EURUSD,BTCUSD
+[2026-02-24T08:30:36.458Z] Response status: 200
+[2026-02-24T08:30:36.458Z] Parsing JSON...
+[2026-02-24T08:30:36.465Z] Data acquired. marketDetails length=4
+[2026-02-24T08:30:36.466Z] Parsing complete. Returning JSON...
+[2026-02-24T08:30:38.726Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:30:40.075Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:30:40.075Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:30:40.076Z] [Service] Using memory cache.
+[2026-02-24T08:30:41.238Z] GET /api/prices?mode=demo
+[2026-02-24T08:30:41.241Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:30:41.662Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:30:41.663Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:30:41.663Z] [Service] Using memory cache.
+[2026-02-24T08:30:41.663Z] Session acquired. accountIsDemo=false, cst=0hhrQ...
+[2026-02-24T08:30:41.664Z] Fetching from https://api-capital.backend-capital.com/api/v1/markets?epics=GOLD,OIL_CRUDE,EURUSD,BTCUSD
+[2026-02-24T08:30:41.903Z] Response status: 200
+[2026-02-24T08:30:41.904Z] Parsing JSON...
+[2026-02-24T08:30:41.910Z] Data acquired. marketDetails length=4
+[2026-02-24T08:30:41.911Z] Parsing complete. Returning JSON...
+[2026-02-24T08:30:45.739Z] GET /api/prices?mode=demo
+[2026-02-24T08:30:45.742Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:30:47.480Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:30:47.482Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:30:47.482Z] [Service] Using memory cache.
+[2026-02-24T08:30:47.483Z] Session acquired. accountIsDemo=false, cst=0hhrQ...
+[2026-02-24T08:30:47.484Z] Fetching from https://api-capital.backend-capital.com/api/v1/markets?epics=GOLD,OIL_CRUDE,EURUSD,BTCUSD
+[2026-02-24T08:30:49.195Z] Response status: 200
+[2026-02-24T08:30:49.196Z] Parsing JSON...
+[2026-02-24T08:30:49.201Z] Data acquired. marketDetails length=4
+[2026-02-24T08:30:49.202Z] Parsing complete. Returning JSON...
+[2026-02-24T08:30:49.381Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:30:49.811Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:30:49.812Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:30:49.813Z] [Service] Using memory cache.
+[2026-02-24T08:30:50.555Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:30:50.786Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:30:50.787Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:30:50.787Z] [Service] Creating fresh session. Fetching owner (userId=abac82fa-165e-4b57-9a6e-c903967a16d5)...
+[2026-02-24T08:30:51.019Z] [Service] Decrypting credentials...
+[2026-02-24T08:30:51.020Z] [Service] Calling createSession for lemicmelic@gmail.com (isDemo=true)...
+[2026-02-24T08:30:51.675Z] [Service] Demo session failed: Capital.com Session Failed: 401 . Falling back to live...
+[2026-02-24T08:30:51.955Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:30:51.997Z] GET /api/prices?mode=demo
+[2026-02-24T08:30:52.000Z] [Service] getValidSession: userId=abac82fa-165e-4b57-9a6e-c903967a16d5, isDemo=true
+[2026-02-24T08:30:52.174Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:30:52.175Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:30:52.175Z] [Service] Using memory cache.
+[2026-02-24T08:30:52.214Z] [Service] Found 2 accounts in DB.
+[2026-02-24T08:30:52.215Z] [Service] Using account ID=0159f77c-26f2-4890-8275-e20eac022086
+[2026-02-24T08:30:52.216Z] [Service] Using memory cache.
+[2026-02-24T08:30:52.217Z] Session acquired. accountIsDemo=false, cst=0hhrQ...
+[2026-02-24T08:30:52.217Z] Fetching from https://api-capital.backend-capital.com/api/v1/markets?epics=GOLD,OIL_CRUDE,EURUSD,BTCUSD
