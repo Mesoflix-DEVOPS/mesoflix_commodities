@@ -47,9 +47,10 @@ interface SidebarProps {
     isCollapsed: boolean;
     setCollapsed: (val: boolean) => void;
     isMobileOpen: boolean;
+    onCloseMobile?: () => void;
 }
 
-export default function Sidebar({ isCollapsed, setCollapsed, isMobileOpen }: SidebarProps) {
+export default function Sidebar({ isCollapsed, setCollapsed, isMobileOpen, onCloseMobile }: SidebarProps) {
     const pathname = usePathname();
 
     return (
@@ -88,6 +89,9 @@ export default function Sidebar({ isCollapsed, setCollapsed, isMobileOpen }: Sid
                                     <Link
                                         key={item.name}
                                         href={item.href}
+                                        onClick={() => {
+                                            if (onCloseMobile) onCloseMobile();
+                                        }}
                                         className={cn(
                                             "flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-300 group relative",
                                             isActive
