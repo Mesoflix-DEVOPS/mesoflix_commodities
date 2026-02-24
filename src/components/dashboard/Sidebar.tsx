@@ -117,6 +117,9 @@ export default function Sidebar({ isCollapsed, setCollapsed, isMobileOpen, onClo
             <div className="p-4 border-t border-white/5 space-y-1">
                 <Link
                     href="/dashboard/settings"
+                    onClick={() => {
+                        if (onCloseMobile) onCloseMobile();
+                    }}
                     className={cn(
                         "flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-300 text-gray-400 hover:text-white hover:bg-white/5",
                         pathname === "/dashboard/settings" && "bg-white/5 text-white"

@@ -18,12 +18,27 @@ const tabs = [
     { id: "profile", name: "My Profile", icon: User },
     { id: "security", name: "Security", icon: Shield },
     { id: "capital", name: "Capital Account", icon: CreditCard },
-    { id: "api", name: "API Management", icon: Key },
     { id: "notifications", name: "Notifications", icon: Bell },
 ];
 
 export default function SettingsPage() {
     const [activeTab, setActiveTab] = useState("profile");
+    const [userData, setUserData] = useState<any>(null);
+
+    // Fetch user data from DB once mounted if checking profile tab
+    // (We actually can just fetch it globally since it's the default view)
+    import("react").then(({ useEffect }) => {
+        useEffect(() => {
+            fetch('/api/user')
+                .then(res => res.json())
+                .then(data => {
+                    if (data?.user) {
+                        setUserData(data.user);
+                    }
+                })
+                .catch(console.error);
+        }, []);
+    });
 
     return (
         <div className="space-y-8 animate-in fade-in duration-700 max-w-5xl">
@@ -63,17 +78,14 @@ export default function SettingsPage() {
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                <InputGroup label="Full Name" placeholder="John Doe" />
-                                <InputGroup label="Email Address" placeholder="john@example.com" disabled />
-                                <InputGroup label="Trading Role" placeholder="Institutional Manager" disabled />
-                                <InputGroup label="Preferred Currency" placeholder="USD ($)" />
+                                <InputGroup label="Full Name" placeholder="Loading..." value={userData?.fullName || ""} disabled={true} />
+                                <InputGroup label="Email Address" placeholder="Loading..." value={userData?.email || ""} disabled={true} />
+                                <InputGroup label="Trading Role" placeholder="Loading..." value={userData?.role || "Trader"} disabled={true} />
+                                <InputGroup label="Preferred Currency" placeholder="USD ($)" disabled={true} />
                             </div>
 
-                            <div className="pt-6 border-t border-white/5">
-                                <button className="bg-teal text-dark-blue px-8 py-3 rounded-2xl font-black text-sm hover:shadow-[0_0_25px_rgba(0,191,166,0.3)] transition-all flex items-center gap-2">
-                                    <Save size={18} />
-                                    <span>COMMIT CHANGES</span>
-                                </button>
+                            <div className="pt-6 border-t border-white/5 opacity-50 cursor-not-allowed">
+                                <p className="text-xs text-gray-400">Profile identifying information is locked and managed separately for security compliance.</p>
                             </div>
                         </div>
                     )}
@@ -85,10 +97,10 @@ export default function SettingsPage() {
                                 <p className="text-xs text-gray-500">Manage your primary trading bridge credentials</p>
                             </div>
 
-                            <div className="p-8 bg-black/20 rounded-3xl border border-white/5 space-y-6">
-                                <div className="flex items-center justify-between">
+                            <div className="p-4 sm:p-8 bg-black/20 rounded-3xl border border-white/5 space-y-6">
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                                     <div className="flex items-center gap-4">
-                                        <div className="w-12 h-12 bg-teal/10 rounded-xl flex items-center justify-center border border-teal/20">
+                                        <div className="w-12 h-12 bg-teal/10 rounded-xl flex-shrink-0 flex items-center justify-center border border-teal/20">
                                             <CreditCard className="text-teal" size={24} />
                                         </div>
                                         <div>
@@ -96,7 +108,7 @@ export default function SettingsPage() {
                                             <p className="text-[10px] text-gray-500 uppercase font-black tracking-widest mt-1">Status: Active & Secure</p>
                                         </div>
                                     </div>
-                                    <button className="text-[10px] text-red-400 font-bold uppercase border border-red-400/20 px-3 py-1.5 rounded-lg hover:bg-red-400/10 transition-all">Disconnect</button>
+                                    <button className="text-[10px] text-red-400 font-bold uppercase border border-red-400/20 px-3 py-2 sm:py-1.5 rounded-lg hover:bg-red-400/10 transition-all text-center">Disconnect</button>
                                 </div>
                             </div>
 
