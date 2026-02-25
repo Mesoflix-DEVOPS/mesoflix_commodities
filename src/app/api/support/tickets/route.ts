@@ -5,6 +5,8 @@ import crypto from 'crypto';
 import { cookies } from 'next/headers';
 import { verifyAccessToken } from '@/lib/auth';
 
+export const dynamic = 'force-dynamic';
+
 const getUserIdFromSession = async () => {
     const cookieStore = await cookies();
     const token = cookieStore.get('access_token')?.value;

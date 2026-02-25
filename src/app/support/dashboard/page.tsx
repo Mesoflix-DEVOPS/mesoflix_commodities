@@ -40,27 +40,37 @@ export default function AgentDashboard() {
     const [showAuditModal, setShowAuditModal] = useState(false);
     const [isFreezing, setIsFreezing] = useState(false);
 
+    // Mobile responsive state for chat panes
+    const [mobileChatPane, setMobileChatPane] = useState<"QUEUE" | "CHAT" | "INTEL">("QUEUE");
+
+    const [sysUsers, setSysUsers] = useState<{ id: string, email: string, full_name: string | null, created_at: string, last_login_at: string | null, role: string, two_factor_enabled: boolean | null }[]>([]);
+
     const fileInputRef = useRef<HTMLInputElement>(null);
     const socketRef = useRef<Socket | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
-    // Fetch real ticket queue
+    // Fetch real ticket queue and users
     useEffect(() => {
-        const fetchQueues = async () => {
+        const fetchDashboardData = async () => {
             try {
-                const res = await fetch("/api/support/agent/tickets");
-                const data = await res.json();
-                if (data.tickets) {
-                    setTickets(data.tickets);
-                }
+                const [tickRes, userRes] = await Promise.all([
+                    fetch("/api/support/agent/tickets", { cache: "no-store" }),
+                    fetch("/api/support/agent/users", { cache: "no-store" })
+                ]);
+
+                const tickData = await tickRes.json();
+                if (tickData.tickets) setTickets(tickData.tickets);
+
+                const userData = await userRes.json();
+                if (userData.users) setSysUsers(userData.users);
             } catch (err) {
-                console.error("Failed to load generic queue:", err);
+                console.error("Failed to load generic queue or users:", err);
             } finally {
                 setLoading(false);
             }
         };
 
-        fetchQueues();
+        fetchDashboardData();
 
         // Connect global agent socket
         socketRef.current = io(window.location.origin, { path: "/api/socket" });
@@ -69,6 +79,7 @@ export default function AgentDashboard() {
 
     const handleSelectTicket = async (t: TicketNode) => {
         setSelectedTicket(t);
+        setMobileChatPane("CHAT");
 
         try {
             const res = await fetch(`/api/support/tickets/${t.id}`);
@@ -112,7 +123,7 @@ export default function AgentDashboard() {
             ticketId: selectedTicket.id,
             sender_type: "agent",
             message: input.trim(),
-            attachment_url: attachment || undefined,
+            attachment_url: attachment || null,
             created_at: new Date().toISOString()
         };
 
@@ -144,36 +155,36 @@ export default function AgentDashboard() {
     };
 
     return (
-        <div className="h-screen w-full flex bg-[#060D14] overflow-hidden">
-            {/* 1. Left Sidebar - Global Nav */}
-            <div className="w-16 h-full bg-[#0A1622] border-r border-white/5 flex flex-col items-center py-6 shrink-0 z-20">
-                <div className="w-8 h-8 bg-gradient-to-br from-teal to-dark-blue rounded-xl flex items-center justify-center border border-white/10 mb-8">
+        <div className="h-[100dvh] w-full flex flex-col md:flex-row bg-[#060D14] overflow-hidden">
+            {/* 1. Global Nav */}
+            <div className="w-full h-16 md:w-16 md:h-full bg-[#0A1622] border-b md:border-b-0 md:border-r border-white/5 flex flex-row md:flex-col items-center justify-between md:justify-start py-2 px-4 md:py-6 md:px-0 shrink-0 z-20">
+                <div className="w-8 h-8 md:mb-8 bg-gradient-to-br from-teal to-dark-blue rounded-xl flex items-center justify-center border border-white/10 shrink-0">
                     <span className="text-white font-bold text-xs">A</span>
                 </div>
 
-                <div className="flex-1 space-y-4 w-full px-2">
+                <div className="flex md:flex-col space-x-2 md:space-x-0 md:space-y-4 md:w-full md:px-2 flex-1 justify-center md:justify-start">
                     <button
                         onClick={() => setActiveTab("dashboard")}
-                        className={cn("w-full aspect-square flex flex-col items-center justify-center gap-1 rounded-xl transition-colors relative", activeTab === "dashboard" ? "text-teal bg-teal/10 border border-teal/20" : "text-gray-400 hover:text-white hover:bg-white/5")}
+                        className={cn("w-10 h-10 md:w-full md:aspect-square flex items-center justify-center rounded-xl transition-colors relative", activeTab === "dashboard" ? "text-teal bg-teal/10 border border-teal/20" : "text-gray-400 hover:text-white hover:bg-white/5")}
                     >
                         <LayoutDashboard size={20} />
                     </button>
                     <button
                         onClick={() => setActiveTab("chat")}
-                        className={cn("w-full aspect-square flex flex-col items-center justify-center gap-1 rounded-xl transition-colors relative", activeTab === "chat" ? "text-teal bg-teal/10 border border-teal/20" : "text-gray-400 hover:text-white hover:bg-white/5")}
+                        className={cn("w-10 h-10 md:w-full md:aspect-square flex items-center justify-center rounded-xl transition-colors relative", activeTab === "chat" ? "text-teal bg-teal/10 border border-teal/20" : "text-gray-400 hover:text-white hover:bg-white/5")}
                     >
                         <MessageSquare size={20} />
                         <div className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full" />
                     </button>
                     <button
                         onClick={() => setActiveTab("users")}
-                        className={cn("w-full aspect-square flex flex-col items-center justify-center gap-1 rounded-xl transition-colors relative", activeTab === "users" ? "text-teal bg-teal/10 border border-teal/20" : "text-gray-400 hover:text-white hover:bg-white/5")}
+                        className={cn("w-10 h-10 md:w-full md:aspect-square flex items-center justify-center rounded-xl transition-colors relative", activeTab === "users" ? "text-teal bg-teal/10 border border-teal/20" : "text-gray-400 hover:text-white hover:bg-white/5")}
                     >
                         <Users size={20} />
                     </button>
                 </div>
 
-                <button onClick={handleLogout} className="w-full aspect-square flex flex-col items-center justify-center text-gray-500 hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-colors mt-auto">
+                <button onClick={handleLogout} className="w-10 h-10 md:w-full md:aspect-square flex items-center justify-center text-gray-500 hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-colors md:mt-auto shrink-0">
                     <LogOut size={20} />
                 </button>
             </div>
@@ -181,7 +192,7 @@ export default function AgentDashboard() {
             {activeTab === "chat" && (
                 <>
                     {/* 2. Queue Panel - Ticket List */}
-                    <div className="w-80 h-full bg-[#0A1622] border-r border-white/5 flex flex-col shrink-0 z-10">
+                    <div className={cn("w-full md:w-80 h-full bg-[#0A1622] border-r border-white/5 flex-col shrink-0 z-10", mobileChatPane === "QUEUE" ? "flex" : "hidden md:flex")}>
                         <div className="p-4 border-b border-white/5 space-y-4">
                             <h2 className="text-lg font-bold text-white tracking-tight">Support Queues</h2>
                             <div className="relative">
@@ -229,23 +240,27 @@ export default function AgentDashboard() {
                     </div>
 
                     {/* 3. Center Panel - Live Chat Center */}
-                    <div className="flex-1 flex flex-col bg-[#060D14] h-full relative z-0">
+                    <div className={cn("flex-1 flex-col bg-[#060D14] h-full relative z-0", mobileChatPane === "CHAT" ? "flex" : "hidden md:flex")}>
                         {selectedTicket ? (
                             <>
-                                <div className="h-[70px] border-b border-white/5 px-6 flex items-center justify-between shrink-0 bg-[#0A1622]/50 backdrop-blur-md z-10">
-                                    <div>
-                                        <h2 className="text-lg font-bold text-white flex items-center gap-3">
-                                            {selectedTicket.subject}
-                                            <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full border border-teal/20 text-teal bg-teal/10">Connected</span>
-                                        </h2>
-                                        <p className="text-xs text-gray-500 flex items-center gap-2 mt-0.5">
-                                            User ID: <span className="font-mono text-gray-400">{selectedTicket.user_id}</span> • Opened: {new Date(selectedTicket.created_at).toLocaleTimeString()}
-                                        </p>
+                                <div className="h-[70px] border-b border-white/5 px-2 md:px-6 flex items-center justify-between shrink-0 bg-[#0A1622]/50 backdrop-blur-md z-10">
+                                    <div className="flex items-center gap-2 md:gap-4">
+                                        <button onClick={() => setMobileChatPane("QUEUE")} className="p-2 md:hidden text-gray-400 hover:text-white"><LogOut className="w-5 h-5 rotate-180" /></button>
+                                        <div>
+                                            <h2 className="text-sm md:text-lg font-bold text-white flex items-center gap-2 md:gap-3 truncate max-w-[150px] md:max-w-[400px]">
+                                                {selectedTicket.subject}
+                                                <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full border border-teal/20 text-teal bg-teal/10 hidden md:inline-flex">Connected</span>
+                                            </h2>
+                                            <p className="text-[10px] md:text-xs text-gray-500 flex items-center gap-2 mt-0.5">
+                                                User ID: <span className="font-mono text-gray-400 truncate max-w-[80px] md:max-w-none">{selectedTicket.user_id}</span> • Opened: {new Date(selectedTicket.created_at).toLocaleTimeString()}
+                                            </p>
+                                        </div>
                                     </div>
-                                    <div className="flex items-center gap-3">
-                                        <button className="px-3 py-1.5 text-xs font-bold bg-yellow-500/10 text-yellow-500 border border-yellow-500/20 rounded-lg hover:bg-yellow-500/20 transition-colors">PENDING</button>
-                                        <button className="px-3 py-1.5 text-xs font-bold bg-white/5 text-gray-400 border border-white/10 rounded-lg hover:bg-white/10 transition-colors">CLOSE TICKET</button>
-                                        <div className="w-px h-6 bg-white/10 mx-1" />
+                                    <div className="flex items-center gap-1 md:gap-3">
+                                        <button onClick={() => setMobileChatPane("INTEL")} className="p-2 md:hidden text-teal bg-teal/10 rounded-lg border border-teal/20"><Activity size={16} /></button>
+                                        <button className="hidden md:block px-3 py-1.5 text-xs font-bold bg-yellow-500/10 text-yellow-500 border border-yellow-500/20 rounded-lg hover:bg-yellow-500/20 transition-colors">PENDING</button>
+                                        <button className="hidden md:block px-3 py-1.5 text-xs font-bold bg-white/5 text-gray-400 border border-white/10 rounded-lg hover:bg-white/10 transition-colors">CLOSE TICKET</button>
+                                        <div className="hidden md:block w-px h-6 bg-white/10 mx-1" />
                                         <button className="p-2 text-gray-400 hover:text-white rounded-lg transition-colors"><MoreVertical size={16} /></button>
                                     </div>
                                 </div>
@@ -357,9 +372,10 @@ export default function AgentDashboard() {
                     </div>
 
                     {/* 4. Right Sidebar - User Intelligence Panel */}
-                    <div className="w-80 h-full bg-[#0A1622] border-l border-white/5 flex flex-col shrink-0 z-10 overflow-y-auto scrollbar-hide">
+                    <div className={cn("w-full md:w-80 h-full bg-[#0A1622] md:border-l border-white/5 flex-col shrink-0 z-10 overflow-y-auto scrollbar-hide", mobileChatPane === "INTEL" ? "flex" : "hidden md:flex")}>
                         {selectedTicket ? (
-                            <div className="p-6 space-y-8 animate-in slide-in-from-right-4 duration-500">
+                            <div className="p-4 md:p-6 space-y-6 md:space-y-8 animate-in slide-in-from-right-4 duration-500">
+                                <button onClick={() => setMobileChatPane("CHAT")} className="md:hidden flex items-center gap-2 text-sm text-gray-400 mb-4 bg-white/5 px-3 py-1.5 rounded-lg w-fit"><LogOut className="w-4 h-4 rotate-180" /> Back to Chat</button>
                                 {/* Status Integrity Header */}
                                 <div className="bg-[#162B40] border border-white/5 rounded-2xl p-4 flex items-start gap-4">
                                     <div className="w-10 h-10 rounded-full bg-teal/10 border border-teal/20 flex items-center justify-center shrink-0">
@@ -456,22 +472,75 @@ export default function AgentDashboard() {
             )}
 
             {activeTab === "users" && (
-                <div className="flex-1 overflow-y-auto p-12 bg-[#060D14]">
-                    <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in zoom-in-95 duration-500">
-                        <div className="flex justify-between items-end">
+                <div className="flex-1 h-full overflow-y-auto p-4 md:p-12 bg-[#060D14]">
+                    <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in zoom-in-95 duration-500 pb-20">
+                        <div className="flex flex-col md:flex-row md:justify-between md:items-end gap-4">
                             <div>
-                                <h1 className="text-3xl font-bold text-white tracking-tight">User Management</h1>
-                                <p className="text-gray-400 mt-2">Advanced search and CRM view.</p>
+                                <h1 className="text-2xl md:text-3xl font-bold text-white tracking-tight">CRM Directory</h1>
+                                <p className="text-gray-400 mt-1 md:mt-2 text-sm md:text-base">Comprehensive user management and administration.</p>
                             </div>
-                            <div className="relative w-80">
+                            <div className="relative w-full md:w-80 shrink-0">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 w-4 h-4" />
                                 <input type="text" placeholder="Search UUID, email..." className="w-full bg-[#162B40] border border-white/5 rounded-lg py-2 pl-9 pr-3 text-sm text-white focus:border-teal/50" />
                             </div>
                         </div>
-                        <div className="bg-[#0A1622] rounded-2xl border border-white/5 p-12 text-center flex flex-col items-center">
-                            <Users className="w-16 h-16 text-teal opacity-20 mb-4" />
-                            <h2 className="text-xl font-bold text-white">Full CRM Directory Empty</h2>
-                            <p className="text-gray-400 max-w-md mt-2">The full user directory is currently inaccessible in this restricted environment.</p>
+
+                        <div className="bg-[#0A1622] rounded-2xl border border-white/5 overflow-hidden">
+                            <div className="overflow-x-auto hide-scrollbar">
+                                <table className="w-full text-left bg-[#0A1622]">
+                                    <thead className="bg-[#162B40]/50 border-b border-white/5">
+                                        <tr>
+                                            <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">User</th>
+                                            <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider hidden md:table-cell">Role / Status</th>
+                                            <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider hidden lg:table-cell">Joined</th>
+                                            <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-white/5">
+                                        {sysUsers.map((user) => (
+                                            <tr key={user.id} className="hover:bg-white/5 transition-colors group">
+                                                <td className="px-6 py-4">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-teal/20 to-dark-blue flex items-center justify-center border border-white/10 shrink-0">
+                                                            <span className="text-teal font-bold">{user.email.charAt(0).toUpperCase()}</span>
+                                                        </div>
+                                                        <div>
+                                                            <h3 className="text-sm font-bold text-white">{user.full_name || "Unverified User"}</h3>
+                                                            <p className="text-xs text-gray-500">{user.email}</p>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4 hidden md:table-cell">
+                                                    <span className="text-xs font-bold text-teal bg-teal/10 border border-teal/20 px-2 py-1 rounded-full uppercase tracking-wider">
+                                                        {user.role}
+                                                    </span>
+                                                    {user.two_factor_enabled && (
+                                                        <span className="ml-2 text-[10px] text-yellow-500 border border-yellow-500/20 px-1.5 py-0.5 rounded-md uppercase">2FA ON</span>
+                                                    )}
+                                                </td>
+                                                <td className="px-6 py-4 hidden lg:table-cell">
+                                                    <span className="text-sm text-gray-400 font-mono">
+                                                        {new Date(user.created_at).toLocaleDateString()}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4 text-right">
+                                                    <button className="px-3 py-1.5 bg-[#162B40] border border-white/5 group-hover:bg-teal group-hover:text-[#060D14] text-gray-400 transition-colors font-bold text-xs rounded-lg">
+                                                        Manage
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                        {sysUsers.length === 0 && !loading && (
+                                            <tr>
+                                                <td colSpan={4} className="py-24 text-center">
+                                                    <Users className="w-12 h-12 text-teal opacity-20 mx-auto mb-4" />
+                                                    <span className="text-gray-400 text-sm">No users found.</span>
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
                 </div>

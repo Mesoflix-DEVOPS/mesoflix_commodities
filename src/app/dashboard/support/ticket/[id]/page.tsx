@@ -10,7 +10,7 @@ interface Message {
     id: string;
     sender_type: "user" | "agent";
     message: string;
-    attachment_url?: string;
+    attachment_url?: string | null;
     created_at: string;
 }
 
@@ -116,7 +116,7 @@ export default function LiveChatPage({ params }: { params: Promise<{ id: string 
             ticketId: id,
             sender_type: "user" as const,
             message: input.trim(),
-            attachment_url: attachment || undefined,
+            attachment_url: attachment || null,
             created_at: new Date().toISOString()
         };
 
@@ -148,6 +148,24 @@ export default function LiveChatPage({ params }: { params: Promise<{ id: string 
         }
     };
 
+    const handleCloseTicket = async () => {
+        if (!confirm("Are you sure you want to permanently close and lock this ticket?")) return;
+
+        try {
+            const res = await fetch(`/api/support/tickets/${id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ status: "CLOSED" })
+            });
+
+            if (res.ok) {
+                setTicket(prev => prev ? { ...prev, status: "CLOSED" } : null);
+            }
+        } catch (err) {
+            console.error("Failed to close ticket:", err);
+        }
+    };
+
     if (loading) {
         return (
             <div className="h-[80vh] flex flex-col items-center justify-center space-y-4">
@@ -168,7 +186,7 @@ export default function LiveChatPage({ params }: { params: Promise<{ id: string 
     }
 
     return (
-        <div className="max-w-4xl mx-auto h-[calc(100vh-120px)] flex flex-col animate-in fade-in zoom-in-95 duration-500">
+        <div className="max-w-4xl mx-auto h-[calc(100dvh-120px)] min-h-[500px] flex flex-col animate-in fade-in zoom-in-95 duration-500">
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 shrink-0">
                 <div className="space-y-1">
@@ -196,6 +214,14 @@ export default function LiveChatPage({ params }: { params: Promise<{ id: string 
                         <span>TKT-{ticket.id.substring(0, 6)}</span>
                     </div>
                 </div>
+                {ticket.status !== "CLOSED" && (
+                    <button
+                        onClick={handleCloseTicket}
+                        className="px-4 py-2 bg-white/5 hover:bg-white/10 text-gray-300 rounded-xl text-sm font-bold transition-colors border border-white/10 shrink-0 self-start md:self-auto"
+                    >
+                        Close Ticket
+                    </button>
+                )}
             </div>
 
             {/* Chat Container */}

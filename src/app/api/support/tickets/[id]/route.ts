@@ -3,6 +3,8 @@ import { db } from '@/lib/db';
 import { tickets, ticketMessages } from '@/lib/db/schema';
 import { eq, asc } from 'drizzle-orm';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
     try {
         const { id } = await params;
@@ -29,5 +31,25 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
             { error: "Internal Server Error" },
             { status: 500 }
         );
+    }
+}
+
+export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
+    try {
+        const { id } = await params;
+        const body = await req.json();
+
+        if (body.status === "CLOSED") {
+            await db.update(tickets)
+                .set({ status: "CLOSED" })
+                .where(eq(tickets.id, id));
+
+            return NextResponse.json({ success: true });
+        }
+
+        return NextResponse.json({ error: "Invalid status update" }, { status: 400 });
+    } catch (error) {
+        console.error("Failed to close ticket:", error);
+        return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
 }

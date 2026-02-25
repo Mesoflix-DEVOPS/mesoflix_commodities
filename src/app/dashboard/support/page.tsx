@@ -26,7 +26,7 @@ export default function SupportHubPage() {
     useEffect(() => {
         const fetchTickets = async () => {
             try {
-                const res = await fetch("/api/support/tickets");
+                const res = await fetch("/api/support/tickets", { cache: "no-store" });
                 if (res.ok) {
                     const data = await res.json();
                     if (data.tickets) {
