@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import {
     LayoutDashboard, MessageSquare, Users, ShieldAlert, LogOut,
     Search, Filter, Clock, CheckCircle2, AlertCircle, Phone, MonitorPlay,
-    Send, Paperclip, MoreVertical, ShieldCheck, FileText, Activity, Loader2
+    Send, Paperclip, MoreVertical, ShieldCheck, FileText, Activity, Loader2, X
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import io, { Socket } from "socket.io-client";
@@ -32,7 +32,11 @@ export default function AgentDashboard() {
     const [chatMessages, setChatMessages] = useState<any[]>([]);
     const [input, setInput] = useState("");
     const [loading, setLoading] = useState(true);
+    const [sending, setSending] = useState(false);
+    const [attachment, setAttachment] = useState<string | null>(null);
+    const [attachmentName, setAttachmentName] = useState<string | null>(null);
 
+    const fileInputRef = useRef<HTMLInputElement>(null);
     const socketRef = useRef<Socket | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -76,20 +80,47 @@ export default function AgentDashboard() {
         socketRef.current?.emit('join_ticket', t.id);
     };
 
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        if (file.size > 2 * 1024 * 1024) {
+            alert("File size must be less than 2MB to ensure real-time delivery performance.");
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            setAttachment(reader.result as string);
+            setAttachmentName(file.name);
+        };
+        reader.readAsDataURL(file);
+    };
+
     const handleSendMessage = (e: React.FormEvent) => {
         e.preventDefault();
-        if (!input.trim() || !selectedTicket) return;
+        if ((!input.trim() && !attachment) || !selectedTicket || sending) return;
+
+        setSending(true);
 
         const payload = {
             id: `msg_${Date.now()}`,
             ticketId: selectedTicket.id,
             sender_type: "agent",
             message: input.trim(),
+            attachment_url: attachment || undefined,
             created_at: new Date().toISOString()
         };
 
         setChatMessages(prev => [...prev, payload]);
+
+        const outgoingInput = input.trim();
+        const outgoingAttachment = attachment;
+
         setInput("");
+        setAttachment(null);
+        setAttachmentName(null);
+        if (fileInputRef.current) fileInputRef.current.value = "";
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
 
         socketRef.current?.emit('send_message', payload);
@@ -97,8 +128,10 @@ export default function AgentDashboard() {
         fetch(`/api/support/agent/tickets/${selectedTicket.id}/messages`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ message: input.trim() })
-        }).catch(err => console.error("Message persist failed", err));
+            body: JSON.stringify({ message: outgoingInput, attachmentUrl: outgoingAttachment })
+        })
+            .catch(err => console.error("Message persist failed", err))
+            .finally(() => setSending(false));
     };
 
     const handleLogout = () => {
@@ -213,7 +246,20 @@ export default function AgentDashboard() {
                                                 ? "bg-gradient-to-br from-teal to-[#009b86] text-white rounded-br-none shadow-lg"
                                                 : "bg-[#162B40] border border-white/5 text-gray-100 rounded-bl-none"
                                         )}>
-                                            <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.message}</p>
+                                            {msg.attachment_url && (
+                                                msg.attachment_url.startsWith("data:image/") ? (
+                                                    // eslint-disable-next-line @next/next/no-img-element
+                                                    <img src={msg.attachment_url} alt="Attachment" className="max-w-full rounded-xl mb-3 border border-white/10 max-h-64 object-contain" />
+                                                ) : (
+                                                    <a href={msg.attachment_url} download="Secure_Document" className="flex items-center gap-3 p-3 bg-black/20 rounded-xl mb-3 hover:bg-black/30 transition-colors border border-white/5">
+                                                        <div className="p-2 bg-white/10 rounded-lg shrink-0">
+                                                            <FileText size={18} className="text-white" />
+                                                        </div>
+                                                        <span className="text-sm font-medium truncate pr-4 text-white underline">Secure_Document_Attached</span>
+                                                    </a>
+                                                )
+                                            )}
+                                            {msg.message && <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.message}</p>}
                                             <div className={cn(
                                                 "mt-2 flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-mono opacity-60",
                                                 isAgent ? "justify-end text-white" : "justify-start text-gray-400"
@@ -227,9 +273,47 @@ export default function AgentDashboard() {
                             <div ref={messagesEndRef} />
                         </div>
 
-                        <div className="p-4 bg-[#0A1622] border-t border-white/5 shrink-0">
+                        <div className="p-4 bg-[#0A1622] border-t border-white/5 shrink-0 flex flex-col gap-3">
+                            {attachment && (
+                                <div className="flex items-center gap-3 bg-[#162B40] p-3 rounded-xl border border-teal/20 w-fit">
+                                    {attachment.startsWith("data:image/") ? (
+                                        // eslint-disable-next-line @next/next/no-img-element
+                                        <img src={attachment} alt="Preview" className="w-10 h-10 object-cover rounded bg-black/50" />
+                                    ) : (
+                                        <div className="w-10 h-10 bg-black/30 rounded flex items-center justify-center shrink-0">
+                                            <FileText size={16} className="text-teal" />
+                                        </div>
+                                    )}
+                                    <div className="flex flex-col mr-4 max-w-[200px]">
+                                        <span className="text-xs font-bold text-white truncate">{attachmentName}</span>
+                                        <span className="text-[10px] text-teal uppercase font-mono">Ready to Send</span>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setAttachment(null);
+                                            setAttachmentName(null);
+                                            if (fileInputRef.current) fileInputRef.current.value = "";
+                                        }}
+                                        className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-white/5 rounded-lg transition-colors"
+                                    >
+                                        <X size={14} />
+                                    </button>
+                                </div>
+                            )}
                             <form onSubmit={handleSendMessage} className="flex items-center gap-3">
-                                <button type="button" className="p-3 text-gray-500 hover:text-teal hover:bg-white/5 rounded-xl transition-all h-[52px]">
+                                <input
+                                    type="file"
+                                    className="hidden"
+                                    ref={fileInputRef}
+                                    onChange={handleFileChange}
+                                    accept="image/*,.pdf,.doc,.docx,.txt"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => fileInputRef.current?.click()}
+                                    className="p-3 text-gray-500 hover:text-teal hover:bg-white/5 rounded-xl transition-all h-[52px]"
+                                >
                                     <Paperclip size={20} />
                                 </button>
                                 <input
@@ -241,10 +325,10 @@ export default function AgentDashboard() {
                                 />
                                 <button
                                     type="submit"
-                                    disabled={!input.trim()}
+                                    disabled={(!input.trim() && !attachment) || sending}
                                     className="px-6 h-[52px] bg-gradient-to-r from-teal to-[#009b86] hover:from-[#00b39b] hover:to-teal disabled:opacity-50 text-[#0A1622] rounded-xl font-bold flex items-center justify-center transition-all shadow-md group shrink-0"
                                 >
-                                    <Send className="w-5 h-5 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
+                                    {sending ? <Loader2 size={20} className="animate-spin" /> : <Send className="w-5 h-5 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />}
                                 </button>
                             </form>
                         </div>

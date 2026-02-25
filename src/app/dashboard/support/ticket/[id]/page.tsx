@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, use } from "react";
-import { ArrowLeft, Send, Paperclip, CheckCheck, Loader2, AlertCircle, Clock, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Send, Paperclip, CheckCheck, Loader2, AlertCircle, Clock, ShieldCheck, X, FileText } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import io, { Socket } from "socket.io-client";
@@ -10,6 +10,7 @@ interface Message {
     id: string;
     sender_type: "user" | "agent";
     message: string;
+    attachment_url?: string;
     created_at: string;
 }
 
@@ -25,9 +26,12 @@ export default function LiveChatPage({ params }: { params: Promise<{ id: string 
     const [ticket, setTicket] = useState<Ticket | null>(null);
     const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState("");
+    const [attachment, setAttachment] = useState<string | null>(null);
+    const [attachmentName, setAttachmentName] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [sending, setSending] = useState(false);
 
+    const fileInputRef = useRef<HTMLInputElement>(null);
     const socketRef = useRef<Socket | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -84,28 +88,64 @@ export default function LiveChatPage({ params }: { params: Promise<{ id: string 
         scrollToBottom();
     }, [messages]);
 
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        if (file.size > 2 * 1024 * 1024) {
+            alert("File size must be less than 2MB to ensure real-time delivery performance.");
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            setAttachment(reader.result as string);
+            setAttachmentName(file.name);
+        };
+        reader.readAsDataURL(file);
+    };
+
     const handleSendMessage = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!input.trim() || ticket?.status === "CLOSED") return;
+        if ((!input.trim() && !attachment) || ticket?.status === "CLOSED" || sending) return;
+
+        setSending(true);
 
         const payload = {
             id: `temp_${Date.now()}`,
             ticketId: id,
             sender_type: "user" as const,
             message: input.trim(),
+            attachment_url: attachment || undefined,
             created_at: new Date().toISOString()
         };
 
         // Optimistic UI Update
         setMessages(prev => [...prev, payload]);
+        const outgoingInput = input.trim();
+        const outgoingAttachment = attachment;
+
         setInput("");
+        setAttachment(null);
+        setAttachmentName(null);
+        if (fileInputRef.current) fileInputRef.current.value = "";
         scrollToBottom();
 
         // Broadcast to WebSocket Room
         socketRef.current?.emit('send_message', payload);
 
-        // TODO: Also POST to an endpoint to persist to Postgres
-        // fetch(`/api/support/tickets/${id}/messages`, { method: "POST", body: ... })
+        // Persist to Postgres
+        try {
+            await fetch(`/api/support/tickets/${id}/messages`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ message: outgoingInput, attachmentUrl: outgoingAttachment })
+            });
+        } catch (err) {
+            console.error("Failed to persist message", err);
+        } finally {
+            setSending(false);
+        }
     };
 
     if (loading) {
@@ -179,7 +219,21 @@ export default function LiveChatPage({ params }: { params: Promise<{ id: string 
                                             ? "bg-gradient-to-br from-teal to-[#009b86] text-white rounded-br-none shadow-[0_5px_15px_rgba(0,191,166,0.1)]"
                                             : "bg-[#162B40] border border-white/5 text-gray-100 rounded-bl-none"
                                     )}>
-                                        <p className="text-[15px] leading-relaxed whitespace-pre-wrap">{msg.message}</p>
+                                        {msg.attachment_url && (
+                                            msg.attachment_url.startsWith("data:image/") ? (
+                                                // eslint-disable-next-line @next/next/no-img-element
+                                                <img src={msg.attachment_url} alt="Attachment" className="max-w-full rounded-xl mb-3 border border-white/10 max-h-64 object-contain" />
+                                            ) : (
+                                                <a href={msg.attachment_url} download="Secure_Document" className="flex items-center gap-3 p-3 bg-black/20 rounded-xl mb-3 hover:bg-black/30 transition-colors border border-white/5">
+                                                    <div className="p-2 bg-white/10 rounded-lg shrink-0">
+                                                        <FileText size={18} className="text-white" />
+                                                    </div>
+                                                    <span className="text-sm font-medium truncate pr-4 text-white underline">Secure_Document_Attached</span>
+                                                </a>
+                                            )
+                                        )}
+                                        {msg.message && <p className="text-[15px] leading-relaxed whitespace-pre-wrap">{msg.message}</p>}
+
                                         <div className={cn(
                                             "mt-2 flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-mono opacity-60",
                                             isUser ? "justify-end text-white" : "justify-start text-gray-400"
@@ -201,9 +255,47 @@ export default function LiveChatPage({ params }: { params: Promise<{ id: string 
                         <p className="text-red-400 font-medium text-sm">This ticket has been permanently locked and resolved.</p>
                     </div>
                 ) : (
-                    <div className="p-4 bg-[#0A1622] border-t border-white/5">
+                    <div className="p-4 bg-[#0A1622] border-t border-white/5 flex flex-col gap-3">
+                        {attachment && (
+                            <div className="flex items-center gap-3 bg-[#162B40] p-3 rounded-xl border border-teal/20 w-fit">
+                                {attachment.startsWith("data:image/") ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img src={attachment} alt="Preview" className="w-10 h-10 object-cover rounded bg-black/50" />
+                                ) : (
+                                    <div className="w-10 h-10 bg-black/30 rounded flex items-center justify-center shrink-0">
+                                        <FileText size={16} className="text-teal" />
+                                    </div>
+                                )}
+                                <div className="flex flex-col mr-4 max-w-[200px]">
+                                    <span className="text-xs font-bold text-white truncate">{attachmentName}</span>
+                                    <span className="text-[10px] text-teal uppercase font-mono">Ready to Send</span>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setAttachment(null);
+                                        setAttachmentName(null);
+                                        if (fileInputRef.current) fileInputRef.current.value = "";
+                                    }}
+                                    className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-white/5 rounded-lg transition-colors"
+                                >
+                                    <X size={14} />
+                                </button>
+                            </div>
+                        )}
                         <form onSubmit={handleSendMessage} className="flex items-center gap-3">
-                            <button type="button" className="p-3 text-gray-500 hover:text-teal hover:bg-white/5 rounded-xl transition-all h-[52px]">
+                            <input
+                                type="file"
+                                className="hidden"
+                                ref={fileInputRef}
+                                onChange={handleFileChange}
+                                accept="image/*,.pdf,.doc,.docx,.txt"
+                            />
+                            <button
+                                type="button"
+                                onClick={() => fileInputRef.current?.click()}
+                                className="p-3 text-gray-500 hover:text-teal hover:bg-white/5 rounded-xl transition-all h-[52px]"
+                            >
                                 <Paperclip size={20} />
                             </button>
                             <input
@@ -215,10 +307,10 @@ export default function LiveChatPage({ params }: { params: Promise<{ id: string 
                             />
                             <button
                                 type="submit"
-                                disabled={!input.trim()}
+                                disabled={(!input.trim() && !attachment) || sending}
                                 className="px-6 h-[52px] bg-gradient-to-r from-teal to-[#009b86] hover:from-[#00b39b] hover:to-teal disabled:opacity-50 disabled:cursor-not-allowed text-[#0A1622] rounded-xl font-bold flex items-center justify-center transition-all shadow-md group shrink-0"
                             >
-                                <Send className="w-5 h-5 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
+                                {sending ? <Loader2 size={20} className="animate-spin" /> : <Send className="w-5 h-5 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />}
                             </button>
                         </form>
                     </div>
