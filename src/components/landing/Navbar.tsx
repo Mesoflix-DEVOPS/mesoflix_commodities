@@ -14,8 +14,8 @@ const Navbar = () => {
     const { theme, setTheme } = useTheme();
     const [mounted, setMounted] = useState(false);
 
-    // Hide navbar on auth and dashboard pages
-    const isHiddenPage = pathname === "/login" || pathname === "/register" || pathname?.startsWith("/dashboard");
+    // Hide navbar on auth, dashboard, and support portal pages
+    const isHiddenPage = pathname === "/login" || pathname === "/register" || pathname?.startsWith("/dashboard") || pathname?.startsWith("/support");
 
     // Prevent hydration mismatch
     useEffect(() => {

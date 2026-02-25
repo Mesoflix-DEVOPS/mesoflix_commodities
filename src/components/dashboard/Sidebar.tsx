@@ -12,6 +12,7 @@ import {
     History,
     Cpu,
     Settings,
+    Headset,
     ChevronLeft,
     ChevronRight,
     TrendingUp,
@@ -36,7 +37,7 @@ const menuGroups = [
     {
         label: "Management",
         items: [
-            { name: "Analytics", icon: PieChart, href: "/dashboard/analytics" },
+            { name: "Support Hub", icon: Headset, href: "/dashboard/support" },
             { name: "Transactions", icon: History, href: "/dashboard/transactions" },
         ]
     }

@@ -1,0 +1,444 @@
+{
+  "Test_1_NoDates": {
+    "activities": []
+  },
+  "Test_2_24Hours": {
+    "activities": [
+      {
+        "date": "2026-02-25T01:52:03.686",
+        "dateUTC": "2026-02-24T22:52:03.686",
+        "epic": "EURUSD",
+        "dealId": "00000000-49c8-d792-044f-e3bd001c241e",
+        "source": "USER",
+        "type": "WORKING_ORDER",
+        "status": "EXECUTED"
+      },
+      {
+        "date": "2026-02-25T01:52:03.685",
+        "dateUTC": "2026-02-24T22:52:03.685",
+        "epic": "EURUSD",
+        "dealId": "00000000-49c8-d777-044f-e3bd001c241e",
+        "source": "USER",
+        "type": "POSITION",
+        "status": "ACCEPTED"
+      },
+      {
+        "date": "2026-02-25T01:50:08.094",
+        "dateUTC": "2026-02-24T22:50:08.094",
+        "epic": "EURUSD",
+        "dealId": "00000000-49c8-d774-044f-e3bd001c241e",
+        "source": "USER",
+        "type": "WORKING_ORDER",
+        "status": "EXECUTED"
+      },
+      {
+        "date": "2026-02-25T01:50:08.093",
+        "dateUTC": "2026-02-24T22:50:08.093",
+        "epic": "EURUSD",
+        "dealId": "00000000-49c8-d777-044f-e3bd001c241e",
+        "source": "USER",
+        "type": "POSITION",
+        "status": "ACCEPTED"
+      },
+      {
+        "date": "2026-02-24T23:33:58.195",
+        "dateUTC": "2026-02-24T20:33:58.195",
+        "epic": "GOLD",
+        "dealId": "00000000-49c8-4de3-044f-e3bd001c241e",
+        "source": "USER",
+        "type": "POSITION",
+        "status": "ACCEPTED"
+      },
+      {
+        "date": "2026-02-24T23:33:58.195",
+        "dateUTC": "2026-02-24T20:33:58.195",
+        "epic": "GOLD",
+        "dealId": "00000000-49c8-a7ea-044f-e3bd001c241e",
+        "source": "USER",
+        "type": "WORKING_ORDER",
+        "status": "EXECUTED"
+      },
+      {
+        "date": "2026-02-24T15:36:03.170",
+        "dateUTC": "2026-02-24T12:36:03.170",
+        "epic": "GOLD",
+        "dealId": "00000000-49c8-4de3-044f-e3bd001c241e",
+        "source": "USER",
+        "type": "POSITION",
+        "status": "ACCEPTED"
+      },
+      {
+        "date": "2026-02-24T15:36:03.170",
+        "dateUTC": "2026-02-24T12:36:03.170",
+        "epic": "GOLD",
+        "dealId": "00000000-49c8-4de0-044f-e3bd001c241e",
+        "source": "USER",
+        "type": "WORKING_ORDER",
+        "status": "EXECUTED"
+      },
+      {
+        "date": "2026-02-24T14:58:16.165",
+        "dateUTC": "2026-02-24T11:58:16.165",
+        "epic": "GOLD",
+        "dealId": "00000000-49c8-16fc-044f-e3bd001c241e",
+        "source": "USER",
+        "type": "POSITION",
+        "status": "ACCEPTED"
+      },
+      {
+        "date": "2026-02-24T14:58:16.165",
+        "dateUTC": "2026-02-24T11:58:16.165",
+        "epic": "GOLD",
+        "dealId": "00000000-49c8-48d8-044f-e3bd001c241e",
+        "source": "USER",
+        "type": "WORKING_ORDER",
+        "status": "EXECUTED"
+      },
+      {
+        "date": "2026-02-24T14:58:13.300",
+        "dateUTC": "2026-02-24T11:58:13.300",
+        "epic": "GOLD",
+        "dealId": "00000000-49c8-16cb-044f-e3bd001c241e",
+        "source": "USER",
+        "type": "POSITION",
+        "status": "ACCEPTED"
+      },
+      {
+        "date": "2026-02-24T14:58:13.300",
+        "dateUTC": "2026-02-24T11:58:13.300",
+        "epic": "GOLD",
+        "dealId": "00000000-49c8-48c7-044f-e3bd001c241e",
+        "source": "USER",
+        "type": "WORKING_ORDER",
+        "status": "EXECUTED"
+      },
+      {
+        "date": "2026-02-24T14:58:10.310",
+        "dateUTC": "2026-02-24T11:58:10.310",
+        "epic": "GOLD",
+        "dealId": "00000000-49c8-16d8-044f-e3bd001c241e",
+        "source": "USER",
+        "type": "POSITION",
+        "status": "ACCEPTED"
+      },
+      {
+        "date": "2026-02-24T14:58:10.310",
+        "dateUTC": "2026-02-24T11:58:10.310",
+        "epic": "GOLD",
+        "dealId": "00000000-49c8-48be-044f-e3bd001c241e",
+        "source": "USER",
+        "type": "WORKING_ORDER",
+        "status": "EXECUTED"
+      },
+      {
+        "date": "2026-02-24T14:58:06.907",
+        "dateUTC": "2026-02-24T11:58:06.907",
+        "epic": "GOLD",
+        "dealId": "00000000-49c8-3927-044f-e3bd001c241e",
+        "source": "USER",
+        "type": "POSITION",
+        "status": "ACCEPTED"
+      },
+      {
+        "date": "2026-02-24T14:58:06.907",
+        "dateUTC": "2026-02-24T11:58:06.907",
+        "epic": "GOLD",
+        "dealId": "00000000-49c8-48ad-044f-e3bd001c241e",
+        "source": "USER",
+        "type": "WORKING_ORDER",
+        "status": "EXECUTED"
+      },
+      {
+        "date": "2026-02-24T11:37:59.727",
+        "dateUTC": "2026-02-24T08:37:59.727",
+        "epic": "GOLD",
+        "dealId": "00000000-49c8-3924-044f-e3bd001c241e",
+        "source": "USER",
+        "type": "WORKING_ORDER",
+        "status": "EXECUTED"
+      },
+      {
+        "date": "2026-02-24T11:37:59.726",
+        "dateUTC": "2026-02-24T08:37:59.726",
+        "epic": "GOLD",
+        "dealId": "00000000-49c8-3927-044f-e3bd001c241e",
+        "source": "USER",
+        "type": "POSITION",
+        "status": "ACCEPTED"
+      },
+      {
+        "date": "2026-02-24T06:13:28.209",
+        "dateUTC": "2026-02-24T03:13:28.209",
+        "epic": "GOLD",
+        "dealId": "00000000-49c8-16fc-044f-e3bd001c241e",
+        "source": "USER",
+        "type": "POSITION",
+        "status": "ACCEPTED"
+      },
+      {
+        "date": "2026-02-24T06:13:28.209",
+        "dateUTC": "2026-02-24T03:13:28.209",
+        "epic": "GOLD",
+        "dealId": "00000000-49c8-16f9-044f-e3bd001c241e",
+        "source": "USER",
+        "type": "WORKING_ORDER",
+        "status": "EXECUTED"
+      },
+      {
+        "date": "2026-02-24T06:12:22.014",
+        "dateUTC": "2026-02-24T03:12:22.014",
+        "epic": "GOLD",
+        "dealId": "00000000-49c8-16f0-044f-e3bd001c241e",
+        "source": "USER",
+        "type": "WORKING_ORDER",
+        "status": "EXECUTED"
+      },
+      {
+        "date": "2026-02-24T06:12:22.013",
+        "dateUTC": "2026-02-24T03:12:22.013",
+        "epic": "GOLD",
+        "dealId": "00000000-49c8-16be-044f-e3bd001c241e",
+        "source": "USER",
+        "type": "POSITION",
+        "status": "ACCEPTED"
+      },
+      {
+        "date": "2026-02-24T06:10:09.306",
+        "dateUTC": "2026-02-24T03:10:09.306",
+        "epic": "GOLD",
+        "dealId": "00000000-49c8-16d8-044f-e3bd001c241e",
+        "source": "USER",
+        "type": "POSITION",
+        "status": "ACCEPTED"
+      },
+      {
+        "date": "2026-02-24T06:10:09.306",
+        "dateUTC": "2026-02-24T03:10:09.306",
+        "epic": "GOLD",
+        "dealId": "00000000-49c8-16d5-044f-e3bd001c241e",
+        "source": "USER",
+        "type": "WORKING_ORDER",
+        "status": "EXECUTED"
+      },
+      {
+        "date": "2026-02-24T06:10:07.466",
+        "dateUTC": "2026-02-24T03:10:07.466",
+        "epic": "GOLD",
+        "dealId": "00000000-49c8-16c8-044f-e3bd001c241e",
+        "source": "USER",
+        "type": "WORKING_ORDER",
+        "status": "EXECUTED"
+      },
+      {
+        "date": "2026-02-24T06:10:07.465",
+        "dateUTC": "2026-02-24T03:10:07.465",
+        "epic": "GOLD",
+        "dealId": "00000000-49c8-16cb-044f-e3bd001c241e",
+        "source": "USER",
+        "type": "POSITION",
+        "status": "ACCEPTED"
+      },
+      {
+        "date": "2026-02-24T06:10:05.946",
+        "dateUTC": "2026-02-24T03:10:05.946",
+        "epic": "GOLD",
+        "dealId": "00000000-49c8-16be-044f-e3bd001c241e",
+        "source": "USER",
+        "type": "POSITION",
+        "status": "ACCEPTED"
+      },
+      {
+        "date": "2026-02-24T06:10:05.946",
+        "dateUTC": "2026-02-24T03:10:05.946",
+        "epic": "GOLD",
+        "dealId": "00000000-49c8-16bb-044f-e3bd001c241e",
+        "source": "USER",
+        "type": "WORKING_ORDER",
+        "status": "EXECUTED"
+      },
+      {
+        "date": "2026-02-24T05:52:49.195",
+        "dateUTC": "2026-02-24T02:52:49.195",
+        "epic": "GOLD",
+        "dealId": "00000000-49c8-15b6-044f-e3bd001c241e",
+        "source": "USER",
+        "type": "POSITION",
+        "status": "ACCEPTED"
+      },
+      {
+        "date": "2026-02-24T05:52:49.195",
+        "dateUTC": "2026-02-24T02:52:49.195",
+        "epic": "GOLD",
+        "dealId": "00000000-49c8-15f6-044f-e3bd001c241e",
+        "source": "USER",
+        "type": "WORKING_ORDER",
+        "status": "EXECUTED"
+      },
+      {
+        "date": "2026-02-24T05:48:13.603",
+        "dateUTC": "2026-02-24T02:48:13.603",
+        "epic": "GOLD",
+        "dealId": "00000000-49c8-15b3-044f-e3bd001c241e",
+        "source": "USER",
+        "type": "WORKING_ORDER",
+        "status": "EXECUTED"
+      },
+      {
+        "date": "2026-02-24T05:48:13.602",
+        "dateUTC": "2026-02-24T02:48:13.602",
+        "epic": "GOLD",
+        "dealId": "00000000-49c8-15b6-044f-e3bd001c241e",
+        "source": "USER",
+        "type": "POSITION",
+        "status": "ACCEPTED"
+      },
+      {
+        "date": "2026-02-24T04:47:06.792",
+        "dateUTC": "2026-02-24T01:47:06.792",
+        "epic": "SILVER",
+        "dealId": "00000000-49c7-fd6b-044f-e3bd001c241e",
+        "source": "USER",
+        "type": "POSITION",
+        "status": "ACCEPTED"
+      },
+      {
+        "date": "2026-02-24T04:47:06.792",
+        "dateUTC": "2026-02-24T01:47:06.792",
+        "epic": "SILVER",
+        "dealId": "00000000-49c8-110e-044f-e3bd001c241e",
+        "source": "USER",
+        "type": "WORKING_ORDER",
+        "status": "EXECUTED"
+      },
+      {
+        "date": "2026-02-24T04:46:50.181",
+        "dateUTC": "2026-02-24T01:46:50.181",
+        "epic": "GOLD",
+        "dealId": "00000000-49c8-1062-044f-e3bd001c241e",
+        "source": "USER",
+        "type": "POSITION",
+        "status": "ACCEPTED"
+      },
+      {
+        "date": "2026-02-24T04:46:50.181",
+        "dateUTC": "2026-02-24T01:46:50.181",
+        "epic": "GOLD",
+        "dealId": "00000000-49c8-1105-044f-e3bd001c241e",
+        "source": "USER",
+        "type": "WORKING_ORDER",
+        "status": "EXECUTED"
+      },
+      {
+        "date": "2026-02-24T04:45:52.446",
+        "dateUTC": "2026-02-24T01:45:52.446",
+        "epic": "OIL_CRUDE",
+        "dealId": "00000000-49c7-fb36-044f-e3bd001c241e",
+        "source": "USER",
+        "type": "POSITION",
+        "status": "ACCEPTED"
+      },
+      {
+        "date": "2026-02-24T04:45:52.446",
+        "dateUTC": "2026-02-24T01:45:52.446",
+        "epic": "OIL_CRUDE",
+        "dealId": "00000000-49c8-10ac-044f-e3bd001c241e",
+        "source": "USER",
+        "type": "WORKING_ORDER",
+        "status": "EXECUTED"
+      },
+      {
+        "date": "2026-02-24T04:45:01.431",
+        "dateUTC": "2026-02-24T01:45:01.431",
+        "epic": "GOLD",
+        "dealId": "00000000-49c8-1062-044f-e3bd001c241e",
+        "source": "USER",
+        "type": "POSITION",
+        "status": "ACCEPTED"
+      },
+      {
+        "date": "2026-02-24T04:45:01.431",
+        "dateUTC": "2026-02-24T01:45:01.431",
+        "epic": "GOLD",
+        "dealId": "00000000-49c8-105f-044f-e3bd001c241e",
+        "source": "USER",
+        "type": "WORKING_ORDER",
+        "status": "EXECUTED"
+      },
+      {
+        "date": "2026-02-24T03:30:49.137",
+        "dateUTC": "2026-02-24T00:30:49.137",
+        "epic": "GOLD",
+        "dealId": "00000000-49c7-fc7e-044f-e3bd001c241e",
+        "source": "USER",
+        "type": "POSITION",
+        "status": "ACCEPTED"
+      },
+      {
+        "date": "2026-02-24T03:30:49.137",
+        "dateUTC": "2026-02-24T00:30:49.137",
+        "epic": "GOLD",
+        "dealId": "00000000-49c7-fdc3-044f-e3bd001c241e",
+        "source": "USER",
+        "type": "WORKING_ORDER",
+        "status": "EXECUTED"
+      },
+      {
+        "date": "2026-02-24T03:16:15.991",
+        "dateUTC": "2026-02-24T00:16:15.991",
+        "epic": "SILVER",
+        "dealId": "00000000-49c7-fd6b-044f-e3bd001c241e",
+        "source": "USER",
+        "type": "POSITION",
+        "status": "ACCEPTED"
+      },
+      {
+        "date": "2026-02-24T03:16:15.991",
+        "dateUTC": "2026-02-24T00:16:15.991",
+        "epic": "SILVER",
+        "dealId": "00000000-49c7-fd68-044f-e3bd001c241e",
+        "source": "USER",
+        "type": "WORKING_ORDER",
+        "status": "EXECUTED"
+      },
+      {
+        "date": "2026-02-24T03:03:33.777",
+        "dateUTC": "2026-02-24T00:03:33.777",
+        "epic": "GOLD",
+        "dealId": "00000000-49c7-fc7b-044f-e3bd001c241e",
+        "source": "USER",
+        "type": "WORKING_ORDER",
+        "status": "EXECUTED"
+      },
+      {
+        "date": "2026-02-24T03:03:33.776",
+        "dateUTC": "2026-02-24T00:03:33.776",
+        "epic": "GOLD",
+        "dealId": "00000000-49c7-fc7e-044f-e3bd001c241e",
+        "source": "USER",
+        "type": "POSITION",
+        "status": "ACCEPTED"
+      },
+      {
+        "date": "2026-02-24T02:56:59.151",
+        "dateUTC": "2026-02-23T23:56:59.151",
+        "epic": "OIL_CRUDE",
+        "dealId": "00000000-49c7-fb36-044f-e3bd001c241e",
+        "source": "USER",
+        "type": "POSITION",
+        "status": "ACCEPTED"
+      },
+      {
+        "date": "2026-02-24T02:56:59.151",
+        "dateUTC": "2026-02-23T23:56:59.151",
+        "epic": "OIL_CRUDE",
+        "dealId": "00000000-49c7-fb33-044f-e3bd001c241e",
+        "source": "USER",
+        "type": "WORKING_ORDER",
+        "status": "EXECUTED"
+      }
+    ]
+  },
+  "Test_3_7Days": {
+    "errorCode": "error.invalid.daterange"
+  }
+}

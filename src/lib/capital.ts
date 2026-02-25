@@ -143,35 +143,76 @@ export const getHistory = async (
     isDemo: boolean = false,
     options?: { from?: string | Date; to?: string | Date; max?: number }
 ) => {
-    const API_URL = getApiUrl(isDemo);
+    const API_URL = LIVE_API_URL; // Always use unified live server for history
 
-    const params = new URLSearchParams();
-    if (options?.from) {
-        const fromDate = typeof options.from === 'string' ? options.from : options.from.toISOString().split('.')[0];
-        params.append('from', fromDate);
+    const performFetch = async (currentFrom?: string | Date, currentTo?: string | Date) => {
+        const params = new URLSearchParams();
+        if (currentFrom) {
+            const fromStr = typeof currentFrom === 'string' ? currentFrom : currentFrom.toISOString().split('.')[0];
+            params.append('from', fromStr);
+        }
+        if (currentTo) {
+            const toStr = typeof currentTo === 'string' ? currentTo : currentTo.toISOString().split('.')[0];
+            params.append('to', toStr);
+        }
+        if (options?.max) {
+            params.append('max', options.max.toString());
+        }
+
+        const queryStr = params.toString() ? `?${params.toString()}` : '';
+
+        const response = await fetch(`${API_URL}/history/activity${queryStr}`, {
+            headers: {
+                'X-SECURITY-TOKEN': xSecurityToken,
+                'CST': cst,
+            },
+        });
+
+        if (!response.ok) {
+            // Check specifically for datarange errors immediately out of the REST payload
+            if (response.status === 400 || response.status === 500) {
+                const text = await response.text();
+                if (text.includes('error.invalid.daterange') || text.includes('error.history.invalid.daterange')) {
+                    return { errorCode: 'error.invalid.daterange', originalText: text };
+                }
+                throw new Error(`Failed to fetch history: ${response.status} - ${text}`);
+            }
+            throw new Error(`Failed to fetch history: ${response.status}`);
+        }
+
+        return response.json();
+    };
+
+    let result = await performFetch(options?.from, options?.to);
+
+    // If Capital.com rejects the date range (e.g. the 'from' date is before the account was created),
+    // iteratively shrink the requested window size from the left until it succeeds or drops to 1 day.
+    if (result && result.errorCode === 'error.invalid.daterange' && options?.from && options?.to) {
+        let fromTime = typeof options.from === 'string' ? new Date(options.from).getTime() : options.from.getTime();
+        const toTime = typeof options.to === 'string' ? new Date(options.to).getTime() : options.to.getTime();
+
+        let distance = toTime - fromTime;
+        const oneDay = 24 * 60 * 60 * 1000;
+
+        while (distance > oneDay) {
+            // Shrink the distance by half (binary search for the account inception date)
+            distance = Math.floor(distance / 2);
+            fromTime = toTime - distance;
+            const newFromDate = new Date(fromTime);
+
+            result = await performFetch(newFromDate, options.to);
+            if (!result || result.errorCode !== 'error.invalid.daterange') {
+                break; // Succeeded or failed with a different error
+            }
+        }
     }
-    if (options?.to) {
-        const toDate = typeof options.to === 'string' ? options.to : options.to.toISOString().split('.')[0];
-        params.append('to', toDate);
-    }
-    if (options?.max) {
-        params.append('max', options.max.toString());
+
+    if (result && result.errorCode === 'error.invalid.daterange') {
+        // If it still fails down to 1 day, drop the date requirement outright
+        result = await performFetch(undefined, undefined);
     }
 
-    const queryStr = params.toString() ? `?${params.toString()}` : '';
-
-    const response = await fetch(`${API_URL}/history/activity${queryStr}`, {
-        headers: {
-            'X-SECURITY-TOKEN': xSecurityToken,
-            'CST': cst,
-        },
-    });
-
-    if (!response.ok) {
-        throw new Error(`Failed to fetch history: ${response.status}`);
-    }
-
-    return response.json();
+    return result;
 };
 
 export const getMarketTickers = async (cst: string, xSecurityToken: string, epics: string[], isDemo: boolean = false) => {

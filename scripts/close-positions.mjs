@@ -1,6 +1,5 @@
 import { neon } from '@neondatabase/serverless';
 import crypto from 'crypto';
-import fs from 'fs';
 
 const DATABASE_URL = process.env.DATABASE_URL;
 const sql = neon(DATABASE_URL);
@@ -18,7 +17,7 @@ function decrypt(text) {
     } catch { return null; }
 }
 
-async function debugHistory() {
+async function closePositions() {
     const user = (await sql`SELECT * FROM users LIMIT 1`)[0];
     const creds = await sql`SELECT * FROM capital_accounts WHERE user_id = ${user.id}`;
     const acc = creds[0];
@@ -45,55 +44,49 @@ async function debugHistory() {
     const sessData = await sessRes.json();
     const accounts = sessData.accounts || [];
 
-    // 2. Identify Sub-accounts
+    // 2. Identify Demo Sub-account
     let demoAccs = accounts.filter(a => a.accountType === 'SPREADBET' || (a.accountName || '').toLowerCase().includes('demo'));
-    let realAccs = accounts.filter(a => a.accountType !== 'SPREADBET' && !(a.accountName || '').toLowerCase().includes('demo'));
-
-    if (demoAccs.length === 0 && realAccs.length > 1) {
+    if (demoAccs.length === 0) {
+        const realAccs = accounts.filter(a => a.accountType !== 'SPREADBET' && !(a.accountName || '').toLowerCase().includes('demo'));
         const gbpAcc = realAccs.find(a => a.currency === 'GBP');
         if (gbpAcc) demoAccs = [gbpAcc];
     }
-
     const demoAccId = demoAccs[0]?.accountId;
-    const realAccId = realAccs[0]?.accountId;
 
-    // Helper to fetch history
-    async function fetchAccHistory(accId, name) {
-        console.log(`\n\n=== Fetching ${name} HISTORY (${accId}) ===`);
-        // Switch context
-        await fetch(`${url}/session`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json', 'CST': cst, 'X-SECURITY-TOKEN': xst },
-            body: JSON.stringify({ accountId: accId })
+    if (!demoAccId) return console.log('No Demo account found.');
+
+    console.log(`\n=== Switching to DEMO (${demoAccId}) ===`);
+    await fetch(`${url}/session`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'CST': cst, 'X-SECURITY-TOKEN': xst },
+        body: JSON.stringify({ accountId: demoAccId })
+    });
+
+    // Fetch open positions
+    const posRes = await fetch(`${url}/positions`, {
+        headers: { 'CST': cst, 'X-SECURITY-TOKEN': xst }
+    });
+    const posData = await posRes.json();
+    console.log(`Found ${posData.positions?.length || 0} open positions.`);
+
+    for (const p of (posData.positions || [])) {
+        const dealId = p.position.dealId;
+        console.log(`Closing position: ${dealId}`);
+        const closeRes = await fetch(`${url}/positions/${dealId}`, {
+            method: 'DELETE',
+            headers: { 'CST': cst, 'X-SECURITY-TOKEN': xst }
         });
-
-        // Hardcoded valid timeframe testing
-        const testRanges = [
-            { label: "String Literal 7 Days", from: "2026-02-17T00:00:00", to: "2026-02-24T00:00:00" },
-            { label: "String Literal 1 Month", from: "2026-01-24T00:00:00", to: "2026-02-24T00:00:00" },
-            { label: "String Literal Native Offset", from: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().replace('Z', ''), to: new Date().toISOString().replace('Z', '') }
-        ];
-
-        const logOutput = {};
-
-        for (const range of testRanges) {
-            const res = await fetch(`${url}/history/activity?max=100&from=${range.from}&to=${range.to}`, {
-                headers: { 'CST': cst, 'X-SECURITY-TOKEN': xst }
-            });
-            const d = await res.json();
-            if (d.errorCode) {
-                logOutput[range.label] = `Failed: ${d.errorCode}`;
-            } else {
-                logOutput[range.label] = `Success! Length: ${d.activities ? d.activities.length : 0}`;
-            }
-        }
-
-        // Also dump the output directly to console safely
-        console.log(JSON.stringify(logOutput, null, 2));
+        const closeData = await closeRes.json();
+        console.log(`Close result:`, closeData);
     }
 
-    if (demoAccId) await fetchAccHistory(demoAccId, "DEMO");
-    if (realAccId) await fetchAccHistory(realAccId, "REAL");
+    // Now check history again!
+    console.log(`\n=== Checking DEMO HISTORY ===`);
+    const histRes = await fetch(`${url}/history/activity?max=100`, {
+        headers: { 'CST': cst, 'X-SECURITY-TOKEN': xst }
+    });
+    const histData = await histRes.json();
+    console.log(`History length: ${histData.activities ? histData.activities.length : 0}`);
 }
 
-debugHistory().catch(console.error);
+closePositions().catch(console.error);
