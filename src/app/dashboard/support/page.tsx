@@ -24,15 +24,23 @@ export default function SupportHubPage() {
     const [search, setSearch] = useState("");
 
     useEffect(() => {
-        // Fetch tickets from API
-        // For now, mockup data
-        setTimeout(() => {
-            setTickets([
-                { id: "1", subject: "My withdrawal is delayed", category: "Withdrawal", status: "OPEN", priority: "HIGH", created_at: new Date(Date.now() - 3600000).toISOString() },
-                { id: "2", subject: "Error connecting Capital.com", category: "Technical Issue", status: "CLOSED", priority: "NORMAL", created_at: new Date(Date.now() - 86400000).toISOString() }
-            ]);
-            setLoading(false);
-        }, 800);
+        const fetchTickets = async () => {
+            try {
+                const res = await fetch("/api/support/tickets");
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.tickets) {
+                        setTickets(data.tickets);
+                    }
+                }
+            } catch (err) {
+                console.error("Failed to load secure tickets:", err);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchTickets();
     }, []);
 
     const filteredTickets = tickets.filter(t =>

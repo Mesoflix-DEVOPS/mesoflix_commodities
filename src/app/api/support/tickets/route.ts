@@ -62,3 +62,30 @@ export async function POST(req: Request) {
         );
     }
 }
+
+export async function GET(req: Request) {
+    try {
+        const userId = await getUserIdFromSession();
+
+        if (!userId) {
+            return NextResponse.json({ error: "Unauthorized access" }, { status: 401 });
+        }
+
+        const userTickets = await db.query.tickets.findMany({
+            where: (tickets, { eq }) => eq(tickets.user_id, userId),
+            orderBy: (tickets, { desc }) => [desc(tickets.created_at)]
+        });
+
+        return NextResponse.json({
+            success: true,
+            tickets: userTickets
+        });
+
+    } catch (error) {
+        console.error("Failed to fetch user tickets:", error);
+        return NextResponse.json(
+            { error: "Internal Server Error" },
+            { status: 500 }
+        );
+    }
+}
