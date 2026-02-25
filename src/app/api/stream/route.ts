@@ -1,8 +1,7 @@
 import { NextRequest } from "next/server";
-import { getValidSession, getApiUrl } from "@/lib/capital-service";
+import { getValidSession } from "@/lib/capital-service";
 import { verifyAccessToken } from "@/lib/auth";
 import { cookies } from "next/headers";
-import WebSocket from "ws";
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -35,7 +34,6 @@ export async function GET(req: NextRequest) {
     const stream = new ReadableStream({
         async start(controller) {
             let isClosed = false;
-            let ws: WebSocket | null = null;
             let pollingTimer: NodeJS.Timeout | null = null;
 
             const sendEvent = (event: string, data: any) => {
@@ -48,113 +46,75 @@ export async function GET(req: NextRequest) {
                 }
             };
 
-            const wsUrl = getApiUrl(isDemo).replace('https://', 'wss://').replace('/api/v1', '/ws');
+            // Send initial ping to confirm connection
+            sendEvent('connected', { status: 'ok' });
 
-            try {
-                ws = new WebSocket(wsUrl);
+            const pollData = async () => {
+                if (isClosed) return;
+                try {
+                    const { getAccounts, getPositions, getMarketTickers } = await import('@/lib/capital');
 
-                ws.on('open', () => {
-                    console.log(`[Stream API] WebSocket Connected to ${wsUrl}`);
-                    ws?.send(JSON.stringify({
-                        destination: "marketData.subscribe",
-                        correlationId: "1",
-                        cst: session.cst,
-                        securityToken: session.xSecurityToken,
-                        payload: { epics }
-                    }));
+                    const [accountsData, positionsData, marketData] = await Promise.all([
+                        getAccounts(session.cst, session.xSecurityToken, false),
+                        getPositions(session.cst, session.xSecurityToken, false),
+                        getMarketTickers(session.cst, session.xSecurityToken, epics, isDemo)
+                    ]);
 
-                    // Aggressive pings every 30 seconds to keep connection alive indefinitely
-                    const pingInterval = setInterval(() => {
-                        if (ws?.readyState === 1) {
-                            ws.send(JSON.stringify({
-                                destination: "ping",
-                                correlationId: "ping",
-                                cst: session.cst,
-                                securityToken: session.xSecurityToken
-                            }));
-                        } else {
-                            clearInterval(pingInterval);
-                        }
-                    }, 30 * 1000);
-
-                    ws?.on('close', () => clearInterval(pingInterval));
-                    ws?.on('error', () => clearInterval(pingInterval));
-                });
-
-                ws.on('message', (dataRaw: any) => {
-                    try {
-                        const data = JSON.parse(dataRaw.toString());
-                        sendEvent('market-data', data);
-                    } catch (e) { }
-                });
-
-                ws.on('close', () => {
-                    console.log("[Stream API] WebSocket Closed.");
-                    sendEvent('system', { status: 'disconnected' });
-                    isClosed = true;
-                    cleanup();
-                });
-
-                ws.on('error', (err: any) => {
-                    console.error("[Stream API] WebSocket Error:", err);
-                    sendEvent('error', { message: 'WebSocket connection error' });
-                    isClosed = true;
-                    cleanup();
-                });
-
-                // Set up polling for balance and positions
-                const pollData = async () => {
-                    if (isClosed) return;
-                    try {
-                        const { getAccounts, getPositions } = await import('@/lib/capital');
-
-                        const [accountsData, positionsData] = await Promise.all([
-                            getAccounts(session.cst, session.xSecurityToken, false),
-                            getPositions(session.cst, session.xSecurityToken, false)
-                        ]);
-
-                        // Send balances separated by mode depending on current session
-                        if (accountsData?.accounts) {
-                            const activeAccountDetails = accountsData.accounts.find((a: any) => a.accountId === session.accountId);
-                            if (activeAccountDetails) {
-                                // Provide simple structure mimicking /api/balance route
-                                const balPayload = isDemo
-                                    ? { hasDemo: true, hasLive: true, demoBalance: activeAccountDetails.balance, realBalance: null }
-                                    : { hasDemo: true, hasLive: true, realBalance: activeAccountDetails.balance, demoBalance: null };
-                                sendEvent('balance', balPayload);
+                    // Send market data
+                    if (marketData && marketData.marketDetails) {
+                        for (const detail of marketData.marketDetails) {
+                            if (detail.instrument?.epic && detail.snapshot) {
+                                sendEvent('market-data', {
+                                    destination: 'quote',
+                                    payload: {
+                                        epic: detail.instrument.epic,
+                                        bid: detail.snapshot.bid,
+                                        offer: detail.snapshot.offer,
+                                        netChange: detail.snapshot.netChange,
+                                        percentageChange: detail.snapshot.percentageChange
+                                    }
+                                });
                             }
                         }
+                    }
 
-                        if (positionsData?.positions) {
-                            sendEvent('positions', positionsData.positions);
-                        }
-
-                    } catch (err: any) {
-                        // Silent fail on minor polling errors to not aggressively kill stream
-                        if (err.message?.includes('401') || err.message?.includes('session')) {
-                            // Token expiration, force close to trigger auto-reconnect from client side
-                            sendEvent('error', { message: 'Session expired during polling' });
-                            isClosed = true;
-                            cleanup();
+                    // Send balances separated by mode depending on current session
+                    if (accountsData?.accounts) {
+                        const activeAccountDetails = accountsData.accounts.find((a: any) => a.accountId === session.activeAccountId);
+                        if (activeAccountDetails) {
+                            // Provide simple structure mimicking /api/balance route
+                            const balPayload = isDemo
+                                ? { hasDemo: true, hasLive: true, demoBalance: activeAccountDetails.balance, realBalance: null }
+                                : { hasDemo: true, hasLive: true, realBalance: activeAccountDetails.balance, demoBalance: null };
+                            sendEvent('balance', balPayload);
                         }
                     }
-                };
 
-                // Poll immediately, then every 3 seconds
-                pollData();
-                pollingTimer = setInterval(pollData, 3000);
+                    if (positionsData?.positions) {
+                        sendEvent('positions', positionsData.positions);
+                    }
 
-            } catch (err: any) {
-                console.error("[Stream API] Failed to establish WebSocket:", err);
-                sendEvent('error', { message: "Internal stream creation error: " + err.message });
-                isClosed = true;
-                cleanup();
-            }
+                } catch (error) {
+                    const err = error as any;
+                    console.error("[Stream API] Polling loop error details:", err.message);
+                    // Silent fail on minor polling errors to not aggressively kill stream
+                    if (err.message?.includes('401') || err.message?.includes('session')) {
+                        console.error("[Stream API] Session expired, closing stream");
+                        // Token expiration, force close to trigger auto-reconnect from client side
+                        sendEvent('error', { message: 'Session expired during polling' });
+                        isClosed = true;
+                        cleanup();
+                    }
+                }
+            };
+
+            // Poll immediately, then every 3 seconds
+            pollData();
+            pollingTimer = setInterval(pollData, 3000);
 
             function cleanup() {
                 isClosed = true;
                 if (pollingTimer) clearInterval(pollingTimer);
-                if (ws?.readyState === 1) ws.close();
                 try { controller.close(); } catch { }
             }
 
