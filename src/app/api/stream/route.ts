@@ -106,29 +106,37 @@ export async function GET(req: NextRequest) {
                 const pollData = async () => {
                     if (isClosed) return;
                     try {
-                        const baseUrl = req.url.split('/api/stream')[0];
-                        // We use our own local API routes to avoid repeating Capital.com fetching logic 
-                        // and ensure the right current account resolution is used.
-                        const cookieHeader = req.headers.get('cookie') || '';
+                        const { getAccounts, getPositions } = await import('@/lib/capital');
 
-                        const [balRes, posRes] = await Promise.all([
-                            fetch(`${baseUrl}/api/balance`, { headers: { cookie: cookieHeader } }),
-                            fetch(`${baseUrl}/api/dashboard?mode=${mode}`, { headers: { cookie: cookieHeader } })
+                        const [accountsData, positionsData] = await Promise.all([
+                            getAccounts(session.cst, session.xSecurityToken, false),
+                            getPositions(session.cst, session.xSecurityToken, false)
                         ]);
 
-                        if (balRes.ok) {
-                            const balData = await balRes.json();
-                            sendEvent('balance', balData);
+                        // Send balances separated by mode depending on current session
+                        if (accountsData?.accounts) {
+                            const activeAccountDetails = accountsData.accounts.find((a: any) => a.accountId === session.accountId);
+                            if (activeAccountDetails) {
+                                // Provide simple structure mimicking /api/balance route
+                                const balPayload = isDemo
+                                    ? { hasDemo: true, hasLive: true, demoBalance: activeAccountDetails.balance, realBalance: null }
+                                    : { hasDemo: true, hasLive: true, realBalance: activeAccountDetails.balance, demoBalance: null };
+                                sendEvent('balance', balPayload);
+                            }
                         }
 
-                        if (posRes.ok) {
-                            const posData = await posRes.json();
-                            // dashboard returns { positions, history, accounts }
-                            sendEvent('positions', posData.positions || []);
+                        if (positionsData?.positions) {
+                            sendEvent('positions', positionsData.positions);
                         }
 
-                    } catch (err) {
-                        console.error("[Stream API] Polling error:", err);
+                    } catch (err: any) {
+                        // Silent fail on minor polling errors to not aggressively kill stream
+                        if (err.message?.includes('401') || err.message?.includes('session')) {
+                            // Token expiration, force close to trigger auto-reconnect from client side
+                            sendEvent('error', { message: 'Session expired during polling' });
+                            isClosed = true;
+                            cleanup();
+                        }
                     }
                 };
 
