@@ -28,7 +28,7 @@ export default function AgentDashboard() {
     const [activeQueue, setActiveQueue] = useState<QueueType>("OPEN");
     const [tickets, setTickets] = useState<TicketNode[]>([]);
     const [selectedTicket, setSelectedTicket] = useState<TicketNode | null>(null);
-    const [chatMessages, setChatMessages] = useState<{ sender_type: string; message: string | null; attachment_url: string | null; created_at: string; }[]>([]);
+    const [chatMessages, setChatMessages] = useState<{ id: string; sender_type: string; message: string | null; attachment_url: string | null; created_at: string; }[]>([]);
     const [input, setInput] = useState("");
     const [loading, setLoading] = useState(true);
     const [sending, setSending] = useState(false);

@@ -143,12 +143,12 @@ export async function GET(req: NextRequest) {
                 cleanup();
             }
 
-            const cleanup = () => {
+            function cleanup() {
                 isClosed = true;
                 if (pollingTimer) clearInterval(pollingTimer);
                 if (ws?.readyState === 1) ws.close();
                 try { controller.close(); } catch { }
-            };
+            }
 
             req.signal.addEventListener('abort', cleanup);
         },
