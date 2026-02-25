@@ -83,95 +83,7 @@ export function MarketDataProvider({ children }: { children: ReactNode }) {
     const balanceFetchingRef = useRef(false);
     const priceFetchingRef = useRef(false);
 
-    // ── Single balance fetch — returns BOTH demo and real in one API call ──────
-    const fetchBothBalances = useCallback(async () => {
-        if (balanceFetchingRef.current) return;
-        balanceFetchingRef.current = true;
-
-        try {
-            // No mode param needed — the backend returns both real & demo accounts at once
-            const res = await authedFetch(`/api/balance`, router);
-
-            if (!res || res.status === 503) {
-                console.warn('[MarketData] Balance 503 — keeping last values');
-                return;
-            }
-            if (!res.ok) {
-                console.warn(`[MarketData] Balance failed: HTTP ${res.status}`);
-                return;
-            }
-
-            const data = await res.json();
-            console.log('[MarketData] Balance response:', JSON.stringify({
-                hasDemo: data.hasDemo,
-                hasLive: data.hasLive,
-                realBalance: data.realBalance?.balance,
-                demoBalance: data.demoBalance?.balance,
-            }));
-
-            const newReal = parseBalance(data.realBalance);
-            const newDemo = parseBalance(data.demoBalance);
-
-            // Only update if we got valid data; don't zero out a known-good balance
-            if (newReal) {
-                setRealBalance(prev => (isNonZero(newReal) || !isNonZero(prev)) ? newReal : prev);
-            }
-            if (newDemo) {
-                setDemoBalance(prev => (isNonZero(newDemo) || !isNonZero(prev)) ? newDemo : prev);
-            }
-
-        } catch (error) {
-            console.error('[MarketData] Balance fetch threw:', error);
-        } finally {
-            balanceFetchingRef.current = false;
-        }
-    }, [router]);
-
-    // ── Fetch prices for the current mode ─────────────────────────────────────
-    const fetchPrices = useCallback(async (targetMode: 'demo' | 'real') => {
-        if (priceFetchingRef.current) return;
-        priceFetchingRef.current = true;
-
-        try {
-            const res = await authedFetch(`/api/prices?mode=${targetMode}`, router);
-            if (!res || !res.ok) { setConnectionStatus('error'); return; }
-            const data = await res.json();
-            if (modeRef.current !== targetMode) return; // stale — mode changed mid-flight
-            if (data.prices && Object.keys(data.prices).length > 0) {
-                setMarketData(data.prices);
-                setConnectionStatus('connected');
-            } else {
-                setConnectionStatus('error');
-            }
-        } catch (error) {
-            console.error('[MarketData] Price fetch threw:', error);
-            setConnectionStatus('error');
-        } finally {
-            priceFetchingRef.current = false;
-        }
-    }, [router]);
-
-    // ── Bootstrap ──────────────────────────────────────────────────────────────
-    useEffect(() => {
-        fetchBothBalances();
-        fetchPrices('real');
-
-        const balanceInterval = setInterval(fetchBothBalances, BALANCE_POLL_MS);
-        const priceInterval = setInterval(() => fetchPrices(modeRef.current), PRICE_POLL_MS);
-
-        return () => {
-            clearInterval(balanceInterval);
-            clearInterval(priceInterval);
-        };
-    }, [fetchBothBalances, fetchPrices]);
-
-    // ── On mode change — fetch prices for new mode immediately ────────────────
-    useEffect(() => {
-        modeRef.current = mode;
-        setConnectionStatus('connecting');
-        fetchPrices(mode);
-        // Balance doesn't need refetching — both are already populated
-    }, [mode, fetchPrices]);
+    // Unused polling functions removed in favor of SSE
 
     // Active balance is strictly the current mode's data — no cross-mode fallback
     const balanceData = mode === 'demo' ? demoBalance : realBalance;
@@ -179,6 +91,70 @@ export function MarketDataProvider({ children }: { children: ReactNode }) {
     const setMode = useCallback((newMode: 'demo' | 'real') => {
         setModeState(newMode);
     }, []);
+
+    // ── Unified SSE Stream ──────────────────────────────────────────────────
+    useEffect(() => {
+        setConnectionStatus('connecting');
+
+        const es = new EventSource(`/api/stream?mode=${mode}`);
+
+        es.onopen = () => {
+            console.log(`[MarketData] Unified Stream Connected (${mode})`);
+        };
+
+        es.addEventListener('market-data', (ev) => {
+            try {
+                const data = JSON.parse(ev.data);
+                // Capital.com 'quote' destination messages
+                if (data.destination === 'quote' && data.payload) {
+                    const snap = data.payload;
+                    const epic = snap.epic;
+                    if (epic) {
+                        setMarketData(prev => ({
+                            ...prev,
+                            [epic]: {
+                                bid: snap.bid ?? prev[epic]?.bid ?? 0,
+                                offer: snap.offer ?? prev[epic]?.offer ?? 0,
+                                change: snap.netChange ?? prev[epic]?.change ?? 0,
+                                changePct: snap.percentageChange ?? prev[epic]?.changePct ?? 0,
+                            }
+                        }));
+                    }
+                }
+                setConnectionStatus('connected');
+            } catch (e) {
+                console.error("[MarketData] Pricing Parse Error", e);
+            }
+        });
+
+        es.addEventListener('balance', (ev) => {
+            try {
+                const data = JSON.parse(ev.data);
+                const newReal = parseBalance(data.realBalance);
+                const newDemo = parseBalance(data.demoBalance);
+
+                if (newReal) setRealBalance(prev => (isNonZero(newReal) || !isNonZero(prev)) ? newReal : prev);
+                if (newDemo) setDemoBalance(prev => (isNonZero(newDemo) || !isNonZero(prev)) ? newDemo : prev);
+            } catch (e) {
+                console.error("[MarketData] Balance Parse Error", e);
+            }
+        });
+
+        // Positions could also be listened to here if we exposed them in Context, 
+        // but currently dashboard components fetch their own or rely on `/api/dashboard`.
+        // If we want to broadcast them, we can add a positions state to MarketDataContext.
+        // For now, we leave the listener out of context to keep it simple, or we can just ignore it.
+
+        es.onerror = () => {
+            console.warn(`[MarketData] Stream Error. Reconnecting in 3s...`);
+            setConnectionStatus('error');
+            es.close();
+        };
+
+        return () => {
+            es.close();
+        };
+    }, [mode]);
 
     return (
         <MarketDataContext.Provider value={{

@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { getValidSession } from "@/lib/capital-service";
+import { getValidSession, getApiUrl } from "@/lib/capital-service";
 import { verifyAccessToken } from "@/lib/auth";
 import { cookies } from "next/headers";
 import WebSocket from "ws";
@@ -8,86 +8,64 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 export async function GET(req: NextRequest) {
-    // 1. Authenticate user request
     const cookieStore = await cookies();
     const accessToken = cookieStore.get('access_token')?.value;
 
-    if (!accessToken) {
-        return new Response('Unauthorized', { status: 401 });
-    }
+    if (!accessToken) return new Response('Unauthorized', { status: 401 });
 
     const tokenPayload = await verifyAccessToken(accessToken);
-    if (!tokenPayload) {
-        return new Response('Unauthorized', { status: 401 });
-    }
+    if (!tokenPayload) return new Response('Unauthorized', { status: 401 });
 
     const userId = tokenPayload.userId;
-
-    // 2. Setup SSE headers
-    const headers = new Headers({
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache, no-transform',
-        'Connection': 'keep-alive',
-    });
-
-    // Get mode and epics from URL
     const { searchParams } = new URL(req.url);
     const mode = searchParams.get('mode') || 'demo';
     const isDemo = mode === 'demo';
     const epicsParam = searchParams.get('epics');
     const epics = epicsParam ? epicsParam.split(',') : ['GOLD', 'OIL_CRUDE', 'EURUSD', 'BTCUSD'];
 
-    // 3. Obtain Capital.com session
-    let session;
+    let session: any;
     try {
         session = await getValidSession(userId, isDemo);
     } catch (err: any) {
-        console.error("[Stream API] Failed to get Valid Session:", err.message);
-        const errorStream = new ReadableStream({
-            start(controller) {
-                const message = `event: error\ndata: ${JSON.stringify({ message: err.message })}\n\n`;
-                controller.enqueue(new TextEncoder().encode(message));
-                controller.close();
-            }
+        return new Response(`event: error\ndata: ${JSON.stringify({ message: err.message })}\n\n`, {
+            headers: { 'Content-Type': 'text/event-stream' }
         });
-        return new Response(errorStream, { headers });
     }
 
-    // 4. Create an SSE stream
     const stream = new ReadableStream({
         async start(controller) {
+            let isClosed = false;
+            let ws: WebSocket | null = null;
+            let pollingTimer: NodeJS.Timeout | null = null;
+
             const sendEvent = (event: string, data: any) => {
-                const message = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
-                controller.enqueue(new TextEncoder().encode(message));
+                if (isClosed) return;
+                try {
+                    const message = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+                    controller.enqueue(new TextEncoder().encode(message));
+                } catch {
+                    isClosed = true;
+                }
             };
 
-            // Connect to Capital.com WebSocket
-            const wsUrl = isDemo ? 'wss://demo-api-capital.backend-capital.com/ws' : 'wss://api-capital.backend-capital.com/ws';
-
-            let ws: any;
+            const wsUrl = getApiUrl(isDemo).replace('https://', 'wss://').replace('/api/v1', '/ws');
 
             try {
                 ws = new WebSocket(wsUrl);
 
                 ws.on('open', () => {
                     console.log(`[Stream API] WebSocket Connected to ${wsUrl}`);
-
-                    // Subscribe to real-time price quotes (marketData.subscribe)
-                    // API docs: destination must be exactly "marketData.subscribe"
-                    // Response comes as messages with destination "quote"
-                    ws.send(JSON.stringify({
+                    ws?.send(JSON.stringify({
                         destination: "marketData.subscribe",
                         correlationId: "1",
                         cst: session.cst,
                         securityToken: session.xSecurityToken,
-                        payload: {
-                            epics: epics
-                        }
+                        payload: { epics }
                     }));
 
-                    // Keep session alive with pings every 9 minutes (tokens expire after 10 min)
+                    // Aggressive pings every 30 seconds to keep connection alive indefinitely
                     const pingInterval = setInterval(() => {
-                        if (ws.readyState === 1 /* OPEN */) {
+                        if (ws?.readyState === 1) {
                             ws.send(JSON.stringify({
                                 destination: "ping",
                                 correlationId: "ping",
@@ -97,47 +75,91 @@ export async function GET(req: NextRequest) {
                         } else {
                             clearInterval(pingInterval);
                         }
-                    }, 9 * 60 * 1000);
+                    }, 30 * 1000);
+
+                    ws?.on('close', () => clearInterval(pingInterval));
+                    ws?.on('error', () => clearInterval(pingInterval));
                 });
 
                 ws.on('message', (dataRaw: any) => {
                     try {
                         const data = JSON.parse(dataRaw.toString());
-                        // Route Capital.com WebSocket responses to the client
                         sendEvent('market-data', data);
-                    } catch (e) {
-                        console.error("Error parsing WS message:", e);
-                    }
+                    } catch (e) { }
                 });
 
                 ws.on('close', () => {
                     console.log("[Stream API] WebSocket Closed.");
                     sendEvent('system', { status: 'disconnected' });
-                    controller.close();
+                    isClosed = true;
+                    cleanup();
                 });
 
                 ws.on('error', (err: any) => {
                     console.error("[Stream API] WebSocket Error:", err);
                     sendEvent('error', { message: 'WebSocket connection error' });
-                    controller.close();
+                    isClosed = true;
+                    cleanup();
                 });
 
-                // Handle client disconnects to clean up Capital.com websocket
-                req.signal.addEventListener('abort', () => {
-                    console.log("[Stream API] Client disconnected from SSE.");
-                    if (ws.readyState === 1 /* OPEN */) {
-                        ws.close();
+                // Set up polling for balance and positions
+                const pollData = async () => {
+                    if (isClosed) return;
+                    try {
+                        const baseUrl = req.url.split('/api/stream')[0];
+                        // We use our own local API routes to avoid repeating Capital.com fetching logic 
+                        // and ensure the right current account resolution is used.
+                        const cookieHeader = req.headers.get('cookie') || '';
+
+                        const [balRes, posRes] = await Promise.all([
+                            fetch(`${baseUrl}/api/balance`, { headers: { cookie: cookieHeader } }),
+                            fetch(`${baseUrl}/api/dashboard?mode=${mode}`, { headers: { cookie: cookieHeader } })
+                        ]);
+
+                        if (balRes.ok) {
+                            const balData = await balRes.json();
+                            sendEvent('balance', balData);
+                        }
+
+                        if (posRes.ok) {
+                            const posData = await posRes.json();
+                            // dashboard returns { positions, history, accounts }
+                            sendEvent('positions', posData.positions || []);
+                        }
+
+                    } catch (err) {
+                        console.error("[Stream API] Polling error:", err);
                     }
-                    controller.close();
-                });
+                };
+
+                // Poll immediately, then every 3 seconds
+                pollData();
+                pollingTimer = setInterval(pollData, 3000);
 
             } catch (err: any) {
                 console.error("[Stream API] Failed to establish WebSocket:", err);
                 sendEvent('error', { message: "Internal stream creation error: " + err.message });
-                controller.close();
+                isClosed = true;
+                cleanup();
             }
+
+            const cleanup = () => {
+                isClosed = true;
+                if (pollingTimer) clearInterval(pollingTimer);
+                if (ws?.readyState === 1) ws.close();
+                try { controller.close(); } catch { }
+            };
+
+            req.signal.addEventListener('abort', cleanup);
         },
     });
 
-    return new Response(stream, { headers });
+    return new Response(stream, {
+        headers: {
+            'Content-Type': 'text/event-stream',
+            'Cache-Control': 'no-cache, no-transform',
+            'Connection': 'keep-alive',
+            'X-Accel-Buffering': 'no',
+        }
+    });
 }

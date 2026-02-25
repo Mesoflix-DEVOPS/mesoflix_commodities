@@ -62,9 +62,21 @@ function DashboardPageInner() {
 
     useEffect(() => {
         fetchData();
-        const interval = setInterval(() => fetchData(true), 15000);
-        return () => clearInterval(interval);
-    }, [fetchData]);
+
+        // Listen to SSE stream for live position updates
+        const es = new EventSource(`/api/stream?mode=${mode}`);
+        es.addEventListener('positions', (ev) => {
+            try {
+                const livePositions = JSON.parse(ev.data);
+                setData((prev: any) => ({
+                    ...prev,
+                    positions: livePositions
+                }));
+            } catch (e) { }
+        });
+
+        return () => es.close();
+    }, [fetchData, mode]);
 
     const handleCloseTrade = async () => {
         if (!selectedTrade?.dealId) return;

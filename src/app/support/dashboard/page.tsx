@@ -8,7 +8,6 @@ import {
     Send, Paperclip, MoreVertical, ShieldCheck, FileText, Activity, Loader2, X
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import io, { Socket } from "socket.io-client";
 
 // Mock typings for the 3-pane architecture
 type QueueType = "UNASSIGNED" | "ASSIGNED" | "OPEN" | "ESCALATED" | "CLOSED";
@@ -46,7 +45,7 @@ export default function AgentDashboard() {
     const [sysUsers, setSysUsers] = useState<{ id: string, email: string, full_name: string | null, created_at: string, last_login_at: string | null, role: string, two_factor_enabled: boolean | null }[]>([]);
 
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const socketRef = useRef<Socket | null>(null);
+    const eventSourceRef = useRef<EventSource | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     // Fetch real ticket queue and users
@@ -72,9 +71,45 @@ export default function AgentDashboard() {
 
         fetchDashboardData();
 
-        // Connect global agent socket
-        socketRef.current = io(window.location.origin, { path: "/api/socket" });
-        return () => { socketRef.current?.disconnect(); };
+        // Connect global agent SSE
+        const connectSSE = () => {
+            const es = new EventSource("/api/support/stream");
+            eventSourceRef.current = es;
+
+            es.onopen = () => {
+                console.log("Connected to secure support stream");
+            };
+
+            es.addEventListener('new_message', (ev) => {
+                try {
+                    const data = JSON.parse(ev.data);
+                    const incomingMsg = data.message;
+                    if (!incomingMsg) return;
+
+                    // Route message to active chat if it matches ticketId
+                    // Note: We need a ref to access the *current* selectedTicket inside the event listener
+                    // To avoid complex ref management here, we just use setState callback
+                    setChatMessages((prev) => {
+                        const exists = prev.find(m => m.id === incomingMsg.id);
+                        if (exists) return prev;
+                        return [...prev, incomingMsg];
+                    });
+                    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+                } catch (e) {
+                    console.error("Failed to parse SSE message", e);
+                }
+            });
+
+            es.onerror = () => {
+                console.warn("SSE stream error. Reconnecting...");
+                es.close();
+                setTimeout(connectSSE, 3000);
+            };
+        };
+
+        connectSSE();
+
+        return () => { eventSourceRef.current?.close(); };
     }, []);
 
     const handleSelectTicket = async (t: TicketNode) => {
@@ -90,9 +125,6 @@ export default function AgentDashboard() {
         } catch (e) {
             console.error(e);
         }
-
-        // Join specific room
-        socketRef.current?.emit('join_ticket', t.id);
     };
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -137,8 +169,6 @@ export default function AgentDashboard() {
         setAttachmentName(null);
         if (fileInputRef.current) fileInputRef.current.value = "";
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-
-        socketRef.current?.emit('send_message', payload);
 
         fetch(`/api/support/agent/tickets/${selectedTicket.id}/messages`, {
             method: "POST",

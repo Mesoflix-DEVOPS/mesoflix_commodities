@@ -58,6 +58,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
                 .where(eq(tickets.id, id));
         }
 
+        import('@/lib/sse').then(({ broadcastSSE }) => {
+            broadcastSSE('new_message', { ticketId: id, message: newMessage }, (client) => {
+                return client.params.ticketId === id || !!client.params.agentId;
+            });
+        });
+
         return NextResponse.json({ success: true, messageId: newMessage.id });
 
     } catch (error) {

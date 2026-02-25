@@ -558,9 +558,18 @@ function ExecutionLogsTab({ mode }: { mode: string }) {
 
     useEffect(() => {
         fetchLogs();
-        const t = setInterval(() => fetchLogs(true), 15_000);
-        return () => clearInterval(t);
-    }, [fetchLogs]);
+
+        // Listen to SSE stream for live position updates
+        const es = new EventSource(`/api/stream?mode=${mode}`);
+        es.addEventListener('positions', (ev) => {
+            try {
+                const livePositions = JSON.parse(ev.data);
+                setPositions(livePositions);
+            } catch (e) { }
+        });
+
+        return () => es.close();
+    }, [fetchLogs, mode]);
 
     // Parse Capital.com activity item into useful display fields
     const parseLog = (log: any) => {

@@ -145,3 +145,16 @@ export const ticketNotes = pgTable('ticket_notes', {
     note: text('note').notNull(),
     created_at: timestamp('created_at').defaultNow(),
 });
+
+// 24 Hour Trade History
+export const platformTrades = pgTable('platform_trades', {
+    id: uuid('id').defaultRandom().primaryKey(),
+    user_id: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+    deal_id: text('deal_id').unique().notNull(),
+    epic: text('epic').notNull(),
+    direction: text('direction').notNull(),
+    size: text('size').notNull(),
+    pnl: text('pnl'),
+    mode: text('mode').default('demo'), // 'demo' or 'live'
+    created_at: timestamp('created_at').defaultNow(),
+});

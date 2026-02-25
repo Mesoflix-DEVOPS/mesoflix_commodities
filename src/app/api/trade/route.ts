@@ -1,5 +1,5 @@
 import { db } from '@/lib/db';
-import { users, notifications } from '@/lib/db/schema';
+import { users, notifications, platformTrades } from '@/lib/db/schema';
 import { getValidSession } from '@/lib/capital-service';
 import { placeOrder, closePosition } from '@/lib/capital';
 import { verifyAccessToken } from '@/lib/auth';
@@ -58,6 +58,28 @@ export async function POST(request: Request) {
                 message: `Successfully executed a ${direction} block on ${epic} for ${size} units.`,
                 type: 'success'
             });
+
+            if (result && result.dealReference) {
+                try {
+                    await db.insert(platformTrades).values({
+                        user_id: userId,
+                        deal_id: result.dealReference,
+                        epic,
+                        direction,
+                        size: String(size),
+                        mode: isDemo ? 'demo' : 'live'
+                    });
+                } catch (dbErr) {
+                    console.error("Failed to insert locally into platformTrades:", dbErr);
+                }
+            }
+
+            try {
+                const { sql } = require('drizzle-orm');
+                await db.delete(platformTrades).where(sql`created_at < NOW() - INTERVAL '1 day'`);
+            } catch (e) {
+                console.error("Cleanup failed", e);
+            }
 
             return NextResponse.json({ success: true, ...result });
         } catch (err: any) {
@@ -123,6 +145,16 @@ export async function DELETE(request: Request) {
                 message: `Successfully closed deal ${dealId}.`,
                 type: 'info'
             });
+
+            try {
+                // Remove closed deal from active tracking log if we want to, 
+                // or just leave it for the 24H cleanup. Given it's a "platform trades" log, let's leave it and update PnL if possible.
+                // For safety and keeping it simple based on Drizzle tracking:
+                const { sql } = require('drizzle-orm');
+                await db.delete(platformTrades).where(sql`created_at < NOW() - INTERVAL '1 day'`);
+            } catch (e) {
+                console.error("Cleanup failed", e);
+            }
 
             return NextResponse.json({ success: true, ...result });
         } catch (err: any) {

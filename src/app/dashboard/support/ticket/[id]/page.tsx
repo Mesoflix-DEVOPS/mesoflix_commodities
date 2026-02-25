@@ -4,7 +4,6 @@ import { useState, useEffect, useRef, use } from "react";
 import { ArrowLeft, Send, Paperclip, CheckCheck, Loader2, AlertCircle, Clock, ShieldCheck, X, FileText } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-import io, { Socket } from "socket.io-client";
 
 interface Message {
     id: string;
@@ -32,7 +31,7 @@ export default function LiveChatPage({ params }: { params: Promise<{ id: string 
     const [sending, setSending] = useState(false);
 
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const socketRef = useRef<Socket | null>(null);
+    const eventSourceRef = useRef<EventSource | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     // Fetch initial chat history
@@ -53,30 +52,44 @@ export default function LiveChatPage({ params }: { params: Promise<{ id: string 
         fetchHistory();
     }, [id]);
 
-    // WebSocket Connection
+    // Server-Sent Events (SSE) Connection
     useEffect(() => {
-        // Initialize socket using custom api path set in server.ts
-        socketRef.current = io(window.location.origin, {
-            path: "/api/socket"
-        });
+        const connectSSE = () => {
+            const es = new EventSource(`/api/support/stream?ticketId=${id}`);
+            eventSourceRef.current = es;
 
-        socketRef.current.on('connect', () => {
-            console.log("Connected to secure support socket:", socketRef.current?.id);
-            socketRef.current?.emit('join_ticket', id);
-        });
+            es.onopen = () => {
+                console.log("Connected to secure support stream");
+            };
 
-        socketRef.current.on('new_message', (incomingMsg: any) => {
-            // Check if it's already in our array to prevent duplicates if we fired it ourselves
-            setMessages((prev) => {
-                const exists = prev.find(m => m.id === incomingMsg.id);
-                if (exists) return prev;
-                return [...prev, incomingMsg];
+            es.addEventListener('new_message', (ev) => {
+                try {
+                    const data = JSON.parse(ev.data);
+                    const incomingMsg = data.message;
+                    if (!incomingMsg) return;
+
+                    setMessages((prev) => {
+                        const exists = prev.find(m => m.id === incomingMsg.id);
+                        if (exists) return prev;
+                        return [...prev, incomingMsg];
+                    });
+                    scrollToBottom();
+                } catch (e) {
+                    console.error("Failed to parse SSE message", e);
+                }
             });
-            scrollToBottom();
-        });
+
+            es.onerror = () => {
+                console.warn("SSE stream error. Reconnecting...");
+                es.close();
+                setTimeout(connectSSE, 3000);
+            };
+        };
+
+        connectSSE();
 
         return () => {
-            socketRef.current?.disconnect();
+            eventSourceRef.current?.close();
         };
     }, [id]);
 
@@ -131,10 +144,7 @@ export default function LiveChatPage({ params }: { params: Promise<{ id: string 
         if (fileInputRef.current) fileInputRef.current.value = "";
         scrollToBottom();
 
-        // Broadcast to WebSocket Room
-        socketRef.current?.emit('send_message', payload);
-
-        // Persist to Postgres
+        // Persist to Postgres (which will broadcast via SSE)
         try {
             await fetch(`/api/support/tickets/${id}/messages`, {
                 method: "POST",
