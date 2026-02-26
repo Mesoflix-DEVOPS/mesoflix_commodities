@@ -20,6 +20,7 @@ import {
     Bell,
     ExternalLink,
     Wallet,
+    BookOpen,
     Calendar as CalendarIcon
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -39,6 +40,7 @@ const menuGroups = [
         items: [
             { name: "Support Hub", icon: Headset, href: "/dashboard/support" },
             { name: "Transactions", icon: History, href: "/dashboard/transactions" },
+            { name: "Learn Hub", icon: BookOpen, href: "/dashboard/learn" },
         ]
     }
 ];
