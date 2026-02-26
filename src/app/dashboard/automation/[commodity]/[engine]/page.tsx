@@ -159,7 +159,7 @@ export default function EngineAnalyticsPage({ params }: { params: Promise<{ comm
                                 contentStyle={{ backgroundColor: '#0A1622', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', fontSize: '12px', fontWeight: 'bold' }}
                                 itemStyle={{ color: '#00BFA6' }}
                                 labelStyle={{ color: '#9ca3af', marginBottom: '4px' }}
-                                formatter={(value: number) => [`$${value.toLocaleString()}`, 'Equity']}
+                                formatter={(value: number | undefined) => [value != null ? `$${value.toLocaleString()}` : '-', 'Equity']}
                             />
                             <Area type="monotone" dataKey="equity" stroke="#00BFA6" strokeWidth={3} fillOpacity={1} fill="url(#colorEq)" />
                         </AreaChart>
