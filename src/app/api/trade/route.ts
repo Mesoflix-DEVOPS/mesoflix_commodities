@@ -110,6 +110,8 @@ export async function POST(request: Request) {
     }
 }
 
+import { closedTrades } from '@/lib/db/schema';
+
 export async function DELETE(request: Request) {
     try {
         const cookieStore = await cookies();
@@ -130,6 +132,14 @@ export async function DELETE(request: Request) {
 
         const isDemo = mode === 'demo';
 
+        // Try parsing body for trade details, if present (frontend should pass it)
+        let requestBody: any = {};
+        try {
+            requestBody = await request.json();
+        } catch (e) {
+            // body is optional
+        }
+
         const executeClose = async (forceRefresh = false) => {
             const session = await getValidSession(userId, isDemo, forceRefresh);
             const accountIsDemo = session.accountIsDemo ?? false;
@@ -146,12 +156,32 @@ export async function DELETE(request: Request) {
                 type: 'info'
             });
 
+            // Store in our database for the Transactions table
+            if (requestBody && requestBody.epic && requestBody.direction) {
+                try {
+                    await db.insert(closedTrades).values({
+                        user_id: userId,
+                        deal_id: dealId,
+                        epic: requestBody.epic,
+                        direction: requestBody.direction,
+                        size: String(requestBody.size || 0),
+                        open_price: String(requestBody.openPrice || 0),
+                        close_price: String(result.level ?? 0),
+                        pnl: String(requestBody.pnl || 0),
+                        mode: isDemo ? 'demo' : 'live'
+                    });
+                } catch (dbErr) {
+                    console.error("Failed to insert into closedTrades:", dbErr);
+                }
+            }
+
             try {
-                // Remove closed deal from active tracking log if we want to, 
-                // or just leave it for the 24H cleanup. Given it's a "platform trades" log, let's leave it and update PnL if possible.
-                // For safety and keeping it simple based on Drizzle tracking:
+                // Cleanup platform trades older than 1 day
                 const { sql } = require('drizzle-orm');
                 await db.delete(platformTrades).where(sql`created_at < NOW() - INTERVAL '1 day'`);
+
+                // Also cleanup closed_trades older than 1 day to ensure it respects the 24-hour retention requirement
+                await db.delete(closedTrades).where(sql`created_at < NOW() - INTERVAL '1 day'`);
             } catch (e) {
                 console.error("Cleanup failed", e);
             }
@@ -170,6 +200,24 @@ export async function DELETE(request: Request) {
                         type: 'info'
                     });
 
+                    if (requestBody && requestBody.epic && requestBody.direction) {
+                        try {
+                            await db.insert(closedTrades).values({
+                                user_id: userId,
+                                deal_id: dealId,
+                                epic: requestBody.epic,
+                                direction: requestBody.direction,
+                                size: String(requestBody.size || 0),
+                                open_price: String(requestBody.openPrice || 0),
+                                close_price: String(result.level ?? 0),
+                                pnl: String(requestBody.pnl || 0),
+                                mode: isDemo ? 'demo' : 'live'
+                            });
+                        } catch (dbErr) {
+                            console.error("Failed to insert into closedTrades after retry:", dbErr);
+                        }
+                    }
+
                     return NextResponse.json({ success: true, ...result });
                 } catch (retryErr: any) {
                     return NextResponse.json({ error: `Close failed after retry: ${retryErr.message}` }, { status: 502 });
@@ -182,3 +230,4 @@ export async function DELETE(request: Request) {
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }
+

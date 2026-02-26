@@ -158,3 +158,18 @@ export const platformTrades = pgTable('platform_trades', {
     mode: text('mode').default('demo'), // 'demo' or 'live'
     created_at: timestamp('created_at').defaultNow(),
 });
+
+// Closed Trades History
+export const closedTrades = pgTable('closed_trades', {
+    id: uuid('id').defaultRandom().primaryKey(),
+    user_id: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+    deal_id: text('deal_id').unique().notNull(),
+    epic: text('epic').notNull(),
+    direction: text('direction').notNull(),
+    size: text('size').notNull(),
+    open_price: text('open_price'),
+    close_price: text('close_price'),
+    pnl: text('pnl').notNull(),
+    mode: text('mode').default('demo'), // 'demo' or 'live'
+    created_at: timestamp('created_at').defaultNow(),
+});

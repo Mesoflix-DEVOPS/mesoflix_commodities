@@ -1,10 +1,9 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { users } from '@/lib/db/schema';
+import { users, closedTrades } from '@/lib/db/schema';
 import { getValidSession } from '@/lib/capital-service';
-import { getHistory } from '@/lib/capital';
 import { verifyAccessToken } from '@/lib/auth';
-import { eq } from 'drizzle-orm';
+import { eq, desc, and, gte } from 'drizzle-orm';
 import { cookies } from 'next/headers';
 
 export const dynamic = 'force-dynamic';
@@ -27,75 +26,47 @@ export async function GET(request: Request) {
 
         const { searchParams } = new URL(request.url);
         const modeInput = searchParams.get('mode') || 'demo';
-
         const isDemo = modeInput === 'demo';
-        let session;
-        try {
-            session = await getValidSession(userId, isDemo);
-        } catch (error: any) {
-            return NextResponse.json({ error: 'Failed to retrieve trading session' }, { status: 500 });
-        }
 
-        // Always use LIVE endpoint; getValidSession handles account mode switching internally
-        // Calculate Date Range (Strictly set to rolling 24-hours to comply with Capital.com's endpoints)
+        // Calculate Date Range (Strictly set to rolling 24-hours)
         const now = new Date();
         const fromDate: Date = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
-        const historyOptions: any = {
-            max: 500,
-            from: fromDate.toISOString().split('.')[0],
-            to: now.toISOString().split('.')[0]
-        };
-
-        // Fetch History (up to 500 items to give the user enough data to dig through)
-        let historyData;
+        // Fetch History from our internal tables
+        let historyData: any[] = [];
         try {
-            historyData = await getHistory(session.cst, session.xSecurityToken, false, historyOptions);
+            historyData = await db.select()
+                .from(closedTrades)
+                .where(
+                    and(
+                        eq(closedTrades.user_id, userId),
+                        eq(closedTrades.mode, isDemo ? 'demo' : 'live'),
+                        gte(closedTrades.created_at, fromDate)
+                    )
+                )
+                .orderBy(desc(closedTrades.created_at))
+                .limit(500);
         } catch (err: any) {
             console.error('[Transactions API] Error fetching history:', err);
             return NextResponse.json({
                 transactions: [],
-                error: 'Failed to fetch transactions from broker'
+                error: 'Failed to fetch transactions from database'
             });
         }
 
-        const activities = historyData?.activities || [];
-
-        // Filter only actual closed trades (exclude internal broker system logs)
-        const closedTrades = activities.filter((log: any) => {
-            const status = log.status?.[0] || log.status;
-            const desc = (log.description || "").toUpperCase();
-
-            // We want closed trades or explicit money movements
-            const isClosed = status === 'CLOSED' || desc.includes('CLOSE');
-            const hasPnL = log.details?.profitAndLoss !== undefined || log.details?.pl !== undefined;
-
-            return isClosed || hasPnL;
-        });
-
         // Map them cleanly for the frontend table
-        const formattedTransactions = closedTrades.map((trade: any) => {
-            const pnl = trade.details?.profitAndLoss ?? trade.details?.pl ?? 0;
-            const size = trade.details?.size ?? trade.size ?? null;
-            const epic = trade.epic || trade.details?.epic || "Unknown Instrument";
-            const channel = trade.channel || "Web";
-            const desc = trade.description || "Position Closed";
-
-            const isBuy = desc.toUpperCase().includes("BUY");
-            const isSell = desc.toUpperCase().includes("SELL");
-            const direction = isBuy ? "BUY" : isSell ? "SELL" : "—";
-
+        const formattedTransactions = historyData.map((trade: any) => {
             return {
-                id: trade.dealId || trade.date, // fallback to date if no ID
-                date: trade.date,
-                epic,
-                direction,
-                size,
-                openPrice: trade.details?.openPrice ?? null,
-                closePrice: trade.details?.closePrice ?? trade.details?.level ?? null,
-                pnl,
-                description: desc,
-                channel
+                id: trade.deal_id,
+                date: trade.created_at,
+                epic: trade.epic,
+                direction: trade.direction,
+                size: parseFloat(trade.size),
+                openPrice: parseFloat(trade.open_price),
+                closePrice: parseFloat(trade.close_price),
+                pnl: parseFloat(trade.pnl),
+                description: `Position Closed`,
+                channel: "Web" // default
             };
         });
 

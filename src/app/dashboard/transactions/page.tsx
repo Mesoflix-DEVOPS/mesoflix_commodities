@@ -3,7 +3,8 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { useMarketData } from "@/contexts/MarketDataContext";
 import { cn } from "@/lib/utils";
-import { History, Clock, RefreshCw, ChevronDown, ChevronUp, CheckCircle2 } from "lucide-react";
+import { History, Clock, RefreshCw, ChevronDown, ChevronUp, CheckCircle2, TrendingUp } from "lucide-react";
+import Link from "next/link";
 
 
 
@@ -65,16 +66,25 @@ export default function TransactionsPage() {
                     <h1 className="text-3xl font-black text-white tracking-tight">Transactions</h1>
                 </div>
 
-                <div className="flex bg-[#0A1622] p-1.5 rounded-2xl border border-white/5 self-start overflow-x-auto w-full sm:w-auto scrollbar-hide">
+                <div className="flex bg-[#0A1622] p-1.5 rounded-2xl border border-white/5 self-start overflow-x-auto w-full sm:w-auto scrollbar-hide gap-2">
                     <button
                         className="flex items-center gap-1.5 px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl transition-all font-black text-[10px] uppercase tracking-widest whitespace-nowrap flex-shrink-0 bg-teal text-dark-blue shadow-[0_0_15px_rgba(0,191,166,0.3)] cursor-default"
                     >
                         <Clock size={12} className="text-dark-blue" />
                         Last 24 Hours
                     </button>
+
+                    <Link
+                        href="/dashboard/transactions/analytics"
+                        className="flex items-center gap-1.5 px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl transition-all font-black text-[10px] uppercase tracking-widest whitespace-nowrap flex-shrink-0 bg-white/5 text-gray-400 hover:text-white hover:bg-white/10 border border-white/5"
+                    >
+                        <TrendingUp size={12} className="text-teal" />
+                        Analytics
+                    </Link>
+
                     <button
                         onClick={fetchTransactions}
-                        className="ml-2 px-3 py-2 flex items-center justify-center text-gray-500 hover:text-white bg-white/5 rounded-xl transition-colors"
+                        className="px-3 py-2 flex items-center justify-center text-gray-500 hover:text-white bg-white/5 rounded-xl transition-colors"
                         disabled={loading}
                     >
                         <RefreshCw size={14} className={loading ? "animate-spin text-teal" : ""} />
@@ -95,15 +105,15 @@ export default function TransactionsPage() {
                 </div>
 
                 {loading ? (
-                    <div className="flex flex-col items-center justify-center h-64 gap-4">
+                    <div className="flex flex-col items-center justify-center h-[60vh] gap-4">
                         <div className="w-10 h-10 border-4 border-teal/20 border-t-teal rounded-full animate-spin" />
                         <p className="text-[10px] font-black text-gray-600 uppercase tracking-widest">Compiling ledger...</p>
                     </div>
                 ) : (
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left whitespace-nowrap">
-                            <thead>
-                                <tr className="text-[9px] text-gray-600 uppercase tracking-widest bg-black/10">
+                    <div className="overflow-x-auto custom-scrollbar overflow-y-auto max-h-[60vh]">
+                        <table className="w-full text-left whitespace-nowrap relative">
+                            <thead className="sticky top-0 z-10 bg-[#0E1B2A] shadow-md">
+                                <tr className="text-[9px] text-gray-600 uppercase tracking-widest bg-black/10 border-b border-white/5">
                                     <th className="px-6 py-4 font-black">Date & Time</th>
                                     <th className="px-6 py-4 font-black">Instrument</th>
                                     <th className="px-6 py-4 font-black">Action</th>

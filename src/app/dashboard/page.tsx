@@ -84,6 +84,14 @@ function DashboardPageInner() {
         try {
             const res = await fetch(`/api/trade?dealId=${selectedTrade.dealId}&mode=${mode}`, {
                 method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    epic: selectedTrade.epic,
+                    direction: selectedTrade.direction,
+                    size: selectedTrade.size,
+                    openPrice: selectedTrade.level,
+                    pnl: selectedTrade.upl,
+                })
             });
             if (res.ok) {
                 // Refresh data immediately
