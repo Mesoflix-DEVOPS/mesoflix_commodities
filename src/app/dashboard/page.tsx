@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import {
     TrendingUp,
     TrendingDown,
@@ -17,8 +17,8 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
-    AreaChart,
-    Area,
+    LineChart,
+    Line,
     XAxis,
     YAxis,
     CartesianGrid,
@@ -27,6 +27,7 @@ import {
     PieChart as RePieChart,
     Pie,
     Cell,
+    Legend
 } from 'recharts';
 import { Suspense } from "react";
 import { useMarketData } from "@/contexts/MarketDataContext";
@@ -44,6 +45,7 @@ function DashboardPageInner() {
     const [data, setData] = useState<any>(null);
     const [selectedTrade, setSelectedTrade] = useState<any>(null);
     const [closingTrade, setClosingTrade] = useState(false);
+    const [liveHistory, setLiveHistory] = useState<any[]>([]);
 
     const fetchData = useCallback((isSilent = false) => {
         if (!isSilent) setLoading(true);
@@ -72,6 +74,19 @@ function DashboardPageInner() {
                     ...prev,
                     positions: livePositions
                 }));
+
+                const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                const tickData: any = { name: now };
+                livePositions.forEach((p: any) => {
+                    const epic = p.market?.instrumentName || p.position?.epic || 'Unknown';
+                    const upl = p.position?.upl ?? 0;
+                    tickData[epic] = parseFloat(Number(upl).toFixed(2));
+                });
+
+                setLiveHistory(prev => {
+                    const newHistory = [...prev, tickData];
+                    return newHistory.slice(-50); // Keep last 50 data points
+                });
             } catch (e) { }
         });
 
@@ -189,6 +204,20 @@ function DashboardPageInner() {
         : [{ name: 'No Exposure', value: 1, color: '#1f2937' }];
 
     // -----------------------------------------------------------------------
+    // Live Chart Formatting
+    // -----------------------------------------------------------------------
+    const activeEpics = useMemo(() => {
+        const epics = new Set<string>();
+        liveHistory.forEach(tick => {
+            Object.keys(tick).forEach(k => {
+                if (k !== 'name') epics.add(k);
+            });
+        });
+        return Array.from(epics);
+    }, [liveHistory]);
+    const lineColors = ['#00BFA6', '#3b82f6', '#f59e0b', '#ef4444', '#a78bfa', '#ec4899', '#8b5cf6', '#14b8a6'];
+
+    // -----------------------------------------------------------------------
     // Recent Activity from history
     // -----------------------------------------------------------------------
     const recentActivity = rawHistory.slice(0, 5).map((h: any) => ({
@@ -284,9 +313,9 @@ function DashboardPageInner() {
 
                     <div className="flex justify-between items-start mb-8 relative z-10">
                         <div>
-                            <h3 className="text-xl font-bold text-white tracking-tight">Aggregate Performance</h3>
+                            <h3 className="text-xl font-bold text-white tracking-tight">Live P/L Trajectory</h3>
                             <p className="text-xs text-gray-400 mt-1">
-                                {activeAccount?.accountName || (mode === 'real' ? 'Live Account' : 'Demo Account')} — equity curve
+                                {activeAccount?.accountName || (mode === 'real' ? 'Live Account' : 'Demo Account')} — real-time curves per asset
                             </p>
                         </div>
                         <div className={cn("text-right px-4 py-2 rounded-2xl border",
@@ -301,13 +330,7 @@ function DashboardPageInner() {
 
                     <div className="h-[280px] min-h-[280px] w-full relative z-10 min-w-0">
                         <ResponsiveContainer width="100%" height="100%" minWidth={1}>
-                            <AreaChart data={performanceData}>
-                                <defs>
-                                    <linearGradient id="colorEquity" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#00BFA6" stopOpacity={0.3} />
-                                        <stop offset="95%" stopColor="#00BFA6" stopOpacity={0} />
-                                    </linearGradient>
-                                </defs>
+                            <LineChart data={liveHistory.length > 0 ? liveHistory : [{ name: 'Now', equity: 0 }]}>
                                 <CartesianGrid strokeDasharray="3 3" stroke="#ffffff05" vertical={false} />
                                 <XAxis
                                     dataKey="name"
@@ -319,20 +342,30 @@ function DashboardPageInner() {
                                 <YAxis hide />
                                 <Tooltip
                                     contentStyle={{ backgroundColor: '#0A1622', border: '1px solid #ffffff10', borderRadius: '12px' }}
-                                    itemStyle={{ fontSize: '12px', fontWeight: 'bold', color: '#00BFA6' }}
+                                    itemStyle={{ fontSize: '12px', fontWeight: 'bold' }}
                                     labelStyle={{ color: '#9ca3af', marginBottom: '4px', fontSize: '10px' }}
-                                    formatter={(v: any) => [`${balance.currency} ${Number(v).toFixed(2)}`, 'Equity']}
+                                    formatter={(value: any, name: any) => {
+                                        if (name === 'equity') return null; // hide fallback
+                                        return [`$${Number(value).toFixed(2)}`, name];
+                                    }}
                                 />
-                                <Area
-                                    type="monotone"
-                                    dataKey="equity"
-                                    stroke="#00BFA6"
-                                    strokeWidth={3}
-                                    fillOpacity={1}
-                                    fill="url(#colorEquity)"
-                                    animationDuration={1500}
-                                />
-                            </AreaChart>
+                                <Legend iconType="circle" wrapperStyle={{ fontSize: '10px', paddingTop: '10px' }} />
+                                {activeEpics.length > 0 ? activeEpics.map((epic, i) => (
+                                    <Line
+                                        key={epic}
+                                        type="monotone"
+                                        dataKey={epic}
+                                        stroke={lineColors[i % lineColors.length]}
+                                        strokeWidth={3}
+                                        dot={false}
+                                        activeDot={{ r: 6 }}
+                                        connectNulls={true}
+                                        isAnimationActive={false}
+                                    />
+                                )) : (
+                                    <Line type="monotone" dataKey="equity" stroke="#4b5563" strokeWidth={1} strokeDasharray="5 5" dot={false} isAnimationActive={false} />
+                                )}
+                            </LineChart>
                         </ResponsiveContainer>
                     </div>
                 </div>

@@ -5,8 +5,8 @@ import { useMarketData } from "@/contexts/MarketDataContext";
 import { ArrowLeft, TrendingUp, TrendingDown, Target, Activity, BarChart2 } from "lucide-react";
 import Link from "next/link";
 import {
-    AreaChart,
-    Area,
+    LineChart,
+    Line,
     XAxis,
     YAxis,
     CartesianGrid,
@@ -14,6 +14,7 @@ import {
     ResponsiveContainer,
     BarChart,
     Bar,
+    Legend,
     Cell
 } from "recharts";
 
@@ -97,17 +98,28 @@ export default function AnalyticsPage() {
 
     // Chart Data Generation
     const chartData = useMemo(() => {
-        let cumulative = 0;
+        const runningPnL: Record<string, number> = {};
         return transactions.map((tx, idx) => {
-            cumulative += tx.pnl;
+            const epic = tx.epic || 'Unknown';
+            if (!runningPnL[epic]) {
+                runningPnL[epic] = 0;
+            }
+            runningPnL[epic] += tx.pnl;
+
             return {
                 name: `Trade ${idx + 1}`,
                 date: new Date(tx.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                pnl: tx.pnl,
-                cumulative: cumulative
+                ...runningPnL // Spread the running PnL of all assets
             };
         });
     }, [transactions]);
+
+    const uniqueEpics = useMemo(() => {
+        if (!metrics) return [];
+        return Object.keys(metrics.assetMap);
+    }, [metrics]);
+
+    const COLORS = ['#00BFA6', '#3b82f6', '#f59e0b', '#ef4444', '#a78bfa', '#ec4899', '#8b5cf6', '#14b8a6'];
 
     const assetChartData = useMemo(() => {
         if (!metrics) return [];
@@ -209,29 +221,34 @@ export default function AnalyticsPage() {
                             <div className="flex items-center justify-between mb-6">
                                 <div>
                                     <h3 className="text-lg font-black text-white">Cumulative Performance</h3>
-                                    <p className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">Rolling trajectory 24H</p>
+                                    <p className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">Rolling trajectory 24H per asset</p>
                                 </div>
                             </div>
                             <div className="h-[300px] w-full">
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <AreaChart data={chartData} margin={{ top: 5, right: 0, left: 10, bottom: 0 }}>
-                                        <defs>
-                                            <linearGradient id="colorCumulative" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="5%" stopColor={metrics.totalPnL >= 0 ? "#00BFA6" : "#ef4444"} stopOpacity={0.3} />
-                                                <stop offset="95%" stopColor={metrics.totalPnL >= 0 ? "#00BFA6" : "#ef4444"} stopOpacity={0} />
-                                            </linearGradient>
-                                        </defs>
+                                    <LineChart data={chartData} margin={{ top: 5, right: 0, left: 10, bottom: 0 }}>
                                         <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
                                         <XAxis dataKey="date" stroke="#4b5563" fontSize={10} tickMargin={10} axisLine={false} tickLine={false} />
                                         <YAxis stroke="#4b5563" fontSize={10} tickFormatter={(value) => `$${value}`} tickMargin={10} axisLine={false} tickLine={false} />
                                         <Tooltip
                                             contentStyle={{ backgroundColor: '#0A1622', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', fontSize: '12px', fontWeight: 'bold' }}
                                             itemStyle={{ color: '#fff' }}
-                                            formatter={(value: any) => [formatCurrency(value), 'Net P/L']}
                                             labelStyle={{ color: '#9ca3af', marginBottom: '4px' }}
                                         />
-                                        <Area type="monotone" dataKey="cumulative" stroke={metrics.totalPnL >= 0 ? "#00BFA6" : "#ef4444"} strokeWidth={3} fillOpacity={1} fill="url(#colorCumulative)" />
-                                    </AreaChart>
+                                        <Legend iconType="circle" wrapperStyle={{ fontSize: '10px', paddingTop: '10px' }} />
+                                        {uniqueEpics.map((epic, i) => (
+                                            <Line
+                                                key={epic}
+                                                type="monotone"
+                                                dataKey={epic}
+                                                stroke={COLORS[i % COLORS.length]}
+                                                strokeWidth={3}
+                                                dot={false}
+                                                activeDot={{ r: 6 }}
+                                                connectNulls={true}
+                                            />
+                                        ))}
+                                    </LineChart>
                                 </ResponsiveContainer>
                             </div>
                         </div>
