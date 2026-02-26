@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { Suspense } from "react";
 import { MarketDataProvider } from "@/contexts/MarketDataContext";
+import { AutomationProvider } from "@/contexts/AutomationContext";
 import { authedFetch } from "@/lib/fetch-utils";
 
 
@@ -39,52 +40,54 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
     }, [fetchUserData]);
 
     return (
-        <MarketDataProvider>
-            <div className="min-h-screen bg-[#0D1B2A] text-white">
-                <Sidebar
-                    isCollapsed={isCollapsed}
-                    setCollapsed={setCollapsed}
-                    isMobileOpen={isMobileOpen}
-                    onCloseMobile={() => setMobileOpen(false)}
-                />
-
-                <div
-                    className={cn(
-                        "flex flex-col transition-all duration-500",
-                        isCollapsed ? "md:pl-20" : "md:pl-64"
-                    )}
-                >
-                    <TopNav
-                        userName={userData?.fullName || "Trader"}
-                        onMenuClick={() => setMobileOpen(!isMobileOpen)}
+        <AutomationProvider>
+            <MarketDataProvider>
+                <div className="min-h-screen bg-[#0D1B2A] text-white">
+                    <Sidebar
+                        isCollapsed={isCollapsed}
+                        setCollapsed={setCollapsed}
                         isMobileOpen={isMobileOpen}
+                        onCloseMobile={() => setMobileOpen(false)}
                     />
 
-                    <div className="flex relative w-full min-w-0">
-                        <main className="flex-1 min-w-0 p-6 md:p-12 animate-in fade-in duration-700">
-                            <div className="max-w-7xl mx-auto w-full">
-                                {children}
-                            </div>
-                        </main>
+                    <div
+                        className={cn(
+                            "flex flex-col transition-all duration-500",
+                            isCollapsed ? "md:pl-20" : "md:pl-64"
+                        )}
+                    >
+                        <TopNav
+                            userName={userData?.fullName || "Trader"}
+                            onMenuClick={() => setMobileOpen(!isMobileOpen)}
+                            isMobileOpen={isMobileOpen}
+                        />
 
-                        <div className="hidden xl:block">
-                            <RightPanel />
+                        <div className="flex relative w-full min-w-0">
+                            <main className="flex-1 min-w-0 p-6 md:p-12 animate-in fade-in duration-700">
+                                <div className="max-w-7xl mx-auto w-full">
+                                    {children}
+                                </div>
+                            </main>
+
+                            <div className="hidden xl:block">
+                                <RightPanel />
+                            </div>
                         </div>
+
+                        <footer className="py-6 px-12 border-t border-white/5 flex justify-center items-center text-gray-500 text-[10px] font-black uppercase tracking-widest">
+                            <span>© 2026 Mesoflix Commodities</span>
+                        </footer>
                     </div>
 
-                    <footer className="py-6 px-12 border-t border-white/5 flex justify-center items-center text-gray-500 text-[10px] font-black uppercase tracking-widest">
-                        <span>© 2026 Mesoflix Commodities</span>
-                    </footer>
+                    {isMobileOpen && (
+                        <div
+                            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[55] md:hidden transition-all duration-500"
+                            onClick={() => setMobileOpen(false)}
+                        />
+                    )}
                 </div>
-
-                {isMobileOpen && (
-                    <div
-                        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[55] md:hidden transition-all duration-500"
-                        onClick={() => setMobileOpen(false)}
-                    />
-                )}
-            </div>
-        </MarketDataProvider>
+            </MarketDataProvider>
+        </AutomationProvider>
     );
 }
 
