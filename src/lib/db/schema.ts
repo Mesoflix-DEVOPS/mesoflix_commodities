@@ -173,3 +173,37 @@ export const closedTrades = pgTable('closed_trades', {
     mode: text('mode').default('demo'), // 'demo' or 'live'
     created_at: timestamp('created_at').defaultNow(),
 });
+
+// Automation Engine Deployments (Persists State for the Dashboard)
+export const automationDeployments = pgTable('automation_deployments', {
+    id: uuid('id').defaultRandom().primaryKey(),
+    user_id: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+    engine_id: text('engine_id').notNull(),
+    commodity: text('commodity').notNull(),
+    allocated_capital: text('allocated_capital').notNull(),
+    risk_multiplier: text('risk_multiplier').default('1.0'),
+    stop_loss_cap: text('stop_loss_cap').notNull(),
+    status: text('status').default('Running'), // 'Running', 'Paused', 'Stopped'
+    mode: text('mode').default('demo'), // 'demo' or 'live'
+    pnl: text('pnl').default('0'), // Running PNL for display
+    created_at: timestamp('created_at').defaultNow(),
+    updated_at: timestamp('updated_at').defaultNow(),
+});
+
+// Automation Trades (Strictly deleted exactly 24h after closure per PRD)
+export const automationTrades = pgTable('automation_trades', {
+    id: uuid('id').defaultRandom().primaryKey(),
+    user_id: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+    deployment_id: uuid('deployment_id').references(() => automationDeployments.id, { onDelete: 'cascade' }),
+    engine_id: text('engine_id').notNull(),
+    deal_id: text('deal_id').unique().notNull(),
+    epic: text('epic').notNull(),
+    direction: text('direction').notNull(),
+    size: text('size').notNull(),
+    open_price: text('open_price'),
+    close_price: text('close_price'),
+    pnl: text('pnl').notNull(),
+    mode: text('mode').default('demo'), // 'demo' or 'live'
+    created_at: timestamp('created_at').defaultNow(),
+    updated_at: timestamp('updated_at').defaultNow(),
+});

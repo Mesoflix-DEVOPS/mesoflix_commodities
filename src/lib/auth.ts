@@ -85,3 +85,27 @@ export async function clearAuthCookies() {
     cookieStore.delete('access_token');
     cookieStore.delete('refresh_token');
 }
+
+/**
+ * Get Current Auth Session for Server Components and APIs
+ */
+export async function auth() {
+    try {
+        const cookieStore = await cookies();
+        const accessToken = cookieStore.get('access_token')?.value;
+        if (!accessToken) return null;
+
+        const payload = await verifyAccessToken(accessToken);
+        if (!payload) return null;
+
+        return {
+            user: {
+                id: payload.userId,
+                email: payload.email,
+                role: payload.role,
+            }
+        };
+    } catch (e) {
+        return null;
+    }
+}

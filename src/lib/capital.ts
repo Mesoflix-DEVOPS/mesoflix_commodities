@@ -300,3 +300,26 @@ export const closePosition = async (
 
     return response.json();
 };
+
+export const getMarketPrices = async (
+    cst: string,
+    xSecurityToken: string,
+    epic: string,
+    resolution: 'MINUTE' | 'MINUTE_5' | 'MINUTE_15' | 'HOUR' | 'HOUR_4' | 'DAY' = 'MINUTE_5',
+    max: number = 200,
+    isDemo: boolean = false
+) => {
+    const API_URL = getApiUrl(isDemo);
+    const response = await fetch(`${API_URL}/prices/${epic}?resolution=${resolution}&max=${max}`, {
+        headers: {
+            'X-SECURITY-TOKEN': xSecurityToken,
+            'CST': cst,
+        },
+    });
+
+    if (!response.ok) {
+        throw new Error(`Failed to fetch prices for ${epic}: ${response.status}`);
+    }
+
+    return response.json();
+};
