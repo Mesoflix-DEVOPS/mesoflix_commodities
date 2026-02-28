@@ -10,6 +10,17 @@ export async function middleware(request: NextRequest) {
     try {
         const { pathname } = request.nextUrl;
 
+        // 0. EXPLICIT GUARD: Never intercept static assets or favicons
+        // This prevents "MIME type mismatch" errors where assets are returned as HTML redirects.
+        if (
+            pathname.startsWith('/_next') ||
+            pathname.startsWith('/api/') ||
+            pathname.includes('/favicon') ||
+            pathname.includes('.') // Matches files with extensions
+        ) {
+            return NextResponse.next();
+        }
+
         // 1. Check if route is protected
         const isProtected = PROTECTED_ROUTES.some(route => pathname.startsWith(route));
 
@@ -75,13 +86,12 @@ export const config = {
     matcher: [
         /*
          * Match all request paths except for the ones starting with:
+         * - api (handled by internal logic)
          * - _next/static (static files)
          * - _next/image (image optimization files)
          * - favicon.ico (favicon file)
-         * - favicon.svg (favicon file)
          * - public/ folder
-         * - files with extensions (e.g. .js, .css, .png)
          */
-        '/((?!_next/static|_next/image|favicon\\.ico|favicon\\.svg|public|.*\\..*).*)',
+        '/((?!api|_next/static|_next/image|favicon.ico|public).*)',
     ],
 };
