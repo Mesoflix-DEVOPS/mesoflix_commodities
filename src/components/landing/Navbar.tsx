@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Menu, X, Sun, Moon } from "lucide-react";
+import { Menu, X, Sun, Moon, ArrowRight } from "lucide-react";
 import { useTheme } from "next-themes";
 
 import { usePathname } from "next/navigation";
@@ -116,14 +116,17 @@ const Navbar = () => {
                         {/* Drawer Header */}
                         <div className="p-8 flex justify-between items-center border-b border-dark-blue/5 dark:border-white/5">
                             <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 bg-gradient-to-br from-teal to-dark-blue rounded-xl flex items-center justify-center border border-white/10">
-                                    <span className="text-gold font-bold">M</span>
+                                <div className="w-10 h-10 bg-golden-gradient rounded-xl flex items-center justify-center shadow-lg shadow-gold/20">
+                                    <span className="text-dark-blue font-bold">M</span>
                                 </div>
-                                <span className="text-lg font-bold text-dark-blue dark:text-white">Mesoflix</span>
+                                <div className="flex flex-col">
+                                    <span className="text-lg font-bold text-dark-blue dark:text-white leading-none">Mesoflix</span>
+                                    <span className="text-[10px] text-teal font-bold uppercase tracking-widest mt-1">Professional</span>
+                                </div>
                             </div>
                             <button
                                 onClick={() => setIsMenuOpen(false)}
-                                className="p-2 bg-white/5 hover:bg-white/10 rounded-full transition-colors text-white"
+                                className="p-2.5 rounded-full bg-dark-blue/5 dark:bg-white/5 text-dark-blue dark:text-white hover:bg-dark-blue/10 dark:hover:bg-white/10 transition-all border border-dark-blue/10 dark:border-white/10"
                             >
                                 <X size={20} />
                             </button>
@@ -147,19 +150,25 @@ const Navbar = () => {
                         </div>
 
                         {/* Drawer Footer */}
-                        <div className="p-8 border-t border-white/5 bg-black/20">
+                        <div className="p-8 border-t border-dark-blue/5 dark:border-white/5 bg-light-gray dark:bg-black/20">
                             <Link
                                 href="/login"
                                 onClick={() => setIsMenuOpen(false)}
-                                className="w-full py-5 bg-gradient-to-r from-teal to-[#008f7a] text-white rounded-2xl text-center font-bold text-lg hover:shadow-[0_0_30px_rgba(0,191,166,0.3)] transition-all flex items-center justify-center gap-3 group"
+                                className="w-full py-5 bg-dark-blue dark:bg-golden-gradient text-white dark:text-dark-blue rounded-2xl text-center font-bold text-lg hover:shadow-xl transition-all flex items-center justify-center gap-3 group border border-white/10"
                             >
-                                <span>Get Started</span>
-                                <Sun size={18} className="group-hover:rotate-12 transition-transform" />
+                                <span>Access Platform</span>
+                                <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
                             </Link>
-                            <div className="mt-8 flex items-center justify-center gap-6">
-                                <div className="h-px bg-white/5 flex-1"></div>
-                                <span className="text-[9px] text-gray-600 font-bold uppercase tracking-[0.15em] whitespace-nowrap">Professional Edition</span>
-                                <div className="h-px bg-white/5 flex-1"></div>
+
+                            <div className="mt-8">
+                                <div className="flex items-center gap-4 mb-3">
+                                    <div className="h-px bg-dark-blue/10 dark:bg-white/10 flex-1"></div>
+                                    <span className="text-[10px] text-gray-400 font-bold uppercase tracking-[0.2em] whitespace-nowrap px-2">IB Edition</span>
+                                    <div className="h-px bg-dark-blue/10 dark:bg-white/10 flex-1"></div>
+                                </div>
+                                <p className="text-[9px] text-center text-gray-500 uppercase tracking-widest leading-relaxed">
+                                    Authorized Introducing Broker <br /> Powered by Capital.com API
+                                </p>
                             </div>
                         </div>
                     </div>
@@ -184,9 +193,10 @@ const MobileNavLink = ({ href, onClick, children }: { href: string; onClick: () 
     <Link
         href={href}
         onClick={onClick}
-        className="text-3xl font-black text-dark-blue dark:text-white hover:text-teal transition-all flex items-center py-4 group"
+        className="text-2xl font-black text-dark-blue/90 dark:text-white hover:text-teal dark:hover:text-gold transition-all flex items-center py-5 group border-b border-dark-blue/5 dark:border-white/5 last:border-0"
     >
-        {children}
+        <span className="flex-1 transition-all group-hover:pl-2">{children}</span>
+        <ArrowRight size={20} className="text-gray-300 dark:text-gray-700 opacity-0 group-hover:opacity-100 -translate-x-4 group-hover:translate-x-0 transition-all" />
     </Link>
 );
 
