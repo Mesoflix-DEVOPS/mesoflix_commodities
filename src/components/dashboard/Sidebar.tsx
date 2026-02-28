@@ -117,27 +117,31 @@ export default function Sidebar({ isCollapsed, setCollapsed, isMobileOpen, onClo
             </div>
 
             {/* Bottom Actions */}
-            <div className="p-4 border-t border-white/5 space-y-1">
+            <div className="p-4 border-t border-white/10 space-y-2 bg-black/20">
                 <Link
                     href="/dashboard/settings"
                     onClick={() => {
                         if (onCloseMobile) onCloseMobile();
                     }}
                     className={cn(
-                        "flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-300 text-gray-400 hover:text-white hover:bg-white/5",
-                        pathname === "/dashboard/settings" && "bg-white/5 text-white"
+                        "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 group",
+                        pathname === "/dashboard/settings"
+                            ? "bg-teal/15 text-teal shadow-[0_0_15px_rgba(0,191,166,0.1)] border border-teal/20"
+                            : "text-gray-400 hover:text-white hover:bg-white/5 border border-transparent"
                     )}
                 >
-                    <Settings size={20} />
-                    {!isCollapsed && <span className="font-medium text-sm">Settings</span>}
+                    <Settings size={20} className={cn("transition-colors", pathname === "/dashboard/settings" ? "text-teal" : "group-hover:text-teal")} />
+                    {!isCollapsed && <span className="font-bold text-sm">Settings</span>}
                 </Link>
 
                 <button
                     onClick={() => setCollapsed(!isCollapsed)}
-                    className="hidden md:flex w-full items-center gap-3 px-3 py-2.5 rounded-xl text-gray-500 hover:text-white transition-colors"
+                    className="hidden md:flex w-full items-center gap-3 px-4 py-3 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 transition-all group border border-transparent"
                 >
-                    {isCollapsed ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
-                    {!isCollapsed && <span className="font-medium text-sm">Collapse Sidebar</span>}
+                    <div className={cn("transition-transform duration-500", !isCollapsed && "group-hover:-translate-x-1")}>
+                        {isCollapsed ? <ChevronRight size={20} className="text-teal" /> : <ChevronLeft size={20} className="text-teal" />}
+                    </div>
+                    {!isCollapsed && <span className="font-bold text-sm">Collapse Sidebar</span>}
                 </button>
             </div>
         </aside>
