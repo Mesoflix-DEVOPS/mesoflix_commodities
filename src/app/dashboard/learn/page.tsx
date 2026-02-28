@@ -193,7 +193,7 @@ const content: Record<string, { title: string; body: React.ReactNode }> = {
         body: (
             <div className="space-y-6">
                 <p className="text-gray-300 leading-relaxed text-base">
-                    Capital.com is one of the world's most trusted and regulated online trading platforms. Founded in 2016, it has grown rapidly to serve over <span className="text-teal font-semibold">6 million clients</span> across more than <span className="text-teal font-semibold">160 countries</span>, offering access to thousands of financial instruments — from commodities and forex to stocks, indices, and cryptocurrencies.
+                    Capital.com is one of the world&apos;s most trusted and regulated online trading platforms. Founded in 2016, it has grown rapidly to serve over <span className="text-teal font-semibold">6 million clients</span> across more than <span className="text-teal font-semibold">160 countries</span>, offering access to thousands of financial instruments — from commodities and forex to stocks, indices, and cryptocurrencies.
                 </p>
                 <div className="bg-white/5 rounded-xl border border-white/10 p-5">
                     <h3 className="font-semibold text-white mb-3 flex items-center gap-2">
@@ -204,7 +204,7 @@ const content: Record<string, { title: string; body: React.ReactNode }> = {
                         <li className="flex items-start gap-2"><span className="text-teal mt-1">✓</span> Segregated client funds — your money is always kept separate from company funds.</li>
                         <li className="flex items-start gap-2"><span className="text-teal mt-1">✓</span> AI-powered risk management tools built into the platform.</li>
                         <li className="flex items-start gap-2"><span className="text-teal mt-1">✓</span> Zero commission on trades — revenue comes only from competitive spreads.</li>
-                        <li className="flex items-start gap-2"><span className="text-teal mt-1">✓</span> Named "Best Trading Platform" multiple times by leading financial publications.</li>
+                        <li className="flex items-start gap-2"><span className="text-teal mt-1">✓</span> Named &quot;Best Trading Platform&quot; multiple times by leading financial publications.</li>
                     </ul>
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -221,7 +221,7 @@ const content: Record<string, { title: string; body: React.ReactNode }> = {
                     ))}
                 </div>
                 <div className="bg-teal/5 border border-teal/20 rounded-xl p-4">
-                    <p className="text-sm text-gray-300"><span className="font-semibold text-teal">Our Connection:</span> Mesoflix integrates with Capital.com's API to give you institutional-grade market access, live prices, and the ability to execute real trades on commodities — all from within our unified dashboard.</p>
+                    <p className="text-sm text-gray-300"><span className="font-semibold text-teal">Our Connection:</span> Mesoflix integrates with Capital.com&apos;s API to give you institutional-grade market access, live prices, and the ability to execute real trades on commodities — all from within our unified dashboard.</p>
                 </div>
             </div>
         ),
@@ -231,7 +231,7 @@ const content: Record<string, { title: string; body: React.ReactNode }> = {
         body: (
             <div className="space-y-6">
                 <p className="text-gray-300 leading-relaxed">
-                    A <span className="text-teal font-semibold">Contract for Difference (CFD)</span> is a financial agreement between you and a broker to exchange the difference in the price of an asset from when you open a position to when you close it. You never actually own the underlying asset — you're simply speculating on whether its price will go up or down.
+                    A <span className="text-teal font-semibold">Contract for Difference (CFD)</span> is a financial agreement between you and a broker to exchange the difference in the price of an asset from when you open a position to when you close it. You never actually own the underlying asset — you&apos;re simply speculating on whether its price will go up or down.
                 </p>
                 <div className="grid md:grid-cols-2 gap-4">
                     <div className="bg-green-500/5 border border-green-500/20 rounded-xl p-5">
@@ -322,7 +322,7 @@ const content: Record<string, { title: string; body: React.ReactNode }> = {
                     </div>
                 </div>
                 <p className="text-gray-300 leading-relaxed">
-                    Gold has been humanity's most prized store of value for over 5,000 years. On Mesoflix, Gold (XAU/USD) is our most actively traded commodity, favoured by both our automated engines and manual traders alike.
+                    Gold has been humanity&apos;s most prized store of value for over 5,000 years. On Mesoflix, Gold (XAU/USD) is our most actively traded commodity, favoured by both our automated engines and manual traders alike.
                 </p>
                 <div className="bg-white/5 rounded-xl border border-white/10 p-5 space-y-3">
                     <h3 className="font-semibold text-white">What Moves Gold Prices?</h3>
@@ -366,7 +366,7 @@ const content: Record<string, { title: string; body: React.ReactNode }> = {
                     </div>
                     <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4">
                         <h3 className="font-semibold text-blue-400 mb-2">🌊 Brent Crude</h3>
-                        <p className="text-sm text-gray-300">The global benchmark crude oil from the North Sea. Used to price about two-thirds of the world's internationally traded oil supplies.</p>
+                        <p className="text-sm text-gray-300">The global benchmark crude oil from the North Sea. Used to price about two-thirds of the world&apos;s internationally traded oil supplies.</p>
                     </div>
                 </div>
                 <p className="text-gray-300 leading-relaxed">Oil is the lifeblood of the global economy. Its price affects everything from transportation costs to manufacturing prices, making it one of the most closely watched commodities on earth.</p>
@@ -464,7 +464,7 @@ const content: Record<string, { title: string; body: React.ReactNode }> = {
         title: "How to Trade on Mesoflix",
         body: (
             <div className="space-y-6">
-                <p className="text-gray-300 leading-relaxed">Mesoflix provides two powerful ways to trade commodities: <span className="text-teal font-semibold">Manual Trading</span> via the Trading page, and <span className="text-teal font-semibold">Automated Trading</span> via our bot engines. Here's how both work.</p>
+                <p className="text-gray-300 leading-relaxed">Mesoflix provides two powerful ways to trade commodities: <span className="text-teal font-semibold">Manual Trading</span> via the Trading page, and <span className="text-teal font-semibold">Automated Trading</span> via our bot engines. Here&apos;s how both work.</p>
                 <div className="space-y-4">
                     {[
                         {
