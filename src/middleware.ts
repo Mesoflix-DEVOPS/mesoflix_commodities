@@ -10,13 +10,13 @@ export async function middleware(request: NextRequest) {
     try {
         const { pathname } = request.nextUrl;
 
-        // 0. EXPLICIT GUARD: Never intercept static assets or favicons
-        // This prevents "MIME type mismatch" errors where assets are returned as HTML redirects.
+        // 0. EXPLICIT GUARD: Never intercept static assets, chunks, or internal Next.js data
+        // This is critical to prevent "MIME type mismatch" errors in production.
         if (
-            pathname.startsWith('/_next') ||
+            pathname.startsWith('/_next/') ||
             pathname.startsWith('/api/') ||
             pathname.includes('/favicon') ||
-            pathname.includes('.') // Matches files with extensions
+            pathname.match(/\.(js|css|png|jpg|jpeg|gif|webp|svg|ico|woff|woff2|ttf|otf|json)$/)
         ) {
             return NextResponse.next();
         }
