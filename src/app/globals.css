@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@variant dark (&:where(.dark, .dark *));
 @plugin "@tailwindcss/typography";
 @plugin "tailwindcss-animate";
 
@@ -52,15 +53,13 @@
 
 /* Base styles with dark mode support */
 body {
-  background-color: var(--color-light-gray);
-  color: var(--color-dark-blue);
+  @apply bg-light-gray text-dark-blue transition-colors duration-300;
   font-family: Arial, Helvetica, sans-serif;
   overflow-x: hidden;
 }
 
 :root.dark body {
-  background-color: var(--color-dark-blue);
-  color: #ffffff;
+  @apply bg-dark-blue text-white;
 }
 
 html {
@@ -74,5 +73,17 @@ html {
 
   .glass-dark {
     @apply bg-dark-blue/80 backdrop-blur-md border-b border-white/10;
+  }
+
+  .text-golden {
+    @apply text-transparent bg-clip-text bg-gradient-to-r from-gold via-[#FFDF00] to-[#B8860B];
+  }
+
+  .bg-golden-gradient {
+    @apply bg-gradient-to-r from-gold via-[#FFDF00] to-[#B8860B];
+  }
+
+  .border-golden {
+    @apply border-gold/50 hover:border-gold transition-colors duration-300;
   }
 }

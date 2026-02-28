@@ -9,9 +9,12 @@ const Footer = () => {
 
                     {/* Brand */}
                     <div className="col-span-1 md:col-span-1">
-                        <h3 className="text-2xl font-bold mb-4"><span className="text-white">Mesoflix_</span><span className="text-teal">Commodities</span></h3>
-                        <p className="text-gray-400 text-sm">
-                            Premium commodity trading platform powered by Capital.com API.
+                        <h3 className="text-2xl font-bold mb-4 tracking-tight">
+                            <span className="text-white">Mesoflix | </span>
+                            <span className="text-gold">Introducing Broker</span>
+                        </h3>
+                        <p className="text-gray-400 text-sm leading-relaxed">
+                            Authorized Introducing Broker platform. Advanced automation and institutional data powered by Capital.com API.
                         </p>
                     </div>
 

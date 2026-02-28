@@ -35,7 +35,7 @@ const Navbar = () => {
     return (
         <nav
             className={`fixed w-full top-0 z-50 transition-all duration-500 ${isScrolled
-                ? "bg-dark-blue/80 backdrop-blur-md py-3 shadow-2xl border-b border-white/5"
+                ? "bg-white/80 dark:bg-dark-blue/80 backdrop-blur-md py-3 shadow-2xl border-b border-dark-blue/5 dark:border-white/5"
                 : "bg-transparent py-6"
                 }`}
         >
@@ -48,9 +48,10 @@ const Navbar = () => {
                     <div className="w-8 h-8 bg-gradient-to-br from-teal to-dark-blue rounded flex items-center justify-center border border-white/10 group-hover:scale-110 transition-transform">
                         <span className="text-gold text-sm">M</span>
                     </div>
-                    <span className="text-white group-hover:text-teal transition-colors">
-                        Mesoflix_
-                        <span className="text-teal group-hover:text-gold transition-colors">Commodities</span>
+                    <span className="text-dark-blue dark:text-white group-hover:text-teal transition-colors">
+                        Mesoflix |
+                        <span className="text-teal group-hover:text-gold transition-colors ml-1 hidden sm:inline">Introducing Broker</span>
+                        <span className="text-teal group-hover:text-gold transition-colors ml-1 inline sm:hidden">IB</span>
                     </span>
                 </Link>
 
@@ -65,7 +66,7 @@ const Navbar = () => {
                     {mounted && (
                         <button
                             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-                            className="p-2.5 rounded-xl hover:bg-white/10 transition-all text-white hover:text-gold"
+                            className="p-2.5 rounded-xl hover:bg-dark-blue/5 dark:hover:bg-white/10 transition-all text-dark-blue dark:text-white hover:text-gold"
                             aria-label="Toggle Theme"
                         >
                             {theme === "dark" ? <Sun size={20} /> : <Moon size={20} />}
@@ -85,13 +86,13 @@ const Navbar = () => {
                     {mounted && (
                         <button
                             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-                            className="p-2 rounded-lg bg-white/5 text-white"
+                            className="p-2 rounded-lg bg-dark-blue/5 dark:bg-white/5 text-dark-blue dark:text-white"
                         >
                             {theme === "dark" ? <Sun size={20} /> : <Moon size={20} />}
                         </button>
                     )}
                     <button
-                        className="p-2 text-white bg-white/5 rounded-lg active:scale-90 transition-all"
+                        className="p-2 text-dark-blue dark:text-white bg-dark-blue/5 dark:bg-white/5 rounded-lg active:scale-90 transition-all"
                         onClick={() => setIsMenuOpen(!isMenuOpen)}
                     >
                         {isMenuOpen ? <X size={26} /> : <Menu size={26} />}
@@ -110,15 +111,15 @@ const Navbar = () => {
 
                     {/* Drawer Content */}
                     <div
-                        className={`absolute right-0 top-0 h-screen w-[85%] max-w-[360px] bg-[#0A1622] border-l border-white/5 flex flex-col shadow-[0_0_50px_rgba(0,0,0,0.5)] transition-transform duration-700 ease-[cubic-bezier(0.2,0.8,0.2,1)] ${isMenuOpen ? "translate-x-0" : "translate-x-full"}`}
+                        className={`absolute right-0 top-0 h-screen w-[85%] max-w-[360px] bg-white dark:bg-[#0A1622] border-l border-dark-blue/5 dark:border-white/5 flex flex-col shadow-[0_0_50px_rgba(0,0,0,0.5)] transition-transform duration-700 ease-[cubic-bezier(0.2,0.8,0.2,1)] ${isMenuOpen ? "translate-x-0" : "translate-x-full"}`}
                     >
                         {/* Drawer Header */}
-                        <div className="p-8 flex justify-between items-center border-b border-white/5">
+                        <div className="p-8 flex justify-between items-center border-b border-dark-blue/5 dark:border-white/5">
                             <div className="flex items-center gap-3">
                                 <div className="w-10 h-10 bg-gradient-to-br from-teal to-dark-blue rounded-xl flex items-center justify-center border border-white/10">
                                     <span className="text-gold font-bold">M</span>
                                 </div>
-                                <span className="text-lg font-bold text-white">Mesoflix</span>
+                                <span className="text-lg font-bold text-dark-blue dark:text-white">Mesoflix</span>
                             </div>
                             <button
                                 onClick={() => setIsMenuOpen(false)}
@@ -172,7 +173,7 @@ const Navbar = () => {
 const NavLink = ({ href, children }: { href: string; children: React.ReactNode }) => (
     <Link
         href={href}
-        className="text-white/80 hover:text-teal font-semibold transition-all duration-300 relative group text-sm tracking-wide"
+        className="text-dark-blue/80 dark:text-white/80 hover:text-teal dark:hover:text-teal font-semibold transition-all duration-300 relative group text-sm tracking-wide"
     >
         {children}
         <span className="absolute -bottom-1.5 left-0 w-0 h-[2px] bg-teal rounded-full transition-all duration-300 group-hover:w-full"></span>
@@ -183,7 +184,7 @@ const MobileNavLink = ({ href, onClick, children }: { href: string; onClick: () 
     <Link
         href={href}
         onClick={onClick}
-        className="text-3xl font-black text-white hover:text-teal transition-all flex items-center py-4 group"
+        className="text-3xl font-black text-dark-blue dark:text-white hover:text-teal transition-all flex items-center py-4 group"
     >
         {children}
     </Link>
