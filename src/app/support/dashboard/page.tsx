@@ -5,9 +5,10 @@ import { useRouter } from "next/navigation";
 import {
     LayoutDashboard, MessageSquare, Users, ShieldAlert, LogOut,
     Search, Clock, CheckCircle2, AlertCircle, MonitorPlay,
-    Send, Paperclip, MoreVertical, ShieldCheck, FileText, Activity, Loader2, X
+    Send, Paperclip, MoreVertical, ShieldCheck, FileText, Activity, Loader2, X, GraduationCap
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import AcademyManagement from "@/components/support/AcademyManagement";
 
 // Mock typings for the 3-pane architecture
 type QueueType = "UNASSIGNED" | "ASSIGNED" | "OPEN" | "ESCALATED" | "CLOSED";
@@ -34,7 +35,7 @@ export default function AgentDashboard() {
     const [sending, setSending] = useState(false);
     const [attachment, setAttachment] = useState<string | null>(null);
     const [attachmentName, setAttachmentName] = useState<string | null>(null);
-    const [activeTab, setActiveTab] = useState<"dashboard" | "chat" | "users">("chat");
+    const [activeTab, setActiveTab] = useState<"dashboard" | "chat" | "users" | "academy">("chat");
     const [showFreezeModal, setShowFreezeModal] = useState(false);
     const [showAuditModal, setShowAuditModal] = useState(false);
     const [isFreezing, setIsFreezing] = useState(false);
@@ -211,6 +212,12 @@ export default function AgentDashboard() {
                         className={cn("w-10 h-10 md:w-full md:aspect-square flex items-center justify-center rounded-xl transition-colors relative", activeTab === "users" ? "text-teal bg-teal/10 border border-teal/20" : "text-gray-400 hover:text-white hover:bg-white/5")}
                     >
                         <Users size={20} />
+                    </button>
+                    <button
+                        onClick={() => setActiveTab("academy")}
+                        className={cn("w-10 h-10 md:w-full md:aspect-square flex items-center justify-center rounded-xl transition-colors relative", activeTab === "academy" ? "text-teal bg-teal/10 border border-teal/20" : "text-gray-400 hover:text-white hover:bg-white/5")}
+                    >
+                        <GraduationCap size={20} />
                     </button>
                 </div>
 
@@ -571,6 +578,23 @@ export default function AgentDashboard() {
                                     </tbody>
                                 </table>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {activeTab === "academy" && (
+                <div className="flex-1 h-full overflow-y-auto p-4 md:p-12 bg-[#060D14]">
+                    <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in zoom-in-95 duration-500 pb-20">
+                        <div>
+                            <h1 className="text-2xl md:text-3xl font-bold text-white tracking-tight flex items-center gap-3">
+                                <GraduationCap className="text-teal" size={32} />
+                                Academy Management
+                            </h1>
+                            <p className="text-gray-400 mt-2">Upload and manage video lessons for the Learn Hub Academy.</p>
+                        </div>
+                        <div className="bg-[#0A1622] backdrop-blur-xl border border-white/10 rounded-[2.5rem] p-8 md:p-12 transition-all hover:border-white/20 shadow-2xl">
+                            <AcademyManagement />
                         </div>
                     </div>
                 </div>

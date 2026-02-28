@@ -207,3 +207,32 @@ export const automationTrades = pgTable('automation_trades', {
     created_at: timestamp('created_at').defaultNow(),
     updated_at: timestamp('updated_at').defaultNow(),
 });
+
+// Academy Classes (Learn Hub Phase 2)
+export const learnClasses = pgTable('learn_classes', {
+    id: uuid('id').defaultRandom().primaryKey(),
+    title: text('title').notNull(),
+    description: text('description').notNull(),
+    youtube_url: text('youtube_url').notNull(),
+    category: text('category').notNull().default('Beginner'), // 'Beginner', 'Intermediate', 'Advanced'
+    created_at: timestamp('created_at').defaultNow(),
+    updated_at: timestamp('updated_at').defaultNow(),
+});
+
+// User Progress in Academy
+export const userProgress = pgTable('user_progress', {
+    id: uuid('id').defaultRandom().primaryKey(),
+    user_id: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+    class_id: uuid('class_id').references(() => learnClasses.id, { onDelete: 'cascade' }).notNull(),
+    is_done: boolean('is_done').default(false),
+    updated_at: timestamp('updated_at').defaultNow(),
+});
+
+// User Notes for Academy Classes
+export const userNotes = pgTable('user_notes', {
+    id: uuid('id').defaultRandom().primaryKey(),
+    user_id: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+    class_id: uuid('class_id').references(() => learnClasses.id, { onDelete: 'cascade' }).notNull(),
+    content: text('content').notNull(),
+    updated_at: timestamp('updated_at').defaultNow(),
+});

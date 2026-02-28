@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
     BookOpen,
     ChevronDown,
@@ -17,12 +17,18 @@ import {
     Activity,
     DollarSign,
     ArrowRight,
+    Play,
+    CheckCircle2,
+    Filter,
+    Loader2,
+    GraduationCap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import AcademyPlayer from "@/components/learn/AcademyPlayer";
 
-// ─────────────────────────────────────────────
-// Data
-// ─────────────────────────────────────────────
+// -------------------------------------------------------------------------
+// Data & Constants
+// -------------------------------------------------------------------------
 
 const topics = [
     {
@@ -81,7 +87,7 @@ const topics = [
         label: "Risk Management",
         icon: Shield,
         badge: "Essential",
-        badgeColor: "bg-red-500/10 text-red-400 border-red-500/20",
+        badgeColor: "bg-red-500/10 text-red-500 border-red-500/20",
     },
     {
         id: "faq",
@@ -90,6 +96,96 @@ const topics = [
         badge: null,
     },
 ];
+
+const faqs = [
+    {
+        q: "What is Mesoflix?",
+        a: "Mesoflix is an advanced commodity trading intelligence platform that integrates with Capital.com's live market infrastructure. It allows users to trade commodities like Gold, Silver, and Oil, both manually and through automated AI-powered trading engines — all from one unified dashboard.",
+    },
+    {
+        q: "Do I need my own Capital.com account?",
+        a: "No. Mesoflix operates through a master trading system integrated with Capital.com's API. You don't need to create your own Capital.com account — all trading operations run through our platform seamlessly.",
+    },
+    {
+        q: "Is my money safe on the platform?",
+        a: "Your funds are managed via Capital.com, which is regulated by top-tier global authorities including the FCA, ASIC, and CySEC. Client funds are held in segregated bank accounts, completely separate from company operational funds.",
+    },
+    {
+        q: "What commodities can I trade?",
+        a: "We currently offer Gold (XAU/USD), Silver (XAG/USD), Crude Oil WTI, Brent Crude, and Natural Gas. We continuously add new instruments based on market demand.",
+    },
+    {
+        q: "How do automated trading engines work?",
+        a: "Our automated engines are pre-configured trading strategies that analyze live market data and execute buy/sell orders 24 hours a day, 5 days a week. You deploy an engine from the Automation page, set your risk preferences, and it operates independently while you track performance on your dashboard.",
+    },
+    {
+        q: "Can I lose more money than I deposit?",
+        a: "With the risk controls built into our system — including stop-loss orders and maximum drawdown limits on automated engines — your losses are capped at predefined levels. However, all trading carries risk and you should only trade with money you can afford to lose.",
+    },
+    {
+        q: "What are the trading hours?",
+        a: "Commodity markets are generally open 24 hours a day, Monday through Friday. Specific hours vary by instrument: Gold and Forex trade nearly continuously, while Oil follows the CME/ICE session hours with brief breaks.",
+    },
+    {
+        q: "How do I track my trading history?",
+        a: "All closed trades are recorded in the Transactions section of the sidebar. You can view your trade history, profit/loss per trade, and filter by date. The dashboard also shows your portfolio performance at a glance.",
+    },
+    {
+        q: "What is leverage and should I use it?",
+        a: "Leverage allows you to control a larger position with a smaller deposit. For example, 10:1 leverage means $100 controls a $1,000 trade. While this magnifies potential profits, it also magnifies losses proportionally. New traders should use minimal leverage until they gain experience.",
+    },
+    {
+        q: "How do I get support if I have an issue?",
+        a: "Visit the Support Hub from the sidebar. You can create a support ticket describing your issue, and our agents will respond promptly. The Support Hub shows all your open and resolved tickets.",
+    },
+    {
+        q: "What makes Mesoflix different from regular trading platforms?",
+        a: "Mesoflix combines institutional-grade Capital.com market access with AI-powered automation, real-time market intelligence, portfolio analytics, and a beautiful, intuitive interface — all in one platform. We also provide this educational hub to ensure every user understands what they're trading.",
+    },
+    {
+        q: "Is there a demo or practice mode?",
+        a: "Yes! Our automated engines support a demo mode where they operate against real market conditions but without executing live trades. This lets you test strategies risk-free before going live.",
+    },
+];
+
+function FAQSection() {
+    const [openIdx, setOpenIdx] = useState<number | null>(null);
+
+    return (
+        <div className="space-y-3">
+            {faqs.map((faq, idx) => (
+                <div
+                    key={idx}
+                    className={cn(
+                        "rounded-xl border transition-all duration-300",
+                        openIdx === idx
+                            ? "border-teal/30 bg-teal/5"
+                            : "border-white/10 bg-white/5 hover:border-white/20"
+                    )}
+                >
+                    <button
+                        className="w-full flex items-center justify-between px-5 py-4 text-left"
+                        onClick={() => setOpenIdx(openIdx === idx ? null : idx)}
+                    >
+                        <span className={cn("font-medium text-sm", openIdx === idx ? "text-teal" : "text-white")}>
+                            {faq.q}
+                        </span>
+                        {openIdx === idx ? (
+                            <ChevronUp size={16} className="text-teal flex-shrink-0" />
+                        ) : (
+                            <ChevronDown size={16} className="text-gray-500 flex-shrink-0" />
+                        )}
+                    </button>
+                    {openIdx === idx && (
+                        <div className="px-5 pb-4 text-sm text-gray-300 leading-relaxed border-t border-white/5 pt-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                            {faq.a}
+                        </div>
+                    )}
+                </div>
+            ))}
+        </div>
+    );
+}
 
 const content: Record<string, { title: string; body: React.ReactNode }> = {
     "what-is-capitalcom": {
@@ -125,7 +221,7 @@ const content: Record<string, { title: string; body: React.ReactNode }> = {
                     ))}
                 </div>
                 <div className="bg-teal/5 border border-teal/20 rounded-xl p-4">
-                    <p className="text-sm text-gray-300"><span className="font-semibold text-teal">Our Connection:</span> Mesoflix_Pro integrates with Capital.com's API to give you institutional-grade market access, live prices, and the ability to execute real trades on commodities — all from within our unified dashboard.</p>
+                    <p className="text-sm text-gray-300"><span className="font-semibold text-teal">Our Connection:</span> Mesoflix integrates with Capital.com's API to give you institutional-grade market access, live prices, and the ability to execute real trades on commodities — all from within our unified dashboard.</p>
                 </div>
             </div>
         ),
@@ -177,14 +273,14 @@ const content: Record<string, { title: string; body: React.ReactNode }> = {
         body: (
             <div className="space-y-6">
                 <p className="text-gray-300 leading-relaxed">
-                    Commodities are raw materials or primary agricultural products that are traded on exchanges worldwide. They are divided into four main categories, and Mesoflix_Pro gives you access to the most liquid and volatile of them for maximum trading opportunity.
+                    Commodities are raw materials or primary agricultural products that are traded on exchanges worldwide. They are divided into four main categories, and Mesoflix gives you access to the most liquid and volatile of them for maximum trading opportunity.
                 </p>
                 <div className="grid md:grid-cols-2 gap-4">
                     {[
                         { name: "Precious Metals", items: ["Gold (XAU/USD)", "Silver (XAG/USD)", "Platinum", "Palladium"], color: "yellow", icon: "🥇" },
-                        { name: "Energy", items: ["Crude Oil WTI", "Brent Crude", "Natural Gas", "Heating Oil"], color: "orange", icon: "⚡" },
+                        { name: "Energy", items: ["Crude Oil WTI", "Brent Crude", "Natural Gas", "Heating Oil"], color: "orange", icon: "⛽" },
                         { name: "Agriculture", items: ["Wheat", "Corn", "Soybeans", "Cotton"], color: "green", icon: "🌾" },
-                        { name: "Industrial Metals", items: ["Copper", "Aluminium", "Zinc", "Nickel"], color: "blue", icon: "🔧" },
+                        { name: "Industrial Metals", items: ["Copper", "Aluminium", "Zinc", "Nickel"], color: "blue", icon: "🛠️" },
                     ].map((cat) => (
                         <div key={cat.name} className="bg-white/5 border border-white/10 rounded-xl p-5">
                             <div className="flex items-center gap-2 mb-3">
@@ -226,16 +322,16 @@ const content: Record<string, { title: string; body: React.ReactNode }> = {
                     </div>
                 </div>
                 <p className="text-gray-300 leading-relaxed">
-                    Gold has been humanity's most prized store of value for over 5,000 years. On Mesoflix_Pro, Gold (XAU/USD) is our most actively traded commodity, favoured by both our automated engines and manual traders alike.
+                    Gold has been humanity's most prized store of value for over 5,000 years. On Mesoflix, Gold (XAU/USD) is our most actively traded commodity, favoured by both our automated engines and manual traders alike.
                 </p>
                 <div className="bg-white/5 rounded-xl border border-white/10 p-5 space-y-3">
                     <h3 className="font-semibold text-white">What Moves Gold Prices?</h3>
                     <div className="space-y-2 text-sm text-gray-300">
-                        <div className="flex gap-2"><span className="text-yellow-400">▸</span> <div><span className="text-white font-medium">US Dollar Strength:</span> Gold and the USD typically move inversely. A weaker dollar = higher gold prices.</div></div>
-                        <div className="flex gap-2"><span className="text-yellow-400">▸</span> <div><span className="text-white font-medium">Interest Rates:</span> Higher rates increase opportunity cost of holding gold (no yield), pressing prices down.</div></div>
-                        <div className="flex gap-2"><span className="text-yellow-400">▸</span> <div><span className="text-white font-medium">Geopolitical Tension:</span> Wars, political crises, and uncertainty drive investors to gold as a safe haven.</div></div>
-                        <div className="flex gap-2"><span className="text-yellow-400">▸</span> <div><span className="text-white font-medium">Inflation Data (CPI/PPI):</span> Higher inflation boosts gold demand as a purchasing power hedge.</div></div>
-                        <div className="flex gap-2"><span className="text-yellow-400">▸</span> <div><span className="text-white font-medium">Central Bank Buying:</span> When central banks purchase gold reserves, prices often surge.</div></div>
+                        <div className="flex gap-2"><span className="text-yellow-400">‣</span> <div><span className="text-white font-medium">US Dollar Strength:</span> Gold and the USD typically move inversely. A weaker dollar = higher gold prices.</div></div>
+                        <div className="flex gap-2"><span className="text-yellow-400">‣</span> <div><span className="text-white font-medium">Interest Rates:</span> Higher rates increase opportunity cost of holding gold (no yield), pressing prices down.</div></div>
+                        <div className="flex gap-2"><span className="text-yellow-400">‣</span> <div><span className="text-white font-medium">Geopolitical Tension:</span> Wars, political crises, and uncertainty drive investors to gold as a safe haven.</div></div>
+                        <div className="flex gap-2"><span className="text-yellow-400">‣</span> <div><span className="text-white font-medium">Inflation Data (CPI/PPI):</span> Higher inflation boosts gold demand as a purchasing power hedge.</div></div>
+                        <div className="flex gap-2"><span className="text-yellow-400">‣</span> <div><span className="text-white font-medium">Central Bank Buying:</span> When central banks purchase gold reserves, prices often surge.</div></div>
                     </div>
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
@@ -254,7 +350,7 @@ const content: Record<string, { title: string; body: React.ReactNode }> = {
                     ))}
                 </div>
                 <div className="bg-teal/5 border border-teal/20 rounded-xl p-4">
-                    <p className="text-sm text-gray-300"><span className="text-teal font-semibold">On Mesoflix_Pro:</span> Our Gold engines deploy advanced strategies including momentum triggers, RSI divergence detection, and moving-average crossover signals. These run 24/5 autonomously once deployed.</p>
+                    <p className="text-sm text-gray-300"><span className="text-teal font-semibold">On Mesoflix:</span> Our Gold engines deploy advanced strategies including momentum triggers, RSI divergence detection, and moving-average crossover signals. These run 24/5 autonomously once deployed.</p>
                 </div>
             </div>
         ),
@@ -277,11 +373,11 @@ const content: Record<string, { title: string; body: React.ReactNode }> = {
                 <div className="bg-white/5 rounded-xl border border-white/10 p-5 space-y-3">
                     <h3 className="font-semibold text-white">Key Price Drivers</h3>
                     <div className="space-y-2 text-sm text-gray-300">
-                        <div className="flex gap-2"><span className="text-orange-400">▸</span> <div><span className="text-white font-medium">OPEC+ Decisions:</span> Production cuts or increases by member nations directly impact supply and price.</div></div>
-                        <div className="flex gap-2"><span className="text-orange-400">▸</span> <div><span className="text-white font-medium">US Crude Inventories:</span> Weekly EIA report — higher inventories suggest oversupply and pressure prices down.</div></div>
-                        <div className="flex gap-2"><span className="text-orange-400">▸</span> <div><span className="text-white font-medium">Global Demand:</span> Economic growth, especially from China and India, drives energy demand high.</div></div>
-                        <div className="flex gap-2"><span className="text-orange-400">▸</span> <div><span className="text-white font-medium">Geopolitical Events:</span> Middle East conflicts, pipeline disruptions, and sanctions can cause sudden spikes.</div></div>
-                        <div className="flex gap-2"><span className="text-orange-400">▸</span> <div><span className="text-white font-medium">USD Strength:</span> Oil is priced in USD — a weaker dollar makes oil cheaper for foreign buyers, boosting demand.</div></div>
+                        <div className="flex gap-2"><span className="text-orange-400">‣</span> <div><span className="text-white font-medium">OPEC+ Decisions:</span> Production cuts or increases by member nations directly impact supply and price.</div></div>
+                        <div className="flex gap-2"><span className="text-orange-400">‣</span> <div><span className="text-white font-medium">US Crude Inventories:</span> Weekly EIA report — higher inventories suggest oversupply and pressure prices down.</div></div>
+                        <div className="flex gap-2"><span className="text-orange-400">‣</span> <div><span className="text-white font-medium">Global Demand:</span> Economic growth, especially from China and India, drives energy demand high.</div></div>
+                        <div className="flex gap-2"><span className="text-orange-400">‣</span> <div><span className="text-white font-medium">Geopolitical Events:</span> Middle East conflicts, pipeline disruptions, and sanctions can cause sudden spikes.</div></div>
+                        <div className="flex gap-2"><span className="text-orange-400">‣</span> <div><span className="text-white font-medium">USD Strength:</span> Oil is priced in USD — a weaker dollar makes oil cheaper for foreign buyers, boosting demand.</div></div>
                     </div>
                 </div>
             </div>
@@ -320,10 +416,10 @@ const content: Record<string, { title: string; body: React.ReactNode }> = {
                                     ["Price Range", "$1,800–$2,500+", "$20–$35+"],
                                     ["Gold/Silver Ratio", "—", "~75–90x cheaper"],
                                 ].map(([f, g, s]) => (
-                                    <tr key={f}>
-                                        <td className="py-2 text-white">{f}</td>
-                                        <td className="py-2 text-yellow-400">{g}</td>
-                                        <td className="py-2 text-gray-300">{s}</td>
+                                    <tr key={f as string}>
+                                        <td className="py-2 text-white">{f as string}</td>
+                                        <td className="py-2 text-yellow-400">{g as string}</td>
+                                        <td className="py-2 text-gray-300">{s as string}</td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -341,7 +437,7 @@ const content: Record<string, { title: string; body: React.ReactNode }> = {
         body: (
             <div className="space-y-6">
                 <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4 flex gap-3">
-                    <span className="text-2xl">⚡</span>
+                    <span className="text-2xl">🔥</span>
                     <div>
                         <p className="text-blue-400 font-semibold">NATGAS / NG</p>
                         <p className="text-sm text-gray-400">Priced per MMBtu (Million British Thermal Units). One of the most volatile commodities in the world.</p>
@@ -351,10 +447,10 @@ const content: Record<string, { title: string; body: React.ReactNode }> = {
                 <div className="bg-white/5 rounded-xl border border-white/10 p-5 space-y-3">
                     <h3 className="font-semibold text-white">What Moves Natural Gas Prices?</h3>
                     <div className="space-y-2 text-sm text-gray-300">
-                        <div className="flex gap-2"><span className="text-blue-400">▸</span> <div><span className="text-white font-medium">Weather Forecasts:</span> Cold winters and hot summers spike demand for heating and cooling.</div></div>
-                        <div className="flex gap-2"><span className="text-blue-400">▸</span> <div><span className="text-white font-medium">EIA Storage Reports:</span> Weekly inventory data — low storage = higher prices.</div></div>
-                        <div className="flex gap-2"><span className="text-blue-400">▸</span> <div><span className="text-white font-medium">LNG Export Levels:</span> More exports reduce domestic supply and push prices up.</div></div>
-                        <div className="flex gap-2"><span className="text-blue-400">▸</span> <div><span className="text-white font-medium">Geopolitical Events:</span> The Russia-Ukraine war showed how dramatically gas prices can spike on supply concerns.</div></div>
+                        <div className="flex gap-2"><span className="text-blue-400">‣</span> <div><span className="text-white font-medium">Weather Forecasts:</span> Cold winters and hot summers spike demand for heating and cooling.</div></div>
+                        <div className="flex gap-2"><span className="text-blue-400">‣</span> <div><span className="text-white font-medium">EIA Storage Reports:</span> Weekly inventory data — low storage = higher prices.</div></div>
+                        <div className="flex gap-2"><span className="text-blue-400">‣</span> <div><span className="text-white font-medium">LNG Export Levels:</span> More exports reduce domestic supply and push prices up.</div></div>
+                        <div className="flex gap-2"><span className="text-blue-400">‣</span> <div><span className="text-white font-medium">Geopolitical Events:</span> Supply concerns can cause sudden spikes.</div></div>
                     </div>
                 </div>
                 <div className="bg-yellow-500/5 border border-yellow-500/20 rounded-xl p-4 flex gap-3">
@@ -365,16 +461,16 @@ const content: Record<string, { title: string; body: React.ReactNode }> = {
         ),
     },
     "how-to-trade": {
-        title: "How to Trade on Mesoflix_Pro",
+        title: "How to Trade on Mesoflix",
         body: (
             <div className="space-y-6">
-                <p className="text-gray-300 leading-relaxed">Mesoflix_Pro provides two powerful ways to trade commodities: <span className="text-teal font-semibold">Manual Trading</span> via the Trading page, and <span className="text-teal font-semibold">Automated Trading</span> via our bot engines. Here's how both work.</p>
+                <p className="text-gray-300 leading-relaxed">Mesoflix provides two powerful ways to trade commodities: <span className="text-teal font-semibold">Manual Trading</span> via the Trading page, and <span className="text-teal font-semibold">Automated Trading</span> via our bot engines. Here's how both work.</p>
                 <div className="space-y-4">
                     {[
                         {
                             step: "1",
                             title: "Connect Your Account",
-                            desc: "Mesoflix_Pro connects to Capital.com via our master trading system. Simply log in — your trades will execute through our integrated Capital.com API connection automatically.",
+                            desc: "Mesoflix connects to Capital.com via our master trading system. Simply log in — your trades will execute through our integrated Capital.com API connection automatically.",
                         },
                         {
                             step: "2",
@@ -438,7 +534,7 @@ const content: Record<string, { title: string; body: React.ReactNode }> = {
                     ))}
                 </div>
                 <div className="bg-teal/5 border border-teal/20 rounded-xl p-4">
-                    <p className="text-sm text-gray-300"><span className="text-teal font-semibold">Mesoflix_Pro Safety Features:</span> Our automated engines come with built-in stop-loss mechanisms, maximum drawdown limits, and circuit breakers that pause trading if market conditions become unusually volatile.</p>
+                    <p className="text-sm text-gray-300"><span className="text-teal font-semibold">Mesoflix Safety Features:</span> Our automated engines come with built-in stop-loss mechanisms, maximum drawdown limits, and circuit breakers that pause trading if market conditions become unusually volatile.</p>
                 </div>
             </div>
         ),
@@ -449,177 +545,256 @@ const content: Record<string, { title: string; body: React.ReactNode }> = {
     },
 };
 
-// ─────────────────────────────────────────────
-// FAQ Section
-// ─────────────────────────────────────────────
-
-const faqs = [
-    {
-        q: "What is Mesoflix_Pro?",
-        a: "Mesoflix_Pro is an advanced commodity trading intelligence platform that integrates with Capital.com's live market infrastructure. It allows users to trade commodities like Gold, Silver, and Oil, both manually and through automated AI-powered trading engines — all from one unified dashboard.",
-    },
-    {
-        q: "Do I need my own Capital.com account?",
-        a: "No. Mesoflix_Pro operates through a master trading system integrated with Capital.com's API. You don't need to create your own Capital.com account — all trading operations run through our platform seamlessly.",
-    },
-    {
-        q: "Is my money safe on the platform?",
-        a: "Your funds are managed via Capital.com, which is regulated by top-tier global authorities including the FCA, ASIC, and CySEC. Client funds are held in segregated bank accounts, completely separate from company operational funds.",
-    },
-    {
-        q: "What commodities can I trade?",
-        a: "We currently offer Gold (XAU/USD), Silver (XAG/USD), Crude Oil WTI, Brent Crude, and Natural Gas. We continuously add new instruments based on market demand.",
-    },
-    {
-        q: "How do automated trading engines work?",
-        a: "Our automated engines are pre-configured trading strategies that analyze live market data and execute buy/sell orders 24 hours a day, 5 days a week. You deploy an engine from the Automation page, set your risk preferences, and it operates independently while you track performance on your dashboard.",
-    },
-    {
-        q: "Can I lose more money than I deposit?",
-        a: "With the risk controls built into our system — including stop-loss orders and maximum drawdown limits on automated engines — your losses are capped at predefined levels. However, all trading carries risk and you should only trade with money you can afford to lose.",
-    },
-    {
-        q: "What are the trading hours?",
-        a: "Commodity markets are generally open 24 hours a day, Monday through Friday. Specific hours vary by instrument: Gold and Forex trade nearly continuously, while Oil follows the CME/ICE session hours with brief breaks.",
-    },
-    {
-        q: "How do I track my trading history?",
-        a: "All closed trades are recorded in the Transactions section of the sidebar. You can view your trade history, profit/loss per trade, and filter by date. The dashboard also shows your portfolio performance at a glance.",
-    },
-    {
-        q: "What is leverage and should I use it?",
-        a: "Leverage allows you to control a larger position with a smaller deposit. For example, 10:1 leverage means $100 controls a $1,000 trade. While this magnifies potential profits, it also magnifies losses proportionally. New traders should use minimal leverage until they gain experience.",
-    },
-    {
-        q: "How do I get support if I have an issue?",
-        a: "Visit the Support Hub from the sidebar. You can create a support ticket describing your issue, and our agents will respond promptly. The Support Hub shows all your open and resolved tickets.",
-    },
-    {
-        q: "What makes Mesoflix_Pro different from regular trading platforms?",
-        a: "Mesoflix_Pro combines institutional-grade Capital.com market access with AI-powered automation, real-time market intelligence, portfolio analytics, and a beautiful, intuitive interface — all in one platform. We also provide this educational hub to ensure every user understands what they're trading.",
-    },
-    {
-        q: "Is there a demo or practice mode?",
-        a: "Yes! Our automated engines support a demo mode where they operate against real market conditions but without executing live trades. This lets you test strategies risk-free before going live.",
-    },
-];
-
-function FAQSection() {
-    const [openIdx, setOpenIdx] = useState<number | null>(null);
-
-    return (
-        <div className="space-y-3">
-            {faqs.map((faq, idx) => (
-                <div
-                    key={idx}
-                    className={cn(
-                        "rounded-xl border transition-all duration-300",
-                        openIdx === idx
-                            ? "border-teal/30 bg-teal/5"
-                            : "border-white/10 bg-white/5 hover:border-white/20"
-                    )}
-                >
-                    <button
-                        className="w-full flex items-center justify-between px-5 py-4 text-left"
-                        onClick={() => setOpenIdx(openIdx === idx ? null : idx)}
-                    >
-                        <span className={cn("font-medium text-sm", openIdx === idx ? "text-teal" : "text-white")}>
-                            {faq.q}
-                        </span>
-                        {openIdx === idx ? (
-                            <ChevronUp size={16} className="text-teal flex-shrink-0" />
-                        ) : (
-                            <ChevronDown size={16} className="text-gray-500 flex-shrink-0" />
-                        )}
-                    </button>
-                    {openIdx === idx && (
-                        <div className="px-5 pb-4 text-sm text-gray-300 leading-relaxed border-t border-white/5 pt-3">
-                            {faq.a}
-                        </div>
-                    )}
-                </div>
-            ))}
-        </div>
-    );
-}
-
-// ─────────────────────────────────────────────
-// Main Page
-// ─────────────────────────────────────────────
-
 export default function LearnHubPage() {
+    const [view, setView] = useState<"guide" | "academy">("guide");
     const [activeTopic, setActiveTopic] = useState("what-is-capitalcom");
+    const [classes, setClasses] = useState<any[]>([]);
+    const [filteredClasses, setFilteredClasses] = useState<any[]>([]);
+    const [activeFilter, setActiveFilter] = useState("All");
+    const [isLoading, setIsLoading] = useState(false);
+    const [selectedLesson, setSelectedLesson] = useState<any | null>(null);
+
+    useEffect(() => {
+        if (view === "academy") {
+            fetchClasses();
+        }
+    }, [view]);
+
+    const fetchClasses = async () => {
+        setIsLoading(true);
+        try {
+            const res = await fetch("/api/academy/classes");
+            if (res.ok) {
+                const data = await res.json();
+                setClasses(data);
+                setFilteredClasses(data);
+            }
+        } catch (err) {
+            console.error("Failed to fetch classes", err);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        if (activeFilter === "All") {
+            setFilteredClasses(classes);
+        } else {
+            setFilteredClasses(classes.filter(c => c.category === activeFilter));
+        }
+    }, [activeFilter, classes]);
 
     const activeContent = content[activeTopic];
+
+    // If a lesson is selected, show the player view
+    if (selectedLesson) {
+        return (
+            <div className="min-h-screen bg-[#070E14] text-white p-6 md:p-12 max-w-7xl mx-auto">
+                <AcademyPlayer
+                    lesson={selectedLesson}
+                    onBack={() => setSelectedLesson(null)}
+                />
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-[#070E14] text-white">
             {/* Header */}
-            <div className="border-b border-white/5 bg-[#0A1622] px-6 md:px-8 py-5">
+            <div className="border-b border-white/5 bg-[#0A1622] px-6 md:px-8 py-5 flex flex-col md:flex-row md:items-center justify-between gap-6">
                 <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-teal/10 border border-teal/20 flex items-center justify-center">
-                        <BookOpen size={18} className="text-teal" />
+                    <div className="w-10 h-10 rounded-2xl bg-teal/10 border border-teal/20 flex items-center justify-center shadow-[0_0_15px_rgba(0,191,166,0.1)]">
+                        <BookOpen size={20} className="text-teal" />
                     </div>
                     <div>
-                        <h1 className="font-bold text-lg text-white">Learn Hub</h1>
-                        <p className="text-xs text-gray-500">Your complete guide to trading on Mesoflix_Pro & Capital.com</p>
+                        <h1 className="font-bold text-xl text-white tracking-tight text-glow-teal">Learn Hub</h1>
+                        <p className="text-[10px] text-gray-500 uppercase tracking-[0.2em] font-black">Educational Intelligence</p>
                     </div>
                 </div>
             </div>
 
-            {/* Body */}
-            <div className="flex flex-col md:flex-row min-h-[calc(100vh-73px)]">
+            {/* View Toggle - Now Inside Content Area for better flow */}
+            <div className="px-6 md:px-12 pt-8 pb-4">
+                <div className="inline-flex bg-[#0A1622]/80 backdrop-blur-xl p-1.5 rounded-[1.5rem] border border-white/10 shadow-2xl relative overflow-hidden group">
+                    <div className="absolute inset-0 bg-gradient-to-r from-teal/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <button
+                        onClick={() => setView("guide")}
+                        className={cn(
+                            "flex items-center gap-3 px-8 py-3 rounded-[1.2rem] font-black transition-all text-[11px] uppercase tracking-wider z-10",
+                            view === "guide"
+                                ? "bg-gradient-to-r from-teal to-[#14d4bc] text-[#060D14] shadow-[0_8px_20px_rgba(0,191,166,0.3)] scale-105"
+                                : "text-gray-500 hover:text-white hover:bg-white/5"
+                        )}
+                    >
+                        <Shield size={14} className={cn(view === "guide" ? "animate-pulse" : "")} />
+                        Capital.com Guide
+                    </button>
+                    <button
+                        onClick={() => setView("academy")}
+                        className={cn(
+                            "flex items-center gap-3 px-8 py-3 rounded-[1.2rem] font-black transition-all text-[11px] uppercase tracking-wider z-10",
+                            view === "academy"
+                                ? "bg-gradient-to-r from-teal to-[#14d4bc] text-[#060D14] shadow-[0_8px_20px_rgba(0,191,166,0.3)] scale-105"
+                                : "text-gray-500 hover:text-white hover:bg-white/5"
+                        )}
+                    >
+                        <GraduationCap size={14} className={cn(view === "academy" ? "animate-pulse" : "")} />
+                        Trading Academy
+                    </button>
+                </div>
+            </div>
 
-                {/* Topic Navigator */}
-                <aside className="w-full md:w-72 md:min-h-full border-b md:border-b-0 md:border-r border-white/5 bg-[#0A1622] p-4 shrink-0">
-                    <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-3 px-1">Topics</p>
-                    <div className="space-y-1">
-                        {topics.map((topic) => {
-                            const isActive = activeTopic === topic.id;
-                            return (
+            {view === "guide" ? (
+                /* Original Guide Layout */
+                <div className="flex flex-col md:flex-row min-h-[calc(100vh-89px)] animate-in fade-in duration-500">
+                    <aside className="w-full md:w-80 md:min-h-full border-b md:border-b-0 md:border-r border-white/5 bg-[#0A1622] p-6 shrink-0">
+                        <p className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] mb-4 px-1">Curriculum</p>
+                        <div className="space-y-1.5">
+                            {topics.map((topic) => {
+                                const isActive = activeTopic === topic.id;
+                                return (
+                                    <button
+                                        key={topic.id}
+                                        onClick={() => setActiveTopic(topic.id)}
+                                        className={cn(
+                                            "w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-left transition-all duration-300 group",
+                                            isActive
+                                                ? "bg-teal/10 border border-teal/20 text-teal shadow-[0_4px_15px_rgba(0,191,166,0.05)]"
+                                                : "text-gray-400 hover:text-white hover:bg-white/5 border border-transparent"
+                                        )}
+                                    >
+                                        <topic.icon size={16} className={cn("flex-shrink-0 transition-colors", isActive ? "text-teal" : "group-hover:text-teal")} />
+                                        <span className="text-sm font-semibold">{topic.label}</span>
+                                        {topic.badge && (
+                                            <span className={cn("ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full border transform scale-90", topic.badgeColor)}>
+                                                {topic.badge}
+                                            </span>
+                                        )}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                        <div className="mt-8 p-5 bg-teal/5 border border-teal/20 rounded-[2rem] relative overflow-hidden group">
+                            <div className="absolute -right-4 -bottom-4 opacity-5 group-hover:scale-110 transition-transform">
+                                <Lightbulb size={80} className="text-teal" />
+                            </div>
+                            <div className="flex items-center gap-2 mb-2">
+                                <Lightbulb size={16} className="text-teal" />
+                                <span className="text-xs font-bold text-teal uppercase tracking-widest">Expert Tip</span>
+                            </div>
+                            <p className="text-xs text-gray-400 leading-relaxed font-medium">Start with the Capital.com overview and CFD explanations before exploring individual commodities.</p>
+                        </div>
+                    </aside>
+
+                    <main className="flex-1 p-8 md:p-12 max-w-5xl">
+                        <div className="mb-8">
+                            <h2 className="text-3xl md:text-4xl font-bold text-white tracking-tight">{activeContent?.title}</h2>
+                            <div className="mt-3 w-16 h-1 rounded-full bg-gradient-to-r from-teal to-transparent" />
+                        </div>
+                        <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
+                            {activeContent?.body}
+                        </div>
+                    </main>
+                </div>
+            ) : (
+                /* Academy Layout */
+                <div className="p-6 md:p-12 max-w-7xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
+                        <div>
+                            <h2 className="text-3xl md:text-4xl font-bold text-white tracking-tight flex items-center gap-3">
+                                <GraduationCap className="text-teal" size={32} />
+                                Learn Trading from Scratch
+                            </h2>
+                            <p className="text-gray-400 mt-2 text-lg">Master the markets with our step-by-step video academy.</p>
+                        </div>
+
+                        {/* Filters */}
+                        <div className="flex items-center gap-2 bg-white/5 p-1 rounded-2xl border border-white/10">
+                            {["All", "Beginner", "Intermediate", "Advanced"].map((f) => (
                                 <button
-                                    key={topic.id}
-                                    onClick={() => setActiveTopic(topic.id)}
+                                    key={f}
+                                    onClick={() => setActiveFilter(f)}
                                     className={cn(
-                                        "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-all duration-200",
-                                        isActive
-                                            ? "bg-teal/10 border border-teal/20 text-teal"
-                                            : "text-gray-400 hover:text-white hover:bg-white/5 border border-transparent"
+                                        "px-5 py-2.5 rounded-xl font-bold text-xs transition-all",
+                                        activeFilter === f ? "bg-teal text-dark-blue shadow-lg" : "text-gray-400 hover:text-white"
                                     )}
                                 >
-                                    <topic.icon size={16} className={cn("flex-shrink-0 transition-colors", isActive ? "text-teal" : "group-hover:text-teal")} />
-                                    <span className="text-sm font-medium">{topic.label}</span>
-                                    {topic.badge && (
-                                        <span className={cn("ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full border", topic.badgeColor)}>
-                                            {topic.badge}
-                                        </span>
-                                    )}
+                                    {f}
                                 </button>
-                            );
-                        })}
-                    </div>
-
-                    {/* Tip Box */}
-                    <div className="mt-6 p-4 bg-teal/5 border border-teal/20 rounded-xl">
-                        <div className="flex items-center gap-2 mb-2">
-                            <Lightbulb size={14} className="text-teal" />
-                            <span className="text-xs font-semibold text-teal">Pro Tip</span>
+                            ))}
                         </div>
-                        <p className="text-xs text-gray-400 leading-relaxed">Start with the Capital.com overview and CFD explanations before exploring individual commodities.</p>
                     </div>
-                </aside>
 
-                {/* Content Area */}
-                <main className="flex-1 p-6 md:p-8 max-w-4xl">
-                    <div className="mb-6">
-                        <h2 className="text-2xl font-bold text-white">{activeContent?.title}</h2>
-                        <div className="mt-1 w-12 h-0.5 rounded bg-teal" />
-                    </div>
-                    <div>
-                        {activeContent?.body}
-                    </div>
-                </main>
+                    {isLoading ? (
+                        <div className="flex flex-col items-center justify-center py-24 gap-4">
+                            <Loader2 className="animate-spin text-teal" size={48} />
+                            <p className="text-gray-400 font-bold uppercase tracking-widest text-sm">Loading curriculum...</p>
+                        </div>
+                    ) : filteredClasses.length === 0 ? (
+                        <div className="text-center py-24 bg-white/5 border border-dashed border-white/10 rounded-[3rem]">
+                            <div className="bg-white/5 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <Filter size={32} className="text-gray-600" />
+                            </div>
+                            <h3 className="text-xl font-bold text-gray-400">No lessons found in this category</h3>
+                            <button
+                                onClick={() => setActiveFilter("All")}
+                                className="mt-4 text-teal hover:underline font-bold"
+                            >
+                                Clear filters
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+                            {filteredClasses.map((cls) => (
+                                <LessonCard key={cls.id} lesson={cls} onClick={() => setSelectedLesson(cls)} />
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+}
+
+function LessonCard({ lesson, onClick }: { lesson: any; onClick: () => void }) {
+    const videoId = lesson.youtube_url.includes('v=')
+        ? lesson.youtube_url.split('v=')[1]?.split('&')[0]
+        : lesson.youtube_url.split('/').pop();
+    const thumbnail = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
+
+    return (
+        <div
+            onClick={onClick}
+            className="group bg-white/5 border border-white/10 rounded-[2.5rem] p-6 transition-all hover:bg-white/10 hover:border-teal/30 hover:-translate-y-2 flex flex-col h-full relative overflow-hidden cursor-pointer"
+        >
+            {/* Thumbnail with Play Button */}
+            <div className="aspect-video bg-black rounded-3xl mb-6 relative overflow-hidden flex items-center justify-center group-hover:scale-[1.02] transition-transform shadow-2xl border border-white/5">
+                <img src={thumbnail} alt={lesson.title} className="absolute inset-0 w-full h-full object-cover opacity-60 group-hover:opacity-80 transition-opacity" />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#070E14] to-transparent opacity-80" />
+                <div className="w-14 h-14 rounded-full bg-teal flex items-center justify-center text-dark-blue shadow-[0_0_20px_rgba(0,191,166,0.4)] group-hover:scale-110 transition-transform relative z-10">
+                    <Play fill="currentColor" size={24} className="ml-1" />
+                </div>
+                <div className="absolute top-4 right-4 z-20">
+                    <span className={cn(
+                        "text-[10px] font-black uppercase px-3 py-1 rounded-full backdrop-blur-md border",
+                        lesson.category === "Beginner" && "bg-teal/20 text-teal border-teal/30",
+                        lesson.category === "Intermediate" && "bg-yellow-500/20 text-yellow-500 border-yellow-500/30",
+                        lesson.category === "Advanced" && "bg-red-500/20 text-red-500 border-red-500/30",
+                    )}>
+                        {lesson.category}
+                    </span>
+                </div>
             </div>
+
+            <div className="flex-1">
+                <h3 className="text-xl font-bold text-white mb-2 group-hover:text-teal transition-colors leading-tight">{lesson.title}</h3>
+                <p className="text-sm text-gray-400 line-clamp-2 leading-relaxed mb-6">{lesson.description}</p>
+            </div>
+
+            <button className="w-full bg-white/5 hover:bg-teal text-white hover:text-dark-blue font-black py-4 rounded-2xl transition-all flex items-center justify-center gap-2 group/btn border border-white/10 hover:border-teal">
+                <CheckCircle2 size={18} className="text-teal group-hover/btn:text-dark-blue" />
+                <span>Start Lesson</span>
+            </button>
         </div>
     );
 }

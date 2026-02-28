@@ -50,7 +50,39 @@ export async function POST(req: Request) {
             });
         }
 
-        // If not enabled, generate a new secret for setup
+        // If 2FA is NOT enabled and the secret is already set, or we just want to allow direct login:
+        // The user specifically wants to remove 2FA for John. 
+        // We check if we should force setup or just log in.
+        // For John, we'll allow direct login if 2FA is disabled.
+
+        if (!agent.two_factor_enabled && agent.email === 'john@gmail.com') {
+            // Generate FINAL session JWT
+            const sessionToken = await new jose.SignJWT({
+                sub: agent.id,
+                email: agent.email,
+                role: agent.role
+            })
+                .setProtectedHeader({ alg: 'HS256' })
+                .setIssuedAt()
+                .setExpirationTime('24h')
+                .sign(JWT_SECRET);
+
+            const response = NextResponse.json({
+                success: true,
+                message: 'Login successful'
+            });
+
+            response.cookies.set('agent_session', sessionToken, {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: 'lax',
+                maxAge: 60 * 60 * 24 // 24 hours
+            });
+
+            return response;
+        }
+
+        // If not enabled and needs setup (not John), generate a new secret for setup
         const buffer = randomBytes(20);
         const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
         let secret = '';
