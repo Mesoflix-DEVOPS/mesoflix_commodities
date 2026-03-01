@@ -33,27 +33,15 @@ function ensureEnvVars() {
     }
 }
 
-function runBuild() {
+function setup() {
     try {
-        // 1. Clean up old build artifacts
-        console.log('[Build] Cleaning up .next directory...');
-        const nextDir = path.join(process.cwd(), '.next');
-        if (fs.existsSync(nextDir)) {
-            fs.rmSync(nextDir, { recursive: true, force: true });
-        }
-
-        // 2. Ensure env vars are set before building
+        console.log('[Pre-build] Ensuring environment variables are set...');
         ensureEnvVars();
-
-        // 3. Run the actual build
-        console.log('[Build] Starting next build...');
-        execSync('npx next build', { stdio: 'inherit' });
-
-        console.log('[Build] Success!');
+        console.log('[Pre-build] Success!');
     } catch (error) {
-        console.error('[Build] Failed:', error.message);
+        console.error('[Pre-build] Failed:', error.message);
         process.exit(1);
     }
 }
 
-runBuild();
+setup();

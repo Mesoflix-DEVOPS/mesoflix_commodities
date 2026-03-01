@@ -4,8 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "prebuild": "node scripts/setup-env.js",
     "build": "next build",
-    "build:prod": "node scripts/build-prod.js",
     "start": "next start",
     "lint": "eslint"
   },
