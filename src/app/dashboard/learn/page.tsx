@@ -615,14 +615,14 @@ export default function LearnHubPage() {
 
             {/* View Toggle - Now Inside Content Area for better flow */}
             <div className="px-6 md:px-12 pt-8 pb-4">
-                <div className="inline-flex bg-[#0A1622]/80 backdrop-blur-xl p-1.5 rounded-[1.5rem] border border-white/10 shadow-2xl relative overflow-hidden group">
+                <div className="flex flex-col sm:flex-row sm:inline-flex bg-[#0A1622]/80 backdrop-blur-xl p-1.5 rounded-[1.5rem] border border-white/10 shadow-2xl relative overflow-hidden group w-full sm:w-auto">
                     <div className="absolute inset-0 bg-gradient-to-r from-teal/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                     <button
                         onClick={() => setView("guide")}
                         className={cn(
-                            "flex items-center gap-3 px-8 py-3 rounded-[1.2rem] font-black transition-all text-[11px] uppercase tracking-wider z-10",
+                            "flex-1 sm:flex-none flex justify-center items-center gap-2 md:gap-3 px-4 md:px-8 py-3 rounded-[1.2rem] font-black transition-all text-[11px] uppercase tracking-wider z-10",
                             view === "guide"
-                                ? "bg-gradient-to-r from-teal to-[#14d4bc] text-[#060D14] shadow-[0_8px_20px_rgba(0,191,166,0.3)] scale-105"
+                                ? "bg-gradient-to-r from-teal to-[#14d4bc] text-[#060D14] shadow-[0_8px_20px_rgba(0,191,166,0.3)] scale-[1.02] sm:scale-105"
                                 : "text-gray-500 hover:text-white hover:bg-white/5"
                         )}
                     >
@@ -632,9 +632,9 @@ export default function LearnHubPage() {
                     <button
                         onClick={() => setView("academy")}
                         className={cn(
-                            "flex items-center gap-3 px-8 py-3 rounded-[1.2rem] font-black transition-all text-[11px] uppercase tracking-wider z-10",
+                            "flex-1 sm:flex-none flex justify-center items-center gap-2 md:gap-3 px-4 md:px-8 py-3 rounded-[1.2rem] font-black transition-all text-[11px] uppercase tracking-wider z-10",
                             view === "academy"
-                                ? "bg-gradient-to-r from-teal to-[#14d4bc] text-[#060D14] shadow-[0_8px_20px_rgba(0,191,166,0.3)] scale-105"
+                                ? "bg-gradient-to-r from-teal to-[#14d4bc] text-[#060D14] shadow-[0_8px_20px_rgba(0,191,166,0.3)] scale-[1.02] sm:scale-105"
                                 : "text-gray-500 hover:text-white hover:bg-white/5"
                         )}
                     >
@@ -647,9 +647,9 @@ export default function LearnHubPage() {
             {view === "guide" ? (
                 /* Original Guide Layout */
                 <div className="flex flex-col md:flex-row min-h-[calc(100vh-89px)] animate-in fade-in duration-500">
-                    <aside className="w-full md:w-80 md:min-h-full border-b md:border-b-0 md:border-r border-white/5 bg-[#0A1622] p-6 shrink-0">
-                        <p className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] mb-4 px-1">Curriculum</p>
-                        <div className="space-y-1.5">
+                    <aside className="w-full md:w-80 md:min-h-full border-b md:border-b-0 md:border-r border-white/5 bg-[#0A1622] p-4 md:p-6 shrink-0 z-10 sticky top-0 md:static">
+                        <p className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] mb-3 px-1 hidden md:block">Curriculum</p>
+                        <div className="flex overflow-x-auto md:flex-col md:overflow-visible gap-2 md:space-y-1.5 pb-3 md:pb-0 scrollbar-hide -mx-4 px-4 md:mx-0 md:px-0">
                             {topics.map((topic) => {
                                 const isActive = activeTopic === topic.id;
                                 return (
@@ -657,16 +657,16 @@ export default function LearnHubPage() {
                                         key={topic.id}
                                         onClick={() => setActiveTopic(topic.id)}
                                         className={cn(
-                                            "w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-left transition-all duration-300 group",
+                                            "flex-shrink-0 md:w-full flex items-center gap-2 md:gap-3 px-4 md:px-4 py-2.5 md:py-3 rounded-[1rem] md:rounded-2xl text-left transition-all duration-300 group whitespace-nowrap md:whitespace-normal",
                                             isActive
                                                 ? "bg-teal/10 border border-teal/20 text-teal shadow-[0_4px_15px_rgba(0,191,166,0.05)]"
-                                                : "text-gray-400 hover:text-white hover:bg-white/5 border border-transparent"
+                                                : "text-gray-400 hover:text-white border border-transparent bg-white/[0.03] md:bg-transparent md:hover:bg-white/5"
                                         )}
                                     >
-                                        <topic.icon size={16} className={cn("flex-shrink-0 transition-colors", isActive ? "text-teal" : "group-hover:text-teal")} />
+                                        <topic.icon size={16} className={cn("flex-shrink-0 transition-colors hidden md:block", isActive ? "text-teal" : "group-hover:text-teal")} />
                                         <span className="text-sm font-semibold">{topic.label}</span>
                                         {topic.badge && (
-                                            <span className={cn("ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full border transform scale-90", topic.badgeColor)}>
+                                            <span className={cn("hidden md:inline-block ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full border transform scale-90", topic.badgeColor)}>
                                                 {topic.badge}
                                             </span>
                                         )}
@@ -674,7 +674,7 @@ export default function LearnHubPage() {
                                 );
                             })}
                         </div>
-                        <div className="mt-8 p-5 bg-teal/5 border border-teal/20 rounded-[2rem] relative overflow-hidden group">
+                        <div className="mt-8 p-5 bg-teal/5 border border-teal/20 rounded-[2rem] relative overflow-hidden group hidden md:block">
                             <div className="absolute -right-4 -bottom-4 opacity-5 group-hover:scale-110 transition-transform">
                                 <Lightbulb size={80} className="text-teal" />
                             </div>
