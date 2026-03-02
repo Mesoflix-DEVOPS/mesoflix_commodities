@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { verifyAccessToken } from '@/lib/auth';
+import { verifyAccessToken } from '@/lib/auth-utils';
 
 // Only protect page routes here. API routes handle their own auth in Node runtime.
 const PROTECTED_ROUTES = ['/dashboard'];
