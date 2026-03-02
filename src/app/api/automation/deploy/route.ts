@@ -15,7 +15,18 @@ export async function POST(req: Request) {
         const userId = session.user.id;
         const body = await req.json();
 
-        const { engine_id, commodity, allocated_capital, risk_multiplier, stop_loss_cap, action, status } = body;
+        const {
+            engine_id,
+            commodity,
+            allocated_capital,
+            risk_multiplier,
+            stop_loss_cap,
+            target_profit,
+            daily_stop_loss,
+            risk_level,
+            action,
+            status
+        } = body;
 
         // Action: Update existing deployment state
         if (action === "update_state") {
@@ -34,8 +45,11 @@ export async function POST(req: Request) {
             await db.update(automationDeployments)
                 .set({
                     allocated_capital: allocated_capital.toString(),
-                    risk_multiplier: risk_multiplier.toString(),
+                    risk_multiplier: risk_multiplier?.toString() || "1.0",
                     stop_loss_cap: stop_loss_cap.toString(),
+                    target_profit: target_profit?.toString() || null,
+                    daily_stop_loss: daily_stop_loss?.toString() || null,
+                    risk_level: risk_level || "Balanced",
                     status: "Running",
                     updated_at: new Date()
                 })
@@ -46,8 +60,11 @@ export async function POST(req: Request) {
                 engine_id,
                 commodity,
                 allocated_capital: allocated_capital.toString(),
-                risk_multiplier: risk_multiplier.toString(),
+                risk_multiplier: risk_multiplier?.toString() || "1.0",
                 stop_loss_cap: stop_loss_cap.toString(),
+                target_profit: target_profit?.toString() || null,
+                daily_stop_loss: daily_stop_loss?.toString() || null,
+                risk_level: risk_level || "Balanced",
                 status: "Running",
                 mode: "demo", // Currently locked to demo for safety during execution loops
             });

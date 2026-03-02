@@ -290,7 +290,7 @@ function ManualTab({ mode }: { mode: string }) {
                 </div>
 
                 {/* Chart box */}
-                <div className="bg-[#0E1B2A] rounded-3xl border border-white/5 p-5">
+                <div className="bg-[#0E1B2A] rounded-3xl border border-white/5 p-3 md:p-5">
                     {/* Toolbar: resolution (internal only) + TV toggle */}
                     <div className="flex items-center gap-2 mb-4 flex-wrap">
                         {chartSource === "internal" && (["MINUTE_5", "MINUTE_30", "HOUR", "DAY"] as Resolution[]).map((r, i) => (
@@ -322,14 +322,14 @@ function ManualTab({ mode }: { mode: string }) {
                             )}
                         >
                             {chartSource === "tradingview"
-                                ? <><LineChart size={11} /> Our Chart</>
+                                ? <><LineChart size={11} /> Market Pulse</>
                                 : <><ExternalLink size={11} /> TradingView</>
                             }
                         </button>
                     </div>
 
                     {/* Chart area */}
-                    <div className="h-72 w-full">
+                    <div className="h-[480px] w-full">
                         {chartSource === "tradingview" ? (
                             <TradingViewChart tvSymbol={instrument.tvSymbol} />
                         ) : chartLoading && chartData.length === 0 ? (

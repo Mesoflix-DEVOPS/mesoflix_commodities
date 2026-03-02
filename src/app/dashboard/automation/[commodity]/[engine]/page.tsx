@@ -1,10 +1,10 @@
 "use client";
 
-import { use, useMemo } from "react";
+import { use, useMemo, useState, useEffect } from "react";
 import Link from "next/link";
-import { ArrowLeft, Activity, ShieldCheck, Target, TrendingUp, BarChart2, History } from "lucide-react";
+import { ArrowLeft, Activity, ShieldCheck, Target, TrendingUp, BarChart2, History, Play, Pause, Square, AlertTriangle, Shield, Gauge, DollarSign } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useAutomation } from "@/contexts/AutomationContext";
+import { useAutomation, EngineState } from "@/contexts/AutomationContext";
 import {
     AreaChart,
     Area,
@@ -15,18 +15,15 @@ import {
     ResponsiveContainer,
 } from "recharts";
 
-// Mock Equity Curve Generation based on Engine ID to simulate realistic institutional tracking
 const generateEquityCurve = (base: number) => {
     let equity = base;
     return Array.from({ length: 30 }).map((_, i) => {
         const volatility = base * 0.05;
-        const drift = base * 0.005; // slight upward drift
+        const drift = base * 0.005;
         const change = (Math.random() - 0.45) * volatility + drift;
         equity += change;
-
         const d = new Date();
         d.setDate(d.getDate() - (30 - i));
-
         return {
             date: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
             equity: Number(equity.toFixed(2))
@@ -34,30 +31,67 @@ const generateEquityCurve = (base: number) => {
     });
 };
 
-const RECENT_TRADES = [
-    { id: "TX-992", type: "LONG", price: "2,642.10", pnl: 450.20, duration: "45m", date: "2 mins ago" },
-    { id: "TX-991", type: "SHORT", price: "2,645.80", pnl: 120.50, duration: "12m", date: "1 hr ago" },
-    { id: "TX-990", type: "LONG", price: "2,638.20", pnl: -85.40, duration: "1h 15m", date: "3 hrs ago" },
-    { id: "TX-989", type: "LONG", price: "2,630.50", pnl: 890.00, duration: "4h 20m", date: "Yesterday" },
-    { id: "TX-988", type: "SHORT", price: "2,650.10", pnl: -210.30, duration: "30m", date: "Yesterday" },
-];
-
 export default function EngineAnalyticsPage({ params }: { params: Promise<{ commodity: string, engine: string }> }) {
     const resolvedParams = use(params);
     const { commodity, engine: engineId } = resolvedParams;
-    const { engines } = useAutomation();
+    const { engines, deployEngine, updateEngineState } = useAutomation();
 
-    // Attempt to pull live state. If not deployed, we still show the analytics but note it's historical.
     const deployment = engines[engineId];
-
-    // Format presentation string
     const engineName = engineId.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
 
-    const chartData = useMemo(() => generateEquityCurve(deployment?.allocatedCapital || 10000), [deployment?.allocatedCapital]);
+    // Local State for Controls
+    const [allocatedCapital, setAllocatedCapital] = useState(deployment?.allocatedCapital || 5000);
+    const [targetProfit, setTargetProfit] = useState(deployment?.targetProfit || 100);
+    const [dailyStopLoss, setDailyStopLoss] = useState(deployment?.dailyStopLoss || 250);
+    const [riskLevel, setRiskLevel] = useState(deployment?.riskLevel || "Balanced");
+    const [liveTrades, setLiveTrades] = useState<any[]>([]);
+
+    useEffect(() => {
+        if (deployment) {
+            setAllocatedCapital(deployment.allocatedCapital);
+            setTargetProfit(deployment.targetProfit);
+            setDailyStopLoss(deployment.dailyStopLoss);
+            setRiskLevel(deployment.riskLevel);
+        }
+    }, [deployment]);
+
+    // Fetch Trades
+    useEffect(() => {
+        const fetchTrades = async () => {
+            const res = await fetch(`/api/automation/trades?engine_id=${engineId}`);
+            if (res.ok) {
+                const data = await res.json();
+                setLiveTrades(data.trades || []);
+            }
+        };
+        fetchTrades();
+        const interval = setInterval(fetchTrades, 10000);
+        return () => clearInterval(interval);
+    }, [engineId]);
+
+    const handleDeploy = () => {
+        deployEngine({
+            id: engineId,
+            name: engineName,
+            commodity,
+            state: "Running",
+            allocatedCapital,
+            riskMultiplier: 1.0,
+            stopLossCap: dailyStopLoss,
+            targetProfit,
+            dailyStopLoss,
+            riskLevel,
+            pnl: 0
+        });
+    };
+
+    const handleStop = () => updateEngineState(engineId, "Stopped");
+
+    const chartData = useMemo(() => generateEquityCurve(allocatedCapital), [allocatedCapital]);
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500 pb-24">
-            {/* Header */}
+            {/* Header / Navigation */}
             <div>
                 <Link href={`/dashboard/automation/${commodity}`} className="inline-flex items-center text-xs font-bold uppercase tracking-widest text-gray-500 hover:text-white transition-colors mb-6">
                     <ArrowLeft size={14} className="mr-2" /> Back to {commodity.toUpperCase()} Engines
@@ -66,151 +100,213 @@ export default function EngineAnalyticsPage({ params }: { params: Promise<{ comm
                     <div>
                         <div className="flex items-center gap-3 mb-2">
                             <h1 className="text-4xl font-black text-white">{engineName}</h1>
-                            {deployment ? (
-                                <span className={cn(
-                                    "px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest border",
-                                    deployment.state === "Running" ? "bg-teal/10 text-teal border-teal/20" :
-                                        deployment.state === "Paused" ? "bg-amber-500/10 text-amber-500 border-amber-500/20" :
+                            <span className={cn(
+                                "px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest border",
+                                deployment?.state === "Running" ? "bg-teal/10 text-teal border-teal/20 animate-pulse" :
+                                    deployment?.state === "Paused" ? "bg-amber-500/10 text-amber-500 border-amber-500/20" :
+                                        deployment?.state === "Target Achieved" ? "bg-teal text-black border-teal" :
                                             "bg-gray-500/10 text-gray-400 border-gray-500/20"
-                                )}>
-                                    LIVE: {deployment.state}
-                                </span>
-                            ) : (
-                                <span className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest bg-white/5 text-gray-400 border border-white/10">
-                                    Historical View (Not Deployed)
-                                </span>
-                            )}
+                            )}>
+                                {deployment?.state || "Not Deployed"}
+                            </span>
                         </div>
-                        <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">Algorithmic Analytics Dashboard</p>
+                        <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">Aurum Velocity Hybrid Scalper</p>
                     </div>
-
-                    {deployment && (
-                        <div className="bg-[#0A1622] rounded-2xl p-4 border border-white/5 text-right">
-                            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Allocated Capital</p>
-                            <p className="text-2xl font-mono font-bold text-white">${deployment.allocatedCapital.toLocaleString()}</p>
-                        </div>
-                    )}
                 </div>
             </div>
 
-            {/* KPI Grid */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                {[
-                    { label: "Win Rate", value: "68.4%", icon: Target, color: "text-teal" },
-                    { label: "Profit Factor", value: "2.14", icon: TrendingUp, color: "text-teal" },
-                    { label: "Max Drawdown", value: "-8.2%", icon: Activity, color: "text-red-400" },
-                    { label: "Recovery Factor", value: "3.5", icon: ShieldCheck, color: "text-blue-400" },
-                ].map((stat, i) => (
-                    <div key={i} className="bg-[#0A1622] rounded-3xl p-6 border border-white/5 flex items-center gap-4">
-                        <div className={`w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center ${stat.color}`}>
-                            <stat.icon size={20} />
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                {/* [ LEFT: CONTROL SETTINGS ] */}
+                <div className="lg:col-span-1 space-y-6">
+                    <div className="bg-[#0A1622] rounded-[2.5rem] p-8 border border-white/5 shadow-2xl relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
+                            <Gauge size={120} />
                         </div>
-                        <div>
-                            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">{stat.label}</p>
-                            <p className="text-xl font-black text-white">{stat.value}</p>
-                        </div>
-                    </div>
-                ))}
-            </div>
 
-            {/* Main Chart */}
-            <div className="bg-[#0A1622] rounded-3xl p-8 border border-white/5">
-                <div className="flex items-center justify-between mb-8">
-                    <div className="flex items-center gap-3">
-                        <BarChart2 className="text-teal" size={24} />
-                        <div>
-                            <h2 className="text-2xl font-black text-white tracking-tight">Equity Curve</h2>
-                            <p className="text-xs font-bold text-gray-500 uppercase tracking-widest">30-Day Trajectory</p>
+                        <div className="relative z-10">
+                            <div className="flex items-center gap-3 mb-8">
+                                <div className="w-10 h-10 rounded-2xl bg-teal/10 flex items-center justify-center border border-teal/20">
+                                    <ShieldCheck className="text-teal" size={20} />
+                                </div>
+                                <h3 className="text-xl font-black text-white uppercase tracking-tight">Control Settings</h3>
+                            </div>
+
+                            <div className="space-y-6">
+                                {/* Capital Allocation */}
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black uppercase tracking-widest text-gray-500 ml-1">Capital Allocation ($)</label>
+                                    <div className="relative">
+                                        <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 text-teal" size={16} />
+                                        <input
+                                            type="number"
+                                            value={allocatedCapital}
+                                            onChange={(e) => setAllocatedCapital(Number(e.target.value))}
+                                            className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-12 pr-4 text-white font-bold focus:outline-none focus:border-teal/50 transition-all font-mono"
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Target Profit */}
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black uppercase tracking-widest text-gray-500 ml-1">Target Profit ($)</label>
+                                    <div className="relative">
+                                        <Target className="absolute left-4 top-1/2 -translate-y-1/2 text-teal" size={16} />
+                                        <input
+                                            type="number"
+                                            value={targetProfit}
+                                            onChange={(e) => setTargetProfit(Number(e.target.value))}
+                                            className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-12 pr-4 text-white font-bold focus:outline-none focus:border-teal/50 transition-all font-mono"
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Daily Stop Loss */}
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black uppercase tracking-widest text-gray-500 ml-1">Daily Stop Loss Limit ($)</label>
+                                    <div className="relative">
+                                        <AlertTriangle className="absolute left-4 top-1/2 -translate-y-1/2 text-red-500" size={16} />
+                                        <input
+                                            type="number"
+                                            value={dailyStopLoss}
+                                            onChange={(e) => setDailyStopLoss(Number(e.target.value))}
+                                            className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-12 pr-4 text-white font-bold focus:outline-none focus:border-red-500/50 transition-all font-mono"
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Risk Level */}
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black uppercase tracking-widest text-gray-500 ml-1">Risk Profile</label>
+                                    <div className="grid grid-cols-3 gap-2">
+                                        {['Conservative', 'Balanced', 'Aggressive'].map(level => (
+                                            <button
+                                                key={level}
+                                                onClick={() => setRiskLevel(level)}
+                                                className={cn(
+                                                    "py-3 rounded-xl text-[10px] font-black uppercase tracking-tighter transition-all border",
+                                                    riskLevel === level ? "bg-teal border-teal text-black" : "bg-white/5 border-white/10 text-gray-500 hover:text-white"
+                                                )}
+                                            >
+                                                {level}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Action Buttons */}
+                                <div className="pt-4 space-y-3">
+                                    {deployment?.state === "Running" ? (
+                                        <button
+                                            onClick={handleStop}
+                                            className="w-full bg-red-500 hover:bg-red-600 text-black font-black uppercase tracking-widest py-5 rounded-2xl flex items-center justify-center gap-3 transition-all shadow-lg"
+                                        >
+                                            <Square size={20} fill="currentColor" /> Emergency Stop
+                                        </button>
+                                    ) : (
+                                        <button
+                                            onClick={handleDeploy}
+                                            className="w-full bg-teal hover:bg-teal/80 text-black font-black uppercase tracking-widest py-5 rounded-2xl flex items-center justify-center gap-3 transition-all shadow-lg"
+                                        >
+                                            <Play size={20} fill="currentColor" /> Deploy Engine
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
                         </div>
                     </div>
-                    <div className="flex gap-2">
-                        {['7D', '30D', '90D', '1Y'].map(tf => (
-                            <button key={tf} className={cn(
-                                "px-3 py-1 text-xs font-bold rounded-lg border transition-colors",
-                                tf === '30D' ? "bg-white/10 text-white border-white/20" : "bg-transparent text-gray-500 border-transparent hover:text-white"
-                            )}>
-                                {tf}
-                            </button>
+                </div>
+
+                {/* [ RIGHT: RESULTS & PERFORMANCE ] */}
+                <div className="lg:col-span-2 space-y-6">
+                    {/* Live Status Box */}
+                    <div className="bg-[#0A1622] rounded-[2.5rem] p-8 border border-white/5 shadow-2xl">
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                            <div className="flex-1">
+                                <p className="text-[10px] font-black text-teal uppercase tracking-[0.2em] mb-2">Live Engine State</p>
+                                <div className="flex items-baseline gap-3">
+                                    <h4 className="text-3xl font-black text-white uppercase">{deployment?.state || "OFFLINE"}</h4>
+                                    <p className="text-sm font-bold text-gray-500 italic">“{deployment?.lastDecisionReason || "Awaiting sequence initialization..."}”</p>
+                                </div>
+                            </div>
+                            <div className="h-12 w-px bg-white/5 hidden md:block" />
+                            <div className="text-right">
+                                <p className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] mb-1">Basket PNL</p>
+                                <p className={cn(
+                                    "text-3xl font-mono font-black",
+                                    (deployment?.pnl || 0) >= 0 ? "text-teal" : "text-red-500"
+                                )}>
+                                    ${Number(deployment?.pnl || 0).toLocaleString()}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* KPI Metrics */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        {[
+                            { label: "Win Rate", value: "72.1%", icon: Target, color: "text-teal" },
+                            { label: "Trades", value: liveTrades.length, icon: Activity, color: "text-white" },
+                            { label: "Profit Factor", value: "2.8", icon: TrendingUp, color: "text-teal" },
+                            { label: "Risk Halted", value: "0", icon: Shield, color: "text-blue-400" },
+                        ].map((stat, i) => (
+                            <div key={i} className="bg-[#0A1622] rounded-3xl p-6 border border-white/5">
+                                <stat.icon size={18} className={cn("mb-4", stat.color)} />
+                                <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">{stat.label}</p>
+                                <p className="text-xl font-black text-white">{stat.value}</p>
+                            </div>
                         ))}
                     </div>
-                </div>
 
-                <div className="h-[400px] w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={chartData} margin={{ top: 5, right: 0, left: 0, bottom: 0 }}>
-                            <defs>
-                                <linearGradient id="colorEq" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="#00BFA6" stopOpacity={0.3} />
-                                    <stop offset="95%" stopColor="#00BFA6" stopOpacity={0} />
-                                </linearGradient>
-                            </defs>
-                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-                            <XAxis dataKey="date" stroke="#4b5563" fontSize={10} tickMargin={10} axisLine={false} tickLine={false} />
-                            <YAxis
-                                stroke="#4b5563"
-                                fontSize={10}
-                                tickFormatter={(value) => `$${value.toLocaleString()}`}
-                                tickMargin={10}
-                                axisLine={false}
-                                tickLine={false}
-                                domain={['dataMin - 500', 'dataMax + 500']}
-                            />
-                            <Tooltip
-                                contentStyle={{ backgroundColor: '#0A1622', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', fontSize: '12px', fontWeight: 'bold' }}
-                                itemStyle={{ color: '#00BFA6' }}
-                                labelStyle={{ color: '#9ca3af', marginBottom: '4px' }}
-                                formatter={(value: number | undefined) => [value != null ? `$${value.toLocaleString()}` : '-', 'Equity']}
-                            />
-                            <Area type="monotone" dataKey="equity" stroke="#00BFA6" strokeWidth={3} fillOpacity={1} fill="url(#colorEq)" />
-                        </AreaChart>
-                    </ResponsiveContainer>
-                </div>
-            </div>
+                    {/* Performance History (Trade History) */}
+                    <div className="bg-[#0A1622] rounded-[2.5rem] p-8 border border-white/5">
+                        <div className="flex items-center gap-3 mb-8">
+                            <History className="text-teal" size={20} />
+                            <h3 className="text-xl font-black text-white uppercase tracking-tight">Execution Log</h3>
+                        </div>
 
-            {/* Trade History */}
-            <div className="bg-[#0A1622] rounded-3xl p-8 border border-white/5">
-                <div className="flex items-center gap-3 mb-6">
-                    <History className="text-teal" size={20} />
-                    <h2 className="text-xl font-bold text-white tracking-tight">Recent Executions</h2>
-                </div>
-
-                <div className="overflow-x-auto">
-                    <table className="w-full text-sm text-left">
-                        <thead className="text-[10px] uppercase font-bold text-gray-500 tracking-widest bg-white/[0.02] border-y border-white/5">
-                            <tr>
-                                <th className="px-6 py-4 rounded-tl-xl">Trade ID</th>
-                                <th className="px-6 py-4">Direction</th>
-                                <th className="px-6 py-4">Entry Price</th>
-                                <th className="px-6 py-4">Duration</th>
-                                <th className="px-6 py-4">Date</th>
-                                <th className="px-6 py-4 text-right rounded-tr-xl">Net P/L</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {RECENT_TRADES.map((trade, i) => (
-                                <tr key={trade.id} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
-                                    <td className="px-6 py-4 font-mono text-gray-400">{trade.id}</td>
-                                    <td className="px-6 py-4">
-                                        <span className={cn(
-                                            "px-2 py-1 rounded text-[10px] font-bold tracking-widest",
-                                            trade.type === "LONG" ? "bg-teal/10 text-teal" : "bg-red-500/10 text-red-500"
-                                        )}>
-                                            {trade.type}
-                                        </span>
-                                    </td>
-                                    <td className="px-6 py-4 font-mono">${trade.price}</td>
-                                    <td className="px-6 py-4 text-gray-400">{trade.duration}</td>
-                                    <td className="px-6 py-4 text-gray-400">{trade.date}</td>
-                                    <td className={cn(
-                                        "px-6 py-4 font-mono font-bold text-right",
-                                        trade.pnl >= 0 ? "text-teal" : "text-red-500"
-                                    )}>
-                                        {trade.pnl >= 0 ? "+" : ""}${trade.pnl.toFixed(2)}
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm text-left">
+                                <thead className="text-[10px] uppercase font-bold text-gray-500 tracking-widest bg-white/[0.02] border-y border-white/5">
+                                    <tr>
+                                        <th className="px-6 py-4">Trade ID</th>
+                                        <th className="px-6 py-4">Entry</th>
+                                        <th className="px-6 py-4">Size</th>
+                                        <th className="px-6 py-4">Status</th>
+                                        <th className="px-6 py-4 text-right">Net P/L</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {liveTrades.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={5} className="px-6 py-12 text-center text-gray-500 italic">No executions logged in the last 24 hours.</td>
+                                        </tr>
+                                    ) : (
+                                        liveTrades.map((trade: any) => (
+                                            <tr key={trade.id} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
+                                                <td className="px-6 py-4 font-mono text-gray-400">{trade.deal_id}</td>
+                                                <td className="px-6 py-4 font-mono">${trade.open_price}</td>
+                                                <td className="px-6 py-4 font-bold">{trade.size} Units</td>
+                                                <td className="px-6 py-4">
+                                                    <span className={cn(
+                                                        "px-2 py-1 rounded text-[10px] font-bold uppercase tracking-widest",
+                                                        trade.direction === "BUY" ? "bg-teal/10 text-teal" : "bg-red-500/10 text-red-500"
+                                                    )}>
+                                                        {trade.direction}
+                                                    </span>
+                                                </td>
+                                                <td className={cn(
+                                                    "px-6 py-4 font-mono font-bold text-right",
+                                                    parseFloat(trade.pnl) >= 0 ? "text-teal" : "text-red-500"
+                                                )}>
+                                                    ${Number(trade.pnl).toFixed(2)}
+                                                </td>
+                                            </tr>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

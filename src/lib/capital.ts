@@ -244,7 +244,7 @@ export const placeOrder = async (
         trailingStop?: boolean;
     }
 ) => {
-    const API_URL = LIVE_API_URL;
+    const API_URL = getApiUrl(accountIsDemo);
 
     const body: Record<string, any> = {
         epic,
@@ -283,7 +283,7 @@ export const closePosition = async (
     dealId: string,
     accountIsDemo: boolean = false
 ) => {
-    const API_URL = LIVE_API_URL;
+    const API_URL = getApiUrl(accountIsDemo);
 
     const response = await fetch(`${API_URL}/positions/${dealId}`, {
         method: 'DELETE',

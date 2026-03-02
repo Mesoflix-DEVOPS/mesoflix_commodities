@@ -58,9 +58,9 @@ export async function GET(request: Request) {
             // account switching via PUT /session internally.
 
             const [accountsData, positionsData, historyData] = await Promise.all([
-                getAccounts(session.cst, session.xSecurityToken, false),
-                getPositions(session.cst, session.xSecurityToken, false),
-                getHistory(session.cst, session.xSecurityToken, false)
+                getAccounts(session.cst, session.xSecurityToken, isDemo),
+                getPositions(session.cst, session.xSecurityToken, isDemo),
+                getHistory(session.cst, session.xSecurityToken, isDemo)
             ]);
 
             const accounts = (accountsData.accounts || []).map((a: any) => ({
@@ -96,9 +96,9 @@ export async function GET(request: Request) {
                     const isDemo2 = modeInput === 'demo';
                     const session = await getValidSession(userId, isDemo2, true);
                     const [accountsData, positionsData, historyData] = await Promise.all([
-                        getAccounts(session.cst, session.xSecurityToken, false),
-                        getPositions(session.cst, session.xSecurityToken, false),
-                        getHistory(session.cst, session.xSecurityToken, false)
+                        getAccounts(session.cst, session.xSecurityToken, isDemo2),
+                        getPositions(session.cst, session.xSecurityToken, isDemo2),
+                        getHistory(session.cst, session.xSecurityToken, isDemo2)
                     ]);
                     const accounts = (accountsData.accounts || []).map((a: any) => ({
                         ...a,

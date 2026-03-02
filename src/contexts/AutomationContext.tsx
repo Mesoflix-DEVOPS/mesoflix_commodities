@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from "react";
 
-export type EngineState = "Not Deployed" | "Running" | "Paused" | "Stopped" | "Error";
+export type EngineState = "Not Deployed" | "Running" | "Paused" | "Stopped" | "Error" | "Target Achieved" | "Risk Halted" | "Cooldown";
 
 export interface EngineDetails {
     id: string;
@@ -12,6 +12,10 @@ export interface EngineDetails {
     allocatedCapital: number;
     riskMultiplier: number;
     stopLossCap: number;
+    targetProfit: number;
+    dailyStopLoss: number;
+    riskLevel: string;
+    lastDecisionReason?: string;
     pnl: number;
 }
 
@@ -43,6 +47,10 @@ export function AutomationProvider({ children }: { children: ReactNode }) {
                         allocatedCapital: parseFloat(dep.allocated_capital),
                         riskMultiplier: parseFloat(dep.risk_multiplier || "1"),
                         stopLossCap: parseFloat(dep.stop_loss_cap || "20"),
+                        targetProfit: parseFloat(dep.target_profit || "0"),
+                        dailyStopLoss: parseFloat(dep.daily_stop_loss || "0"),
+                        riskLevel: dep.risk_level || "Balanced",
+                        lastDecisionReason: dep.last_decision_reason,
                         pnl: parseFloat(dep.pnl || "0"),
                     };
                 });
@@ -91,6 +99,9 @@ export function AutomationProvider({ children }: { children: ReactNode }) {
                 allocated_capital: engine.allocatedCapital,
                 risk_multiplier: engine.riskMultiplier,
                 stop_loss_cap: engine.stopLossCap,
+                target_profit: engine.targetProfit,
+                daily_stop_loss: engine.dailyStopLoss,
+                risk_level: engine.riskLevel,
             })
         });
     };

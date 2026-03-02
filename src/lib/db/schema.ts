@@ -183,9 +183,15 @@ export const automationDeployments = pgTable('automation_deployments', {
     allocated_capital: text('allocated_capital').notNull(),
     risk_multiplier: text('risk_multiplier').default('1.0'),
     stop_loss_cap: text('stop_loss_cap').notNull(),
-    status: text('status').default('Running'), // 'Running', 'Paused', 'Stopped'
+    status: text('status').default('Running'), // 'Running', 'Paused', 'Stopped', 'Cooldown', 'Target Achieved', 'Risk Halted'
     mode: text('mode').default('demo'), // 'demo' or 'live'
     pnl: text('pnl').default('0'), // Running PNL for display
+    target_profit: text('target_profit'),
+    daily_stop_loss: text('daily_stop_loss'),
+    risk_level: text('risk_level').default('Balanced'), // 'Conservative', 'Balanced', 'Aggressive'
+    last_decision_reason: text('last_decision_reason'),
+    metrics: text('metrics'), // JSON string for performance data
+    cooldown_until: timestamp('cooldown_until'),
     created_at: timestamp('created_at').defaultNow(),
     updated_at: timestamp('updated_at').defaultNow(),
 });
