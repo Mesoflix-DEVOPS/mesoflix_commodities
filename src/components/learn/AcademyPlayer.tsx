@@ -40,6 +40,7 @@ export default function AcademyPlayer({ lesson, onBack }: AcademyPlayerProps) {
     const [isSaving, setIsSaving] = useState(false);
     const [isDone, setIsDone] = useState(false);
     const [isNotesActive, setIsNotesActive] = useState(false);
+    const [showFullDescription, setShowFullDescription] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
     const playerRef = useRef<HTMLDivElement>(null);
     const timeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -241,9 +242,9 @@ export default function AcademyPlayer({ lesson, onBack }: AcademyPlayerProps) {
     };
 
     return (
-        <div className="animate-in fade-in slide-in-from-bottom-6 duration-700">
-            {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+        <div className="animate-in fade-in slide-in-from-bottom-6 duration-700 flex flex-col gap-0 md:gap-4 h-full">
+            {/* Header - Transparent and professional on mobile */}
+            <div className="flex flex-col gap-4 p-4 md:p-0 md:mb-8 bg-[#0A1622]/50 md:bg-transparent backdrop-blur-md md:backdrop-blur-none border-b border-white/5 md:border-none">
                 <button
                     onClick={onBack}
                     className="flex items-center gap-2 text-gray-400 hover:text-teal transition-colors group w-fit"
@@ -254,10 +255,10 @@ export default function AcademyPlayer({ lesson, onBack }: AcademyPlayerProps) {
                     <span className="font-bold uppercase tracking-widest text-[10px] sm:text-xs">Back to curriculum</span>
                 </button>
 
-                <div className="flex items-center gap-2 sm:gap-3">
+                <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-2 md:pb-0 -mx-4 px-4 md:mx-0 md:px-0">
                     <button
                         onClick={exportToPDF}
-                        className="flex-1 sm:flex-none justify-center bg-white/5 hover:bg-white/10 text-white px-3 sm:px-4 py-2.5 sm:py-2 rounded-xl text-[10px] sm:text-xs font-bold transition-all border border-white/10 flex items-center gap-2 whitespace-nowrap"
+                        className="flex-shrink-0 bg-white/5 hover:bg-white/10 text-white px-4 py-2.5 rounded-xl text-[10px] sm:text-xs font-black uppercase tracking-[0.15em] transition-all border border-white/10 flex items-center gap-2 whitespace-nowrap"
                     >
                         <FileDown size={14} className="text-teal" />
                         Export Notes
@@ -265,7 +266,7 @@ export default function AcademyPlayer({ lesson, onBack }: AcademyPlayerProps) {
                     <button
                         onClick={toggleComplete}
                         className={cn(
-                            "flex-1 sm:flex-none justify-center px-3 sm:px-4 py-2.5 sm:py-2 rounded-xl text-[10px] sm:text-xs font-bold transition-all flex items-center gap-2 border whitespace-nowrap",
+                            "flex-shrink-0 px-4 py-2.5 rounded-xl text-[10px] sm:text-xs font-black uppercase tracking-[0.15em] transition-all flex items-center gap-2 border whitespace-nowrap",
                             isDone
                                 ? "bg-teal/20 text-teal border-teal/30 hover:bg-teal/30"
                                 : "bg-white/5 text-gray-400 border-white/10 hover:border-teal/30 hover:text-white"
@@ -277,10 +278,10 @@ export default function AcademyPlayer({ lesson, onBack }: AcademyPlayerProps) {
                 </div>
             </div>
 
-            <div className="grid lg:grid-cols-3 gap-8">
+            <div className="grid lg:grid-cols-3 gap-0 md:gap-8">
                 {/* Player Section */}
-                <div className="lg:col-span-2 space-y-6 min-w-0">
-                    <div className="bg-black aspect-video rounded-3xl sm:rounded-[2.5rem] overflow-hidden shadow-2xl border border-white/10 relative group">
+                <div className="lg:col-span-2 space-y-0 md:space-y-6 min-w-0">
+                    <div className="bg-black aspect-video md:rounded-[2.5rem] overflow-hidden shadow-2xl md:border border-white/10 relative group">
                         <div id="youtube-player" className="w-full h-full" />
 
                         {!player && (
@@ -308,7 +309,7 @@ export default function AcademyPlayer({ lesson, onBack }: AcademyPlayerProps) {
                         )}
                     </div>
 
-                    <div>
+                    <div className="p-5 md:p-0">
                         <div className="flex items-center gap-3 mb-3">
                             <span className={cn(
                                 "text-[10px] font-black uppercase px-3 py-1 rounded-full border",
@@ -319,14 +320,28 @@ export default function AcademyPlayer({ lesson, onBack }: AcademyPlayerProps) {
                                 {lesson.category}
                             </span>
                         </div>
-                        <h1 className="text-2xl sm:text-3xl font-bold text-white mb-4 leading-tight">{lesson.title}</h1>
-                        <p className="text-gray-400 leading-relaxed text-base sm:text-lg">{lesson.description}</p>
+                        <h1 className="text-xl sm:text-3xl font-black text-white mb-3 leading-tight tracking-tight uppercase">{lesson.title}</h1>
+
+                        <div className="relative">
+                            <p className={cn(
+                                "text-gray-400 leading-relaxed text-sm sm:text-lg transition-all duration-500",
+                                !showFullDescription && "line-clamp-2 md:line-clamp-none"
+                            )}>
+                                {lesson.description}
+                            </p>
+                            <button
+                                onClick={() => setShowFullDescription(!showFullDescription)}
+                                className="md:hidden mt-2 text-teal text-[10px] font-black uppercase tracking-widest hover:text-white transition-colors"
+                            >
+                                {showFullDescription ? "View Less ▲" : "Read More ▼"}
+                            </button>
+                        </div>
                     </div>
                 </div>
 
                 {/* Notes Section */}
-                <div className="space-y-6 h-fit min-w-0">
-                    <div className="bg-[#0A1622] border border-white/10 rounded-3xl sm:rounded-[2.5rem] overflow-hidden flex flex-col h-[400px] sm:h-[500px] shadow-2xl">
+                <div className="p-5 md:p-0 space-y-6 h-fit min-w-0">
+                    <div className="bg-[#0A1622] border border-white/10 md:rounded-[2.5rem] rounded-3xl overflow-hidden flex flex-col h-[400px] sm:h-[500px] shadow-2xl">
                         <div className="p-6 border-b border-white/10 flex items-center justify-between bg-white/[0.02]">
                             <div className="flex items-center gap-2">
                                 <MessageSquare size={18} className="text-teal" />
