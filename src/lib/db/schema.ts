@@ -209,6 +209,7 @@ export const automationTrades = pgTable('automation_trades', {
     open_price: text('open_price'),
     close_price: text('close_price'),
     pnl: text('pnl').notNull(),
+    status: text('status').default('Open'), // 'Open' or 'Closed'
     mode: text('mode').default('demo'), // 'demo' or 'live'
     created_at: timestamp('created_at').defaultNow(),
     updated_at: timestamp('updated_at').defaultNow(),

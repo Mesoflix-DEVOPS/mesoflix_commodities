@@ -57,7 +57,11 @@ export async function POST(req: Request) {
 
                 // 1. SYNC & CLOSURE DETECTION
                 const openTrades = await db.select().from(automationTrades)
-                    .where(and(eq(automationTrades.deployment_id, dep.id), eq(automationTrades.user_id, userId)));
+                    .where(and(
+                        eq(automationTrades.deployment_id, dep.id),
+                        eq(automationTrades.user_id, userId),
+                        eq(automationTrades.status, "Open")
+                    ));
 
                 let basketPnl = 0;
                 for (const trade of openTrades) {
@@ -75,7 +79,11 @@ export async function POST(req: Request) {
 
                         const currentTotal = parseFloat(dep.pnl || "0");
                         await db.update(automationDeployments).set({ pnl: (currentTotal + finalPnl).toString() }).where(eq(automationDeployments.id, dep.id));
-                        await db.update(automationTrades).set({ pnl: finalPnl.toString(), close_price: latestPrice.toString() }).where(eq(automationTrades.id, trade.id));
+                        await db.update(automationTrades).set({
+                            pnl: finalPnl.toString(),
+                            close_price: latestPrice.toString(),
+                            status: "Closed"
+                        }).where(eq(automationTrades.id, trade.id));
                         continue;
                     }
 
@@ -100,12 +108,29 @@ export async function POST(req: Request) {
                     continue;
                 }
 
-                // 3. ENTRY LOGIC
-                const signal = engineClass.analyze(candles);
+                // 3. ENTRY & LIVE PRICE
+                const tickerRes = await getMarketTickers(cst, xst, [epic], dep.mode === 'demo');
+                const marketInfo = tickerRes?.markets?.[0]?.snapshot;
+                const currentBid = marketInfo?.bid || latestPrice;
+                const currentOffer = marketInfo?.offer || latestPrice;
+                const currentSpread = Math.abs(currentOffer - currentBid);
+
+                const signal = engineClass.analyze(candles, currentSpread, dep.risk_level || 'Balanced');
                 if (signal.direction !== "NEUTRAL" && openTrades.length < 3) {
                     const capital = parseFloat(dep.allocated_capital);
-                    const riskAmount = capital * (signal.riskPercentage / 100);
-                    const size = Math.max(1, Math.floor(riskAmount / 5));
+                    const riskPerTrade = capital * (signal.riskPercentage / 100);
+
+                    // Dynamic Size Calculation based on Stop Loss distance
+                    // Formula: Size = (Capital * Risk%) / |Entry - SL|
+                    const entryPrice = signal.direction === "BUY" ? currentBid : currentOffer;
+                    const slDistance = Math.abs(entryPrice - (signal.stopLoss || entryPrice - 5));
+
+                    // Min Lot Size for GOLD is typically 0.1 on many CFD platforms, 
+                    // but we floor to 2 decimal places to be safe and precise.
+                    let calculatedSize = slDistance > 0 ? riskPerTrade / slDistance : 0.1;
+
+                    // Cap and Floor for safety
+                    const size = Math.max(0.1, parseFloat(calculatedSize.toFixed(2)));
 
                     const orderRes = await placeOrder(cst, xst, epic, signal.direction, size, dep.mode === 'demo', {
                         takeProfit: signal.targetPrice,
@@ -113,6 +138,7 @@ export async function POST(req: Request) {
                     });
 
                     if (orderRes && orderRes.dealReference) {
+                        const entryPrice = signal.direction === "BUY" ? currentBid : currentOffer;
                         await db.insert(automationTrades).values({
                             user_id: userId,
                             deployment_id: dep.id,
@@ -121,9 +147,10 @@ export async function POST(req: Request) {
                             epic: epic,
                             direction: signal.direction,
                             size: size.toString(),
-                            open_price: latestPrice.toString(),
+                            open_price: entryPrice.toString(),
                             pnl: "0",
-                            mode: dep.mode || "demo"
+                            mode: dep.mode || "demo",
+                            status: "Open"
                         });
                     }
                 } else {

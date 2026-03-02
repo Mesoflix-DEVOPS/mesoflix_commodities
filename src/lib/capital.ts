@@ -1,7 +1,7 @@
 const LIVE_API_URL = 'https://api-capital.backend-capital.com/api/v1';
 const DEMO_API_URL = 'https://demo-api-capital.backend-capital.com/api/v1';
 
-const getApiUrl = (isDemo: boolean) => LIVE_API_URL; // Unified session must stay on the server it was founded on
+const getApiUrl = (isDemo: boolean) => isDemo ? DEMO_API_URL : LIVE_API_URL;
 
 export interface SessionResponse {
     cst: string;

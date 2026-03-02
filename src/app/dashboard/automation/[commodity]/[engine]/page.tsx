@@ -114,6 +114,8 @@ export default function EngineAnalyticsPage({ params }: { params: Promise<{ comm
     const metrics = useMemo(() => {
         if (liveTrades.length === 0) return { winRate: "0%", profitFactor: "0.0", totalTrades: 0, netPnl: 0 };
         const closedTrades = liveTrades.filter((t: any) => t.status === 'Closed' || t.close_price);
+        const openTrades = liveTrades.filter((t: any) => t.status === 'Open' || !t.close_price);
+
         const wins = closedTrades.filter((t: any) => parseFloat(t.pnl) > 0);
         const winRate = closedTrades.length > 0 ? ((wins.length / closedTrades.length) * 100).toFixed(1) + "%" : "0%";
 
@@ -123,7 +125,7 @@ export default function EngineAnalyticsPage({ params }: { params: Promise<{ comm
 
         const netPnl = liveTrades.reduce((sum, t) => sum + parseFloat(t.pnl), 0);
 
-        return { winRate, profitFactor, totalTrades: liveTrades.length, netPnl };
+        return { winRate, profitFactor, totalTrades: openTrades.length, netPnl };
     }, [liveTrades]);
 
     return (

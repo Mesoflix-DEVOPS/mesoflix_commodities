@@ -133,7 +133,7 @@ function calculateVWAP(candles: Candle[]): number | null {
 export class AurumVelocityEngine {
     static riskRange = { min: 2.0, max: 3.0 }; // %
 
-    static analyze(candles: Candle[], spread: number = 0.3): EngineSignal {
+    static analyze(candles: Candle[], spread: number = 0.3, riskLevel: string = 'Balanced'): EngineSignal {
         if (candles.length < 50) return { direction: 'NEUTRAL', confidence: 0, riskPercentage: 0, reasoning: "Insufficient data (need 50+ candles)" };
 
         const latest = candles[candles.length - 1];
@@ -152,7 +152,7 @@ export class AurumVelocityEngine {
         }
 
         // PRD Thresholds
-        const spreadThreshold = 0.5; // Institutional gold spread max
+        const spreadThreshold = 1.0; // Relaxed for Demo market noise
         const minVolatility = atr > 0.05; // Slightly lower volatility threshold for scalping
 
         // Signal Logic
@@ -162,10 +162,14 @@ export class AurumVelocityEngine {
         // BUY Logic: Price > VWAP && EMA20 > EMA50 && RSI(7) > 50
         if (isBullish && rsi7 > 50 && spread < spreadThreshold && minVolatility) {
             const confidence = rsi7 > 60 && volumeSpike ? 95 : 85;
+            let riskPercentage = 2.5;
+            if (riskLevel === 'Conservative') riskPercentage = 1.0;
+            if (riskLevel === 'Aggressive') riskPercentage = 5.0;
+
             return {
                 direction: 'BUY',
                 confidence,
-                riskPercentage: 2.5,
+                riskPercentage,
                 stopLoss: latest.close - (atr * 1.5),
                 targetPrice: latest.close + (atr * 3),
                 reasoning: `Bullish Sequence: Price holds above VWAP ($${vwap.toFixed(2)}) and EMA(20) > EMA(50). RSI is healthy at ${rsi7.toFixed(1)}.`
@@ -175,10 +179,14 @@ export class AurumVelocityEngine {
         // SELL Logic: Price < VWAP && EMA20 < EMA50 && RSI(7) < 50
         if (isBearish && rsi7 < 50 && spread < spreadThreshold && minVolatility) {
             const confidence = rsi7 < 40 && volumeSpike ? 95 : 85;
+            let riskPercentage = 2.5;
+            if (riskLevel === 'Conservative') riskPercentage = 1.0;
+            if (riskLevel === 'Aggressive') riskPercentage = 5.0;
+
             return {
                 direction: 'SELL',
                 confidence,
-                riskPercentage: 2.5,
+                riskPercentage,
                 stopLoss: latest.close + (atr * 1.5),
                 targetPrice: latest.close - (atr * 3),
                 reasoning: `Bearish Sequence: Price rejected by VWAP ($${vwap.toFixed(2)}) and EMA(20) < EMA(50). RSI is weak at ${rsi7.toFixed(1)}.`
@@ -206,7 +214,7 @@ export class AurumVelocityEngine {
 export class AurumMomentumEngine {
     static riskRange = { min: 1.0, max: 2.0 };
 
-    static analyze(candles: Candle[]): EngineSignal {
+    static analyze(candles: Candle[], riskLevel: string = 'Balanced'): EngineSignal {
         if (candles.length < 200) return { direction: 'NEUTRAL', confidence: 0, riskPercentage: 0 };
 
         const latestInfo = candles[candles.length - 1];
@@ -220,7 +228,7 @@ export class AurumMomentumEngine {
             return {
                 direction: 'BUY',
                 confidence: 78,
-                riskPercentage: 1.5,
+                riskPercentage: riskLevel === 'Conservative' ? 0.75 : riskLevel === 'Aggressive' ? 2.5 : 1.5,
                 stopLoss: latestInfo.close * 0.995, // 0.5% stop
                 targetPrice: latestInfo.close * 1.015, // 1.5% target (1:3 RR)
                 reasoning: `Mom-Intraday: Pullback to EMA50 while > EMA200.`
@@ -229,7 +237,7 @@ export class AurumMomentumEngine {
             return {
                 direction: 'SELL',
                 confidence: 78,
-                riskPercentage: 1.5,
+                riskPercentage: riskLevel === 'Conservative' ? 0.75 : riskLevel === 'Aggressive' ? 2.5 : 1.5,
                 stopLoss: latestInfo.close * 1.005,
                 targetPrice: latestInfo.close * 0.985,
                 reasoning: `Mom-Intraday: Pullback to EMA50 while < EMA200.`
@@ -250,7 +258,7 @@ export class AurumMomentumEngine {
 export class AurumApexEngine {
     static riskRange = { min: 1.0, max: 1.0 };
 
-    static analyze(candles: Candle[]): EngineSignal {
+    static analyze(candles: Candle[], riskLevel: string = 'Balanced'): EngineSignal {
         if (candles.length < 50) return { direction: 'NEUTRAL', confidence: 0, riskPercentage: 0 };
 
         const latestInfo = candles[candles.length - 1];
@@ -263,7 +271,7 @@ export class AurumApexEngine {
             return {
                 direction: 'BUY',
                 confidence: 90,
-                riskPercentage: 1.0,
+                riskPercentage: riskLevel === 'Conservative' ? 0.5 : riskLevel === 'Aggressive' ? 2.0 : 1.0,
                 stopLoss: latestInfo.close * 0.980, // 2% Deep stop
                 targetPrice: latestInfo.close * 1.080, // 8% Macro Target (1:4 RR)
                 reasoning: `Apex-Swing: Extreme structural bottom tracking (RSI ${rsi.toFixed(2)})`
@@ -272,7 +280,7 @@ export class AurumApexEngine {
             return {
                 direction: 'SELL',
                 confidence: 90,
-                riskPercentage: 1.0,
+                riskPercentage: riskLevel === 'Conservative' ? 0.5 : riskLevel === 'Aggressive' ? 2.0 : 1.0,
                 stopLoss: latestInfo.close * 1.020,
                 targetPrice: latestInfo.close * 0.920,
                 reasoning: `Apex-Swing: Extreme structural top exhaustion (RSI ${rsi.toFixed(2)})`
