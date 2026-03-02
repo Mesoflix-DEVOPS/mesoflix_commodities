@@ -25,18 +25,22 @@ export async function POST(req: Request) {
             daily_stop_loss,
             risk_level,
             action,
-            status
+            status,
+            mode
         } = body;
 
         // Action: Update existing deployment state
         if (action === "update_state") {
+            if (!engine_id) throw new Error("Missing engine_id for update_state");
             await db.update(automationDeployments)
                 .set({ status, updated_at: new Date() })
                 .where(and(eq(automationDeployments.user_id, userId), eq(automationDeployments.engine_id, engine_id)));
             return NextResponse.json({ success: true, message: "Engine state updated." });
         }
 
-        // Action: New Deploy
+        // Action: New Deploy (Upsert)
+        if (!engine_id || !commodity) throw new Error("Missing required fields (engine_id, commodity)");
+
         // Upsert logic (if user has it deployed already, just update params)
         const existing = await db.select().from(automationDeployments)
             .where(and(eq(automationDeployments.user_id, userId), eq(automationDeployments.engine_id, engine_id)));
@@ -44,13 +48,14 @@ export async function POST(req: Request) {
         if (existing.length > 0) {
             await db.update(automationDeployments)
                 .set({
-                    allocated_capital: (allocated_capital || "0").toString(),
+                    allocated_capital: (allocated_capital ?? "0").toString(),
                     risk_multiplier: risk_multiplier?.toString() || "1.0",
-                    stop_loss_cap: (stop_loss_cap || "0").toString(),
+                    stop_loss_cap: (stop_loss_cap ?? "0").toString(),
                     target_profit: target_profit?.toString() || null,
                     daily_stop_loss: daily_stop_loss?.toString() || null,
                     risk_level: risk_level || "Balanced",
                     status: "Running",
+                    mode: mode || existing[0].mode || "demo",
                     updated_at: new Date()
                 })
                 .where(eq(automationDeployments.id, existing[0].id));
@@ -59,20 +64,21 @@ export async function POST(req: Request) {
                 user_id: userId,
                 engine_id,
                 commodity,
-                allocated_capital: (allocated_capital || "0").toString(),
+                allocated_capital: (allocated_capital ?? "0").toString(),
                 risk_multiplier: risk_multiplier?.toString() || "1.0",
-                stop_loss_cap: (stop_loss_cap || "0").toString(),
+                stop_loss_cap: (stop_loss_cap ?? "0").toString(),
                 target_profit: target_profit?.toString() || null,
                 daily_stop_loss: daily_stop_loss?.toString() || null,
                 risk_level: risk_level || "Balanced",
                 status: "Running",
-                mode: "demo", // Currently locked to demo for safety during execution loops
+                mode: mode || "demo",
             });
         }
 
         return NextResponse.json({ success: true, message: "Engine deployed successfully via API." });
     } catch (e: any) {
-        return NextResponse.json({ error: e.message || "Failed to deploy engine" }, { status: 500 });
+        console.error("[DeployAPI Error]:", e);
+        return NextResponse.json({ error: e.message || "Internal Server Error" }, { status: 500 });
     }
 }
 

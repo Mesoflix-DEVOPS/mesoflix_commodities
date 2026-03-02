@@ -18,118 +18,125 @@ export async function POST(req: Request) {
 
         if (!activeDeployments.length) return NextResponse.json({ message: "No active engines", executed: 0 });
 
-        const capSession = await getValidSession(userId, activeDeployments[0].mode === 'demo');
-        const { cst, xSecurityToken: xst } = capSession;
-
-        // Fetch Live Positions for Sync
-        const { positions: capPositions } = await getPositions(cst, xst, activeDeployments[0].mode === 'demo');
-
         for (const dep of activeDeployments) {
-            if (dep.commodity !== "gold") continue;
+            try {
+                if (dep.commodity !== "gold") continue;
 
-            // Check Cooldown
-            if (dep.cooldown_until && new Date() < new Date(dep.cooldown_until)) continue;
+                // 0. Get Session for THIS deployment mode
+                const capSession = await getValidSession(userId, dep.mode === 'demo');
+                const { cst, xSecurityToken: xst } = capSession;
 
-            const epic = "GOLD";
-            let resolution: any = "MINUTE_5";
-            let engineClass: any = AurumVelocityEngine;
+                // Fetch Live Positions for THIS account
+                const { positions: capPositions } = await getPositions(cst, xst, dep.mode === 'demo');
 
-            if (dep.engine_id === "aurum-velocity") { resolution = "MINUTE_5"; engineClass = AurumVelocityEngine; }
-            else if (dep.engine_id === "aurum-momentum") { resolution = "HOUR"; engineClass = AurumMomentumEngine; }
-            else if (dep.engine_id === "aurum-apex") { resolution = "HOUR_4"; engineClass = AurumApexEngine; }
+                // Check Cooldown
+                if (dep.cooldown_until && new Date() < new Date(dep.cooldown_until)) continue;
 
-            const priceRes = await getMarketPrices(cst, xst, epic, resolution, 100, dep.mode === 'demo');
-            if (!priceRes || !priceRes.prices) continue;
+                const epic = "GOLD";
+                let resolution: any = "MINUTE_5";
+                let engineClass: any = AurumVelocityEngine;
 
-            const candles: Candle[] = priceRes.prices.map((p: any) => ({
-                timestamp: p.snapshotTime,
-                open: p.openPrice.ask,
-                high: p.highPrice.ask,
-                low: p.lowPrice.ask,
-                close: p.closePrice.ask,
-                volume: p.lastTradedVolume || 1
-            }));
+                if (dep.engine_id === "aurum-velocity") { resolution = "MINUTE_5"; engineClass = AurumVelocityEngine; }
+                else if (dep.engine_id === "aurum-momentum") { resolution = "HOUR"; engineClass = AurumMomentumEngine; }
+                else if (dep.engine_id === "aurum-apex") { resolution = "HOUR_4"; engineClass = AurumApexEngine; }
 
-            const latestPrice = candles[candles.length - 1].close;
+                const priceRes = await getMarketPrices(cst, xst, epic, resolution, 100, dep.mode === 'demo');
+                if (!priceRes || !priceRes.prices) continue;
 
-            // 1. SYNC & CLOSURE DETECTION
-            const openTrades = await db.select().from(automationTrades)
-                .where(and(eq(automationTrades.deployment_id, dep.id), eq(automationTrades.user_id, userId)));
+                const candles: Candle[] = priceRes.prices.map((p: any) => ({
+                    timestamp: p.snapshotTime,
+                    open: p.openPrice.ask,
+                    high: p.highPrice.ask,
+                    low: p.lowPrice.ask,
+                    close: p.closePrice.ask,
+                    volume: p.lastTradedVolume || 1
+                }));
 
-            let basketPnl = 0;
-            for (const trade of openTrades) {
-                const stillOpen = capPositions.find((p: any) => p.dealId === trade.deal_id);
-                if (!stillOpen) {
-                    const history = await getHistory(cst, xst, dep.mode === 'demo', { max: 10 });
-                    const historyItem = history?.activities?.find((a: any) => a.dealId === trade.deal_id && a.action === "POSITION_CLOSED");
-                    const finalPnl = historyItem ? parseFloat(historyItem.result) : 0;
+                const latestPrice = candles[candles.length - 1].close;
 
-                    if (finalPnl < 0) {
-                        const cooldown = new Date();
-                        cooldown.setMinutes(cooldown.getMinutes() + 5);
-                        await db.update(automationDeployments).set({ cooldown_until: cooldown }).where(eq(automationDeployments.id, dep.id));
+                // 1. SYNC & CLOSURE DETECTION
+                const openTrades = await db.select().from(automationTrades)
+                    .where(and(eq(automationTrades.deployment_id, dep.id), eq(automationTrades.user_id, userId)));
+
+                let basketPnl = 0;
+                for (const trade of openTrades) {
+                    const stillOpen = capPositions.find((p: any) => p.dealId === trade.deal_id);
+                    if (!stillOpen) {
+                        const history = await getHistory(cst, xst, dep.mode === 'demo', { max: 10 });
+                        const historyItem = history?.activities?.find((a: any) => a.dealId === trade.deal_id && a.action === "POSITION_CLOSED");
+                        const finalPnl = historyItem ? parseFloat(historyItem.result) : 0;
+
+                        if (finalPnl < 0) {
+                            const cooldown = new Date();
+                            cooldown.setMinutes(cooldown.getMinutes() + 5);
+                            await db.update(automationDeployments).set({ cooldown_until: cooldown }).where(eq(automationDeployments.id, dep.id));
+                        }
+
+                        const currentTotal = parseFloat(dep.pnl || "0");
+                        await db.update(automationDeployments).set({ pnl: (currentTotal + finalPnl).toString() }).where(eq(automationDeployments.id, dep.id));
+                        await db.update(automationTrades).set({ pnl: finalPnl.toString(), close_price: latestPrice.toString() }).where(eq(automationTrades.id, trade.id));
+                        continue;
                     }
 
-                    const currentTotal = parseFloat(dep.pnl || "0");
-                    await db.update(automationDeployments).set({ pnl: (currentTotal + finalPnl).toString() }).where(eq(automationDeployments.id, dep.id));
-                    await db.update(automationTrades).set({ pnl: finalPnl.toString(), close_price: latestPrice.toString() }).where(eq(automationTrades.id, trade.id));
+                    const openPrice = parseFloat(trade.open_price || "0");
+                    const unrealized = trade.direction === "BUY"
+                        ? (latestPrice - openPrice) * parseFloat(trade.size)
+                        : (openPrice - latestPrice) * parseFloat(trade.size);
+
+                    // Real-time Sync: Update the trade's PNL in the DB so it reflects in the dashboard
+                    await db.update(automationTrades).set({ pnl: unrealized.toString() }).where(eq(automationTrades.id, trade.id));
+
+                    basketPnl += unrealized;
+                }
+
+                // 2. EXIT LOGIC
+                const targetProfit = parseFloat(dep.target_profit || "999999");
+                if (basketPnl >= targetProfit) {
+                    for (const t of openTrades) {
+                        try { await closePosition(cst, xst, t.deal_id, dep.mode === 'demo'); } catch { }
+                    }
+                    await db.update(automationDeployments).set({ status: "Target Achieved", last_decision_reason: `Target of $${targetProfit} reached.` }).where(eq(automationDeployments.id, dep.id));
                     continue;
                 }
 
-                const openPrice = parseFloat(trade.open_price || "0");
-                const unrealized = trade.direction === "BUY"
-                    ? (latestPrice - openPrice) * parseFloat(trade.size)
-                    : (openPrice - latestPrice) * parseFloat(trade.size);
+                // 3. ENTRY LOGIC
+                const signal = engineClass.analyze(candles);
+                if (signal.direction !== "NEUTRAL" && openTrades.length < 3) {
+                    const capital = parseFloat(dep.allocated_capital);
+                    const riskAmount = capital * (signal.riskPercentage / 100);
+                    const size = Math.max(1, Math.floor(riskAmount / 5));
 
-                // Real-time Sync: Update the trade's PNL in the DB so it reflects in the dashboard
-                await db.update(automationTrades).set({ pnl: unrealized.toString() }).where(eq(automationTrades.id, trade.id));
-
-                basketPnl += unrealized;
-            }
-
-            // 2. EXIT LOGIC
-            const targetProfit = parseFloat(dep.target_profit || "999999");
-            if (basketPnl >= targetProfit) {
-                for (const t of openTrades) {
-                    try { await closePosition(cst, xst, t.deal_id, dep.mode === 'demo'); } catch { }
-                }
-                await db.update(automationDeployments).set({ status: "Target Achieved", last_decision_reason: `Target of $${targetProfit} reached.` }).where(eq(automationDeployments.id, dep.id));
-                continue;
-            }
-
-            // 3. ENTRY LOGIC
-            const signal = engineClass.analyze(candles);
-            if (signal.direction !== "NEUTRAL" && openTrades.length < 3) {
-                const capital = parseFloat(dep.allocated_capital);
-                const riskAmount = capital * (signal.riskPercentage / 100);
-                const size = Math.max(1, Math.floor(riskAmount / 5));
-
-                const orderRes = await placeOrder(cst, xst, epic, signal.direction, size, dep.mode === 'demo', {
-                    takeProfit: signal.targetPrice,
-                    stopLoss: signal.stopLoss
-                });
-
-                if (orderRes && orderRes.dealReference) {
-                    await db.insert(automationTrades).values({
-                        user_id: userId,
-                        deployment_id: dep.id,
-                        engine_id: dep.engine_id,
-                        deal_id: orderRes.dealReference,
-                        epic: epic,
-                        direction: signal.direction,
-                        size: size.toString(),
-                        open_price: latestPrice.toString(),
-                        pnl: "0",
-                        mode: dep.mode || "demo"
+                    const orderRes = await placeOrder(cst, xst, epic, signal.direction, size, dep.mode === 'demo', {
+                        takeProfit: signal.targetPrice,
+                        stopLoss: signal.stopLoss
                     });
+
+                    if (orderRes && orderRes.dealReference) {
+                        await db.insert(automationTrades).values({
+                            user_id: userId,
+                            deployment_id: dep.id,
+                            engine_id: dep.engine_id,
+                            deal_id: orderRes.dealReference,
+                            epic: epic,
+                            direction: signal.direction,
+                            size: size.toString(),
+                            open_price: latestPrice.toString(),
+                            pnl: "0",
+                            mode: dep.mode || "demo"
+                        });
+                    }
+                } else {
+                    await db.update(automationDeployments).set({ last_decision_reason: signal.reasoning }).where(eq(automationDeployments.id, dep.id));
                 }
-            } else {
-                await db.update(automationDeployments).set({ last_decision_reason: signal.reasoning }).where(eq(automationDeployments.id, dep.id));
+            } catch (innerError: any) {
+                console.error(`[RunnerAPI Engine Error for ${dep.engine_id}]:`, innerError);
+                // Continue to next engine even if one fails
             }
         }
 
         return NextResponse.json({ success: true });
     } catch (e: any) {
-        return NextResponse.json({ error: e.message }, { status: 500 });
+        console.error("[RunnerAPI Error]:", e);
+        return NextResponse.json({ error: e.message || "Internal Server Error" }, { status: 500 });
     }
 }
