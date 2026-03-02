@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowLeft, Activity, ShieldCheck, Target, TrendingUp, BarChart2, History, Play, Pause, Square, AlertTriangle, Shield, Gauge, DollarSign } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAutomation, EngineState } from "@/contexts/AutomationContext";
+import { useMarketData } from "@/contexts/MarketDataContext";
 import {
     AreaChart,
     Area,
@@ -35,6 +36,7 @@ export default function EngineAnalyticsPage({ params }: { params: Promise<{ comm
     const resolvedParams = use(params);
     const { commodity, engine: engineId } = resolvedParams;
     const { engines, deployEngine, updateEngineState } = useAutomation();
+    const { marketData } = useMarketData();
 
     const deployment = engines[engineId];
     const engineName = engineId.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
@@ -67,7 +69,25 @@ export default function EngineAnalyticsPage({ params }: { params: Promise<{ comm
         fetchTrades();
         const interval = setInterval(fetchTrades, 10000);
         return () => clearInterval(interval);
-    }, [engineId]);
+    }, [engineId, deployment?.mode]);
+
+    // Heartbeat: Trigger the runner every 30s to keep the engine ticking
+    useEffect(() => {
+        if (!deployment || deployment.state !== "Running") return;
+
+        const pingRunner = async () => {
+            try {
+                await fetch('/api/automation/runner', { method: 'POST' });
+            } catch (e) {
+                console.error("[Heartbeat] Runner ping failed:", e);
+            }
+        };
+
+        // Initial ping
+        pingRunner();
+        const interval = setInterval(pingRunner, 30000);
+        return () => clearInterval(interval);
+    }, [deployment?.state]);
 
     const handleDeploy = () => {
         deployEngine({
@@ -255,6 +275,38 @@ export default function EngineAnalyticsPage({ params }: { params: Promise<{ comm
                                     ${Number(deployment?.pnl || 0).toLocaleString()}
                                 </p>
                             </div>
+                        </div>
+                    </div>
+
+                    {/* Market Pulse: Gold Price Action */}
+                    <div className="bg-[#0A1622] rounded-[2.5rem] p-8 border border-white/5 shadow-2xl relative overflow-hidden group">
+                        <div className="flex items-center justify-between relative z-10">
+                            <div>
+                                <p className="text-[10px] font-black text-amber-500 uppercase tracking-[0.2em] mb-2 flex items-center gap-2">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" /> Market Pulse: GOLD (XAU)
+                                </p>
+                                <div className="flex items-baseline gap-4">
+                                    <h4 className="text-4xl font-black text-white font-mono tracking-tighter">
+                                        ${marketData["GOLD"]?.bid?.toLocaleString(undefined, { minimumFractionDigits: 2 }) || "---.--"}
+                                    </h4>
+                                    <span className={cn(
+                                        "text-sm font-black px-2 py-1 rounded-lg border",
+                                        (marketData["GOLD"]?.changePct || 0) >= 0 ? "text-teal bg-teal/10 border-teal/20" : "text-red-500 bg-red-500/10 border-red-500/20"
+                                    )}>
+                                        {(marketData["GOLD"]?.changePct || 0) >= 0 ? "+" : ""}{(marketData["GOLD"]?.changePct || 0).toFixed(2)}%
+                                    </span>
+                                </div>
+                            </div>
+                            <div className="text-right">
+                                <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1 font-mono">Institutional ASK</p>
+                                <p className="text-xl font-black text-red-400 font-mono">
+                                    ${marketData["GOLD"]?.offer?.toLocaleString(undefined, { minimumFractionDigits: 2 }) || "---.--"}
+                                </p>
+                            </div>
+                        </div>
+                        {/* Background Decoration */}
+                        <div className="absolute -bottom-10 -right-10 opacity-5 group-hover:opacity-10 transition-opacity">
+                            <TrendingUp size={200} className="text-amber-500" />
                         </div>
                     </div>
 

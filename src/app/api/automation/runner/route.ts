@@ -21,6 +21,7 @@ export async function POST(req: Request) {
         for (const dep of activeDeployments) {
             try {
                 if (dep.commodity !== "gold") continue;
+                console.info(`[Runner] Ticking engine: ${dep.engine_id} (${dep.mode}) for user: ${userId}`);
 
                 // 0. Get Session for THIS deployment mode
                 const capSession = await getValidSession(userId, dep.mode === 'demo');
