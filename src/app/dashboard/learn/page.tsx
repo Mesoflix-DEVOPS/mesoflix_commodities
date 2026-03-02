@@ -589,11 +589,13 @@ export default function LearnHubPage() {
     // If a lesson is selected, show the player view
     if (selectedLesson) {
         return (
-            <div className="min-h-screen bg-[#070E14] text-white p-6 md:p-12 max-w-7xl mx-auto">
-                <AcademyPlayer
-                    lesson={selectedLesson}
-                    onBack={() => setSelectedLesson(null)}
-                />
+            <div className="min-h-screen bg-[#070E14] text-white -mx-6 -mt-6 md:-mx-12 md:-mt-12 overflow-x-hidden">
+                <div className="p-4 md:p-12 max-w-7xl mx-auto">
+                    <AcademyPlayer
+                        lesson={selectedLesson}
+                        onBack={() => setSelectedLesson(null)}
+                    />
+                </div>
             </div>
         );
     }

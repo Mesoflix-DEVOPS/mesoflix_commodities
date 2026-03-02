@@ -243,21 +243,21 @@ export default function AcademyPlayer({ lesson, onBack }: AcademyPlayerProps) {
     return (
         <div className="animate-in fade-in slide-in-from-bottom-6 duration-700">
             {/* Header */}
-            <div className="flex items-center justify-between mb-8">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
                 <button
                     onClick={onBack}
-                    className="flex items-center gap-2 text-gray-400 hover:text-teal transition-colors group"
+                    className="flex items-center gap-2 text-gray-400 hover:text-teal transition-colors group w-fit"
                 >
                     <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center group-hover:bg-teal/10 transition-all border border-white/10 group-hover:border-teal/20">
                         <ChevronLeft size={18} />
                     </div>
-                    <span className="font-bold uppercase tracking-widest text-xs">Back to curriculum</span>
+                    <span className="font-bold uppercase tracking-widest text-[10px] sm:text-xs">Back to curriculum</span>
                 </button>
 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 sm:gap-3">
                     <button
                         onClick={exportToPDF}
-                        className="bg-white/5 hover:bg-white/10 text-white px-4 py-2 rounded-xl text-xs font-bold transition-all border border-white/10 flex items-center gap-2"
+                        className="flex-1 sm:flex-none justify-center bg-white/5 hover:bg-white/10 text-white px-3 sm:px-4 py-2.5 sm:py-2 rounded-xl text-[10px] sm:text-xs font-bold transition-all border border-white/10 flex items-center gap-2 whitespace-nowrap"
                     >
                         <FileDown size={14} className="text-teal" />
                         Export Notes
@@ -265,7 +265,7 @@ export default function AcademyPlayer({ lesson, onBack }: AcademyPlayerProps) {
                     <button
                         onClick={toggleComplete}
                         className={cn(
-                            "px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 border",
+                            "flex-1 sm:flex-none justify-center px-3 sm:px-4 py-2.5 sm:py-2 rounded-xl text-[10px] sm:text-xs font-bold transition-all flex items-center gap-2 border whitespace-nowrap",
                             isDone
                                 ? "bg-teal/20 text-teal border-teal/30 hover:bg-teal/30"
                                 : "bg-white/5 text-gray-400 border-white/10 hover:border-teal/30 hover:text-white"
@@ -279,8 +279,8 @@ export default function AcademyPlayer({ lesson, onBack }: AcademyPlayerProps) {
 
             <div className="grid lg:grid-cols-3 gap-8">
                 {/* Player Section */}
-                <div className="lg:col-span-2 space-y-6">
-                    <div className="bg-black aspect-video rounded-[2.5rem] overflow-hidden shadow-2xl border border-white/10 relative group">
+                <div className="lg:col-span-2 space-y-6 min-w-0">
+                    <div className="bg-black aspect-video rounded-3xl sm:rounded-[2.5rem] overflow-hidden shadow-2xl border border-white/10 relative group">
                         <div id="youtube-player" className="w-full h-full" />
 
                         {!player && (
@@ -319,14 +319,14 @@ export default function AcademyPlayer({ lesson, onBack }: AcademyPlayerProps) {
                                 {lesson.category}
                             </span>
                         </div>
-                        <h1 className="text-3xl font-bold text-white mb-4">{lesson.title}</h1>
-                        <p className="text-gray-400 leading-relaxed text-lg">{lesson.description}</p>
+                        <h1 className="text-2xl sm:text-3xl font-bold text-white mb-4 leading-tight">{lesson.title}</h1>
+                        <p className="text-gray-400 leading-relaxed text-base sm:text-lg">{lesson.description}</p>
                     </div>
                 </div>
 
                 {/* Notes Section */}
-                <div className="space-y-6 h-fit">
-                    <div className="bg-[#0A1622] border border-white/10 rounded-[2.5rem] overflow-hidden flex flex-col h-[500px] shadow-2xl">
+                <div className="space-y-6 h-fit min-w-0">
+                    <div className="bg-[#0A1622] border border-white/10 rounded-3xl sm:rounded-[2.5rem] overflow-hidden flex flex-col h-[400px] sm:h-[500px] shadow-2xl">
                         <div className="p-6 border-b border-white/10 flex items-center justify-between bg-white/[0.02]">
                             <div className="flex items-center gap-2">
                                 <MessageSquare size={18} className="text-teal" />
