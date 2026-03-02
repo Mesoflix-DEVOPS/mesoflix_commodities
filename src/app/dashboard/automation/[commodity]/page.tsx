@@ -1,16 +1,18 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { ArrowLeft, Cpu, Activity, ShieldAlert, BarChart3, Settings2, Play, Pause, Square } from "lucide-react";
+import { ArrowLeft, Cpu, Activity, ShieldAlert, BarChart3, Settings2, Play, Pause, Square, ArrowUpRight, ArrowDownRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAutomation, EngineState, EngineDetails } from "@/contexts/AutomationContext";
+import { useMarketData } from "@/contexts/MarketDataContext";
 import DeployModal from "./DeployModal";
 
 // Data Structure defined by PRD
 const MARKET_DATA: Record<string, any> = {
     "gold": {
-        name: "Gold", symbol: "XAU", price: "$2,642.80", range: "$2,610 - $2,655", status: "Open", vol: "High",
+        epic: "GOLD",
+        name: "Gold", symbol: "XAU", defaultPrice: "$2,642.80", range: "$2,610 - $2,655", status: "Open", vol: "High",
         desc: "The premier safe-haven asset. Gold algorithms explicitly target macro-volatility events and inflation hedging flows.",
         color: "text-amber-400", bg: "from-amber-400/20", borderColor: "border-amber-400/30",
         engines: [
@@ -20,7 +22,8 @@ const MARKET_DATA: Record<string, any> = {
         ]
     },
     "crude-oil": {
-        name: "Crude Oil", symbol: "WTI", price: "$78.41", range: "$76.20 - $79.10", status: "Open", vol: "Medium",
+        epic: "OIL_CRUDE",
+        name: "Crude Oil", symbol: "WTI", defaultPrice: "$78.41", range: "$76.20 - $79.10", status: "Open", vol: "Medium",
         desc: "Highly reactive to geopolitical news. Oil engines are designed to capture inventory sweeps and supply-side shocks.",
         color: "text-blue-500", bg: "from-blue-500/20", borderColor: "border-blue-500/30",
         engines: [
@@ -30,7 +33,8 @@ const MARKET_DATA: Record<string, any> = {
         ]
     },
     "eur-usd": {
-        name: "EUR/USD", symbol: "EUR/USD", price: "1.0842", range: "1.0810 - 1.0890", status: "Open", vol: "Low",
+        epic: "EURUSD",
+        name: "EUR/USD", symbol: "EUR/USD", defaultPrice: "1.0842", range: "1.0810 - 1.0890", status: "Open", vol: "Low",
         desc: "The most liquid forex pair. EUR/USD systems focus on central bank divergence and tight-spread mean reversion.",
         color: "text-blue-400", bg: "from-blue-400/20", borderColor: "border-blue-400/30",
         engines: [
@@ -40,7 +44,8 @@ const MARKET_DATA: Record<string, any> = {
         ]
     },
     "bitcoin": {
-        name: "Bitcoin", symbol: "BTC", price: "$64,210", range: "$61,000 - $65,500", status: "Open 24/7", vol: "Extreme",
+        epic: "BTCUSD",
+        name: "Bitcoin", symbol: "BTC", defaultPrice: "$64,210", range: "$61,000 - $65,500", status: "Open 24/7", vol: "Extreme",
         desc: "High velocity, high risk. Crypto engines utilize extreme volatility parameters to capture violent liquidity zones.",
         color: "text-orange-500", bg: "from-orange-500/20", borderColor: "border-orange-500/30",
         engines: [
@@ -57,9 +62,25 @@ export default function CommodityAutomationPage({ params }: { params: Promise<{ 
     const commId = resolvedParams.commodity;
     const market = MARKET_DATA[commId];
     const { engines, deployEngine, updateEngineState } = useAutomation();
+    const { marketData } = useMarketData();
+    const live = marketData[market?.epic];
 
     const [deployModalOpen, setDeployModalOpen] = useState(false);
     const [selectedEngine, setSelectedEngine] = useState<any>(null);
+    const [flash, setFlash] = useState<"up" | "down" | null>(null);
+    const prevPrice = useRef<number | null>(null);
+
+    const price = live?.bid ?? 0;
+    const changePct = live?.changePct ?? 0;
+
+    useEffect(() => {
+        if (price && prevPrice.current !== null && price !== prevPrice.current) {
+            setFlash(price > prevPrice.current ? "up" : "down");
+            const timer = setTimeout(() => setFlash(null), 800);
+            return () => clearTimeout(timer);
+        }
+        if (price) prevPrice.current = price;
+    }, [price]);
 
     if (!market) {
         return <div className="p-12 text-center text-gray-500">Market not found.</div>;
@@ -79,10 +100,23 @@ export default function CommodityAutomationPage({ params }: { params: Promise<{ 
             allocatedCapital: capital,
             stopLossCap: stopLoss,
             riskMultiplier: multiplier,
-            pnl: 0 // Starting PnL
+            targetProfit: 100, // Default for now
+            dailyStopLoss: stopLoss,
+            riskLevel: "Balanced", // Default for now
+            pnl: 0
         });
         setDeployModalOpen(false);
     };
+
+    const displayPrice = price > 0
+        ? (market.epic.includes("USD") && !market.epic.includes("BTC") ? price.toFixed(4) : `$${price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)
+        : market.defaultPrice;
+
+    const displayChange = price > 0
+        ? `${changePct >= 0 ? '+' : ''}${changePct.toFixed(2)}%`
+        : null;
+
+    const isPositive = price > 0 ? changePct >= 0 : true;
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500 pb-24">
@@ -91,8 +125,19 @@ export default function CommodityAutomationPage({ params }: { params: Promise<{ 
                 <Link href="/dashboard/automation" className="inline-flex items-center text-xs font-bold uppercase tracking-widest text-gray-500 hover:text-white transition-colors mb-6">
                     <ArrowLeft size={14} className="mr-2" /> Back to Markets
                 </Link>
-                <div className={cn("bg-[#0A1622] rounded-3xl p-8 border relative overflow-hidden", market.borderColor)}>
+                <div className={cn(
+                    "bg-[#0A1622] rounded-3xl p-8 border relative overflow-hidden transition-all duration-500",
+                    market.borderColor,
+                    flash === "up" ? "bg-teal/5 border-teal/40" : flash === "down" ? "bg-red-500/5 border-red-500/40" : ""
+                )}>
                     <div className={cn("absolute top-0 right-0 w-96 h-96 blur-[100px] rounded-full translate-x-1/3 -translate-y-1/3 opacity-50", market.bg)} />
+
+                    {/* Price Flash Overlay */}
+                    <div className={cn(
+                        "absolute inset-0 transition-opacity duration-500 pointer-events-none",
+                        flash === "up" ? "bg-teal/10 opacity-100" : flash === "down" ? "bg-red-500/10 opacity-100" : "opacity-0"
+                    )} />
+
                     <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-8">
                         <div>
                             <div className="flex items-center gap-3 mb-2">
@@ -107,7 +152,21 @@ export default function CommodityAutomationPage({ params }: { params: Promise<{ 
                         <div className="flex gap-6 text-right">
                             <div>
                                 <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Live Price</p>
-                                <p className="text-2xl font-mono font-bold text-white">{market.price}</p>
+                                <p className={cn(
+                                    "text-2xl font-mono font-bold transition-colors duration-300",
+                                    flash === "up" ? "text-teal" : flash === "down" ? "text-red-400" : "text-white"
+                                )}>
+                                    {displayPrice}
+                                </p>
+                                {displayChange && (
+                                    <div className={cn(
+                                        "font-bold text-xs flex items-center justify-end gap-1 mt-1",
+                                        isPositive ? "text-teal" : "text-red-500"
+                                    )}>
+                                        {isPositive ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
+                                        {displayChange}
+                                    </div>
+                                )}
                             </div>
                             <div>
                                 <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Daily Range</p>
@@ -139,19 +198,17 @@ export default function CommodityAutomationPage({ params }: { params: Promise<{ 
                         const isRunning = deployment?.state === "Running";
 
                         return (
-                            <div key={eng.id} className="bg-[#0A1622] rounded-3xl border border-white/5 overflow-hidden flex flex-col">
-                                {/* Card Head */}
+                            <div key={eng.id} className="bg-[#0A1622] rounded-3xl border border-white/5 overflow-hidden flex flex-col h-full relative group hover:border-white/10 transition-colors">
                                 <div className="p-6 border-b border-white/5 bg-white/[0.02]">
                                     <div className="flex justify-between items-start mb-2">
                                         <h3 className="text-xl font-black text-white">{eng.name}</h3>
-                                        <span className="px-2 py-1 bg-white/5 rounded absolute right-6 text-[10px] font-bold uppercase tracking-widest text-gray-400">
+                                        <span className="px-2 py-1 bg-white/5 rounded text-[10px] font-bold uppercase tracking-widest text-gray-400">
                                             {eng.type}
                                         </span>
                                     </div>
                                     <p className="text-xs text-teal font-bold tracking-wide">{eng.tag}</p>
                                 </div>
 
-                                {/* Risk & Metrics Grid */}
                                 <div className="p-6 space-y-6 flex-1">
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
@@ -204,7 +261,6 @@ export default function CommodityAutomationPage({ params }: { params: Promise<{ 
                                     </div>
                                 </div>
 
-                                {/* Actions */}
                                 <div className="p-6 border-t border-white/5 bg-black/20">
                                     {!isDeployed ? (
                                         <div className="flex gap-3">
