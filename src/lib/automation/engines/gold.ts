@@ -153,38 +153,44 @@ export class AurumVelocityEngine {
 
         // PRD Thresholds
         const spreadThreshold = 0.5; // Institutional gold spread max
-        const minVolatility = atr > 0.1; // Ensure market is moving
+        const minVolatility = atr > 0.05; // Slightly lower volatility threshold for scalping
 
-        // BUY Logic: Price > VWAP && EMA20 > EMA50 && RSI(7) > 55 && Vol Spike
-        if (latest.close > vwap && ema20 > ema50 && rsi7 > 55 && volumeSpike && spread < spreadThreshold && minVolatility) {
+        // Signal Logic
+        const isBullish = latest.close > vwap && ema20 > ema50;
+        const isBearish = latest.close < vwap && ema20 < ema50;
+
+        // BUY Logic: Price > VWAP && EMA20 > EMA50 && RSI(7) > 50
+        if (isBullish && rsi7 > 50 && spread < spreadThreshold && minVolatility) {
+            const confidence = rsi7 > 60 && volumeSpike ? 95 : 85;
             return {
                 direction: 'BUY',
-                confidence: 90,
+                confidence,
                 riskPercentage: 2.5,
-                stopLoss: latest.close - (atr * 2), // ATR based SL
-                targetPrice: latest.close + (atr * 3), // 1:1.5 RR
-                reasoning: `Bullish: P > VWAP, EMA Cross UP, RSI ${rsi7.toFixed(1)}, Vol Spike.`
+                stopLoss: latest.close - (atr * 1.5),
+                targetPrice: latest.close + (atr * 3),
+                reasoning: `Bullish Sequence: Price holds above VWAP ($${vwap.toFixed(2)}) and EMA(20) > EMA(50). RSI is healthy at ${rsi7.toFixed(1)}.`
             };
         }
 
-        // SELL Logic: Price < VWAP && EMA20 < EMA50 && RSI(7) < 45 && Vol Spike
-        if (latest.close < vwap && ema20 < ema50 && rsi7 < 45 && volumeSpike && spread < spreadThreshold && minVolatility) {
+        // SELL Logic: Price < VWAP && EMA20 < EMA50 && RSI(7) < 50
+        if (isBearish && rsi7 < 50 && spread < spreadThreshold && minVolatility) {
+            const confidence = rsi7 < 40 && volumeSpike ? 95 : 85;
             return {
                 direction: 'SELL',
-                confidence: 90,
+                confidence,
                 riskPercentage: 2.5,
-                stopLoss: latest.close + (atr * 2),
+                stopLoss: latest.close + (atr * 1.5),
                 targetPrice: latest.close - (atr * 3),
-                reasoning: `Bearish: P < VWAP, EMA Cross DOWN, RSI ${rsi7.toFixed(1)}, Vol Spike.`
+                reasoning: `Bearish Sequence: Price rejected by VWAP ($${vwap.toFixed(2)}) and EMA(20) < EMA(50). RSI is weak at ${rsi7.toFixed(1)}.`
             };
         }
 
         // Block Reasons for UI Transparency
-        let blockReason = "No Trade: Neutral Market Structure";
-        if (spread >= spreadThreshold) blockReason = "No Trade: Spread too high";
-        else if (!minVolatility) blockReason = "No Trade: Volatility too low";
-        else if (!volumeSpike) blockReason = "No Trade: Awaiting volume confirmation";
-        else if (latest.close > vwap && ema20 < ema50) blockReason = "No Trade: P > VWAP but EMA still Bearish";
+        let blockReason = "Market Neutral: Awaiting trend alignment (P/VWAP/EMA)";
+        if (spread >= spreadThreshold) blockReason = `Execution Halted: Spread ($${spread.toFixed(2)}) exceeds institutional threshold.`;
+        else if (!minVolatility) blockReason = "Execution Halted: Volatility below minimum scalp threshold.";
+        else if (isBullish && rsi7 < 50) blockReason = "Bullish bias detected, but momentum (RSI) is insufficient for entry.";
+        else if (isBearish && rsi7 > 50) blockReason = "Bearish bias detected, but momentum (RSI) is still too high.";
 
         return { direction: 'NEUTRAL', confidence: 0, riskPercentage: 0, reasoning: blockReason };
     }

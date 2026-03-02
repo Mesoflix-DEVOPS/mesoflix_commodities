@@ -58,7 +58,7 @@ export default function EngineAnalyticsPage({ params }: { params: Promise<{ comm
     // Fetch Trades
     useEffect(() => {
         const fetchTrades = async () => {
-            const res = await fetch(`/api/automation/trades?engine_id=${engineId}`);
+            const res = await fetch(`/api/automation/trades?engine_id=${engineId}&mode=${deployment?.mode || 'demo'}`);
             if (res.ok) {
                 const data = await res.json();
                 setLiveTrades(data.trades || []);
@@ -81,6 +81,7 @@ export default function EngineAnalyticsPage({ params }: { params: Promise<{ comm
             targetProfit,
             dailyStopLoss,
             riskLevel,
+            mode: "demo",
             pnl: 0
         });
     };
@@ -88,6 +89,22 @@ export default function EngineAnalyticsPage({ params }: { params: Promise<{ comm
     const handleStop = () => updateEngineState(engineId, "Stopped");
 
     const chartData = useMemo(() => generateEquityCurve(allocatedCapital), [allocatedCapital]);
+
+    // Calculate Metrics from liveTrades
+    const metrics = useMemo(() => {
+        if (liveTrades.length === 0) return { winRate: "0%", profitFactor: "0.0", totalTrades: 0, netPnl: 0 };
+        const closedTrades = liveTrades.filter((t: any) => t.status === 'Closed' || t.close_price);
+        const wins = closedTrades.filter((t: any) => parseFloat(t.pnl) > 0);
+        const winRate = closedTrades.length > 0 ? ((wins.length / closedTrades.length) * 100).toFixed(1) + "%" : "0%";
+
+        const grossProfit = closedTrades.filter((t: any) => parseFloat(t.pnl) > 0).reduce((sum, t) => sum + parseFloat(t.pnl), 0);
+        const grossLoss = Math.abs(closedTrades.filter((t: any) => parseFloat(t.pnl) < 0).reduce((sum, t) => sum + parseFloat(t.pnl), 0));
+        const profitFactor = grossLoss === 0 ? (grossProfit > 0 ? "MAX" : "0.0") : (grossProfit / grossLoss).toFixed(2);
+
+        const netPnl = liveTrades.reduce((sum, t) => sum + parseFloat(t.pnl), 0);
+
+        return { winRate, profitFactor, totalTrades: liveTrades.length, netPnl };
+    }, [liveTrades]);
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500 pb-24">
@@ -244,9 +261,9 @@ export default function EngineAnalyticsPage({ params }: { params: Promise<{ comm
                     {/* KPI Metrics */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         {[
-                            { label: "Win Rate", value: "72.1%", icon: Target, color: "text-teal" },
-                            { label: "Trades", value: liveTrades.length, icon: Activity, color: "text-white" },
-                            { label: "Profit Factor", value: "2.8", icon: TrendingUp, color: "text-teal" },
+                            { label: "Win Rate", value: metrics.winRate, icon: Target, color: "text-teal" },
+                            { label: "Active Trades", value: metrics.totalTrades, icon: Activity, color: "text-white" },
+                            { label: "Profit Factor", value: metrics.profitFactor, icon: TrendingUp, color: "text-teal" },
                             { label: "Risk Halted", value: "0", icon: Shield, color: "text-blue-400" },
                         ].map((stat, i) => (
                             <div key={i} className="bg-[#0A1622] rounded-3xl p-6 border border-white/5">
@@ -265,8 +282,8 @@ export default function EngineAnalyticsPage({ params }: { params: Promise<{ comm
                         </div>
 
                         {/* Equity Chart */}
-                        <div className="h-[240px] w-full mb-12 bg-white/[0.02] rounded-3xl p-4 border border-white/5">
-                            <ResponsiveContainer width="100%" height="100%">
+                        <div className="h-[280px] w-full mb-12 bg-white/[0.02] rounded-3xl p-6 border border-white/5 shadow-inner">
+                            <ResponsiveContainer width="100%" height="100%" debounce={100}>
                                 <AreaChart data={chartData}>
                                     <defs>
                                         <linearGradient id="colorEquity" x1="0" y1="0" x2="0" y2="1">
@@ -303,9 +320,9 @@ export default function EngineAnalyticsPage({ params }: { params: Promise<{ comm
                             </ResponsiveContainer>
                         </div>
 
-                        <div className="overflow-x-auto">
+                        <div className="max-h-[400px] overflow-y-auto custom-scrollbar pr-2">
                             <table className="w-full text-sm text-left">
-                                <thead className="text-[10px] uppercase font-bold text-gray-500 tracking-widest bg-white/[0.02] border-y border-white/5">
+                                <thead className="text-[10px] uppercase font-bold text-gray-500 tracking-widest bg-black/20 border-y border-white/5 sticky top-0 z-10">
                                     <tr>
                                         <th className="px-6 py-4">Trade ID</th>
                                         <th className="px-6 py-4">Entry</th>
@@ -317,7 +334,7 @@ export default function EngineAnalyticsPage({ params }: { params: Promise<{ comm
                                 <tbody>
                                     {liveTrades.length === 0 ? (
                                         <tr>
-                                            <td colSpan={5} className="px-6 py-12 text-center text-gray-500 italic">No executions logged in the last 24 hours.</td>
+                                            <td colSpan={5} className="px-6 py-12 text-center text-gray-500 italic">No executions logged.</td>
                                         </tr>
                                     ) : (
                                         liveTrades.map((trade: any) => (

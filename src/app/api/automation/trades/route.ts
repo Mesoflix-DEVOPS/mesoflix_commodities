@@ -14,8 +14,13 @@ export async function GET(req: Request) {
 
         if (!engineId) return NextResponse.json({ error: "Missing engine_id" }, { status: 400 });
 
+        const mode = searchParams.get('mode') || 'demo';
         const trades = await db.select().from(automationTrades)
-            .where(and(eq(automationTrades.user_id, session.user.id), eq(automationTrades.engine_id, engineId)))
+            .where(and(
+                eq(automationTrades.user_id, session.user.id),
+                eq(automationTrades.engine_id, engineId),
+                eq(automationTrades.mode, mode)
+            ))
             .orderBy(desc(automationTrades.created_at))
             .limit(20);
 

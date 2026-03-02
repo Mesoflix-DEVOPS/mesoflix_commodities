@@ -103,6 +103,7 @@ export default function CommodityAutomationPage({ params }: { params: Promise<{ 
             targetProfit: 100, // Default target
             dailyStopLoss: stopLoss, // Use stoploss for daily cap too
             riskLevel: "Balanced", // Default level
+            mode: "demo",
             pnl: 0
         });
         setDeployModalOpen(false);

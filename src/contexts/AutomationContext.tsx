@@ -16,6 +16,7 @@ export interface EngineDetails {
     dailyStopLoss: number;
     riskLevel: string;
     lastDecisionReason?: string;
+    mode: "demo" | "real";
     pnl: number;
 }
 
@@ -51,6 +52,7 @@ export function AutomationProvider({ children }: { children: ReactNode }) {
                         dailyStopLoss: parseFloat(dep.daily_stop_loss || "0"),
                         riskLevel: dep.risk_level || "Balanced",
                         lastDecisionReason: dep.last_decision_reason,
+                        mode: (dep.mode || "demo") as "demo" | "real",
                         pnl: parseFloat(dep.pnl || "0"),
                     };
                 });
@@ -102,6 +104,7 @@ export function AutomationProvider({ children }: { children: ReactNode }) {
                 target_profit: engine.targetProfit,
                 daily_stop_loss: engine.dailyStopLoss,
                 risk_level: engine.riskLevel,
+                mode: engine.mode
             })
         });
     };
