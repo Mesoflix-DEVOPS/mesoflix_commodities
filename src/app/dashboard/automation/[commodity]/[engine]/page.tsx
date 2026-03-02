@@ -264,6 +264,45 @@ export default function EngineAnalyticsPage({ params }: { params: Promise<{ comm
                             <h3 className="text-xl font-black text-white uppercase tracking-tight">Execution Log</h3>
                         </div>
 
+                        {/* Equity Chart */}
+                        <div className="h-[240px] w-full mb-12 bg-white/[0.02] rounded-3xl p-4 border border-white/5">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <AreaChart data={chartData}>
+                                    <defs>
+                                        <linearGradient id="colorEquity" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="5%" stopColor="#00BFA6" stopOpacity={0.3} />
+                                            <stop offset="95%" stopColor="#00BFA6" stopOpacity={0} />
+                                        </linearGradient>
+                                    </defs>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#ffffff05" vertical={false} />
+                                    <XAxis
+                                        dataKey="date"
+                                        axisLine={false}
+                                        tickLine={false}
+                                        tick={{ fill: '#4b5563', fontSize: 10, fontWeight: 'bold' }}
+                                    />
+                                    <YAxis
+                                        hide
+                                        domain={['dataMin - 100', 'dataMax + 100']}
+                                    />
+                                    <Tooltip
+                                        contentStyle={{ backgroundColor: '#0A1622', border: '1px solid #ffffff10', borderRadius: '12px' }}
+                                        itemStyle={{ fontSize: '12px', fontWeight: 'bold' }}
+                                        labelStyle={{ color: '#9ca3af', marginBottom: '4px', fontSize: '10px' }}
+                                    />
+                                    <Area
+                                        type="monotone"
+                                        dataKey="equity"
+                                        stroke="#00BFA6"
+                                        strokeWidth={3}
+                                        fillOpacity={1}
+                                        fill="url(#colorEquity)"
+                                        isAnimationActive={false}
+                                    />
+                                </AreaChart>
+                            </ResponsiveContainer>
+                        </div>
+
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm text-left">
                                 <thead className="text-[10px] uppercase font-bold text-gray-500 tracking-widest bg-white/[0.02] border-y border-white/5">

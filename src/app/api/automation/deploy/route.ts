@@ -44,9 +44,9 @@ export async function POST(req: Request) {
         if (existing.length > 0) {
             await db.update(automationDeployments)
                 .set({
-                    allocated_capital: allocated_capital.toString(),
+                    allocated_capital: (allocated_capital || "0").toString(),
                     risk_multiplier: risk_multiplier?.toString() || "1.0",
-                    stop_loss_cap: stop_loss_cap.toString(),
+                    stop_loss_cap: (stop_loss_cap || "0").toString(),
                     target_profit: target_profit?.toString() || null,
                     daily_stop_loss: daily_stop_loss?.toString() || null,
                     risk_level: risk_level || "Balanced",
@@ -59,9 +59,9 @@ export async function POST(req: Request) {
                 user_id: userId,
                 engine_id,
                 commodity,
-                allocated_capital: allocated_capital.toString(),
+                allocated_capital: (allocated_capital || "0").toString(),
                 risk_multiplier: risk_multiplier?.toString() || "1.0",
-                stop_loss_cap: stop_loss_cap.toString(),
+                stop_loss_cap: (stop_loss_cap || "0").toString(),
                 target_profit: target_profit?.toString() || null,
                 daily_stop_loss: daily_stop_loss?.toString() || null,
                 risk_level: risk_level || "Balanced",

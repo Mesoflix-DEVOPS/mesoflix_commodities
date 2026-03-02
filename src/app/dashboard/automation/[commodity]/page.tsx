@@ -100,9 +100,9 @@ export default function CommodityAutomationPage({ params }: { params: Promise<{ 
             allocatedCapital: capital,
             stopLossCap: stopLoss,
             riskMultiplier: multiplier,
-            targetProfit: 100, // Default for now
-            dailyStopLoss: stopLoss,
-            riskLevel: "Balanced", // Default for now
+            targetProfit: 100, // Default target
+            dailyStopLoss: stopLoss, // Use stoploss for daily cap too
+            riskLevel: "Balanced", // Default level
             pnl: 0
         });
         setDeployModalOpen(false);

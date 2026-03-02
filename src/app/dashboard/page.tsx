@@ -329,7 +329,7 @@ function DashboardPageInner() {
                     </div>
 
                     <div className="h-[280px] min-h-[280px] w-full relative z-10 min-w-0">
-                        <ResponsiveContainer width="100%" height="100%" minWidth={1}>
+                        <ResponsiveContainer width="100%" height="100%" debounce={100}>
                             <LineChart data={liveHistory.length > 0 ? liveHistory : [{ name: 'Now', equity: 0 }]}>
                                 <CartesianGrid strokeDasharray="3 3" stroke="#ffffff05" vertical={false} />
                                 <XAxis
