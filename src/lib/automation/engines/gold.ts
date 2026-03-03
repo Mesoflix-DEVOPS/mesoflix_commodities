@@ -152,8 +152,8 @@ export class AurumVelocityEngine {
         }
 
         // PRD Thresholds
-        const spreadThreshold = 1.0; // Relaxed for Demo market noise
-        const minVolatility = atr > 0.05; // Slightly lower volatility threshold for scalping
+        const spreadThreshold = 1.5; // Slightly more relaxed for XAU
+        const minVolatility = atr > 0.03; // Lowered to ensure execution in slower sessions
 
         // Signal Logic
         const isBullish = latest.close > vwap && ema20 > ema50;
@@ -223,24 +223,30 @@ export class AurumMomentumEngine {
 
         if (!ema50 || !ema200) return { direction: 'NEUTRAL', confidence: 0, riskPercentage: 0 };
 
-        // Pullback simulation logic
-        if (latestInfo.close > ema200 && latestInfo.close <= ema50 * 1.001 && latestInfo.close >= ema50 * 0.999) {
+        // Pullback simulation logic: Price pulling back to EMA 50 while trend is confirmed by EMA 200
+        const isBullishTrend = latestInfo.close > ema200;
+        const isBearishTrend = latestInfo.close < ema200;
+
+        // Broader pullback window: 0.25% instead of 0.1%
+        const isAtEma50Pullback = Math.abs(latestInfo.close - ema50) / ema50 < 0.0025;
+
+        if (isBullishTrend && isAtEma50Pullback && latestInfo.close >= ema50) {
             return {
                 direction: 'BUY',
-                confidence: 78,
+                confidence: 82,
                 riskPercentage: riskLevel === 'Conservative' ? 0.75 : riskLevel === 'Aggressive' ? 2.5 : 1.5,
-                stopLoss: latestInfo.close * 0.995, // 0.5% stop
-                targetPrice: latestInfo.close * 1.015, // 1.5% target (1:3 RR)
-                reasoning: `Mom-Intraday: Pullback to EMA50 while > EMA200.`
+                stopLoss: latestInfo.close - 5, // Static 5-point stop for gold
+                targetPrice: latestInfo.close + 15, // 1:3 RR
+                reasoning: `Mom-Intraday: Pullback to EMA50 confirmed by bullish EMA200 trend.`
             }
-        } else if (latestInfo.close < ema200 && latestInfo.close >= ema50 * 0.999 && latestInfo.close <= ema50 * 1.001) {
+        } else if (isBearishTrend && isAtEma50Pullback && latestInfo.close <= ema50) {
             return {
                 direction: 'SELL',
-                confidence: 78,
+                confidence: 82,
                 riskPercentage: riskLevel === 'Conservative' ? 0.75 : riskLevel === 'Aggressive' ? 2.5 : 1.5,
-                stopLoss: latestInfo.close * 1.005,
-                targetPrice: latestInfo.close * 0.985,
-                reasoning: `Mom-Intraday: Pullback to EMA50 while < EMA200.`
+                stopLoss: latestInfo.close + 5,
+                targetPrice: latestInfo.close - 15,
+                reasoning: `Mom-Intraday: Pullback to EMA50 confirmed by bearish EMA200 trend.`
             }
         }
 
@@ -262,28 +268,43 @@ export class AurumApexEngine {
         if (candles.length < 50) return { direction: 'NEUTRAL', confidence: 0, riskPercentage: 0 };
 
         const latestInfo = candles[candles.length - 1];
-        const rsi = calculateRSI(candles, 14);
+        const rsiLast = calculateRSI(candles, 14);
+        const ema200 = calculateEMA(candles, 200);
 
-        if (!rsi) return { direction: 'NEUTRAL', confidence: 0, riskPercentage: 0 };
+        if (!rsiLast || !ema200) return { direction: 'NEUTRAL', confidence: 0, riskPercentage: 0 };
 
-        // Simulating Deep Oversold/Overbought structural bounces
-        if (rsi < 25) {
+        const isTrendUp = latestInfo.close > ema200;
+
+        // Long-term Trend Following: Buy when trend is up and RSI pulls back to 40 (instead of extreme 25)
+        if (isTrendUp && rsiLast < 40) {
+            return {
+                direction: 'BUY',
+                confidence: 85,
+                riskPercentage: riskLevel === 'Conservative' ? 0.5 : riskLevel === 'Aggressive' ? 2.0 : 1.0,
+                stopLoss: latestInfo.close - 20, // Wider stops for swing
+                targetPrice: latestInfo.close + 80, // High reward 1:4
+                reasoning: `Apex-Swing: Trend-following entry on RSI (${rsiLast.toFixed(1)}) pullback above EMA200.`
+            }
+        }
+
+        // Counter-trend for extremes still active
+        if (rsiLast < 25) {
             return {
                 direction: 'BUY',
                 confidence: 90,
                 riskPercentage: riskLevel === 'Conservative' ? 0.5 : riskLevel === 'Aggressive' ? 2.0 : 1.0,
-                stopLoss: latestInfo.close * 0.980, // 2% Deep stop
-                targetPrice: latestInfo.close * 1.080, // 8% Macro Target (1:4 RR)
-                reasoning: `Apex-Swing: Extreme structural bottom tracking (RSI ${rsi.toFixed(2)})`
+                stopLoss: latestInfo.close - 25,
+                targetPrice: latestInfo.close + 100,
+                reasoning: `Apex-Swing: Extreme structural bottom (RSI ${rsiLast.toFixed(2)})`
             }
-        } else if (rsi > 75) {
+        } else if (rsiLast > 75) {
             return {
                 direction: 'SELL',
                 confidence: 90,
                 riskPercentage: riskLevel === 'Conservative' ? 0.5 : riskLevel === 'Aggressive' ? 2.0 : 1.0,
-                stopLoss: latestInfo.close * 1.020,
-                targetPrice: latestInfo.close * 0.920,
-                reasoning: `Apex-Swing: Extreme structural top exhaustion (RSI ${rsi.toFixed(2)})`
+                stopLoss: latestInfo.close + 25,
+                targetPrice: latestInfo.close - 100,
+                reasoning: `Apex-Swing: Extreme structural top exhaustion (RSI ${rsiLast.toFixed(2)})`
             }
         }
 

@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { automationDeployments, automationTrades } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getValidSession } from "@/lib/capital-service";
-import { getMarketPrices, placeOrder, closePosition, getPositions, getHistory } from "@/lib/capital";
+import { getMarketPrices, placeOrder, closePosition, getPositions, getHistory, getMarketTickers } from "@/lib/capital";
 import { AurumVelocityEngine, AurumMomentumEngine, AurumApexEngine, Candle } from "@/lib/automation/engines/gold";
 
 export async function POST(req: Request) {
