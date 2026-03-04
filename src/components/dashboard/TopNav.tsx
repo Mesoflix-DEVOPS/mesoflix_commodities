@@ -5,6 +5,7 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { useMarketData } from "@/contexts/MarketDataContext";
+import NetworkMeter from "./NetworkMeter";
 
 interface TopNavProps {
     userName: string;
@@ -100,8 +101,8 @@ export default function TopNav({
     };
 
     return (
-        <header className="h-[70px] bg-[#0A1622]/80 backdrop-blur-xl border-b border-white/5 sticky top-0 z-50 flex items-center justify-between px-6 md:px-12">
-            <div className="flex items-center gap-4">
+        <header className="h-[70px] bg-[#0A1622]/80 backdrop-blur-xl border-b border-white/5 sticky top-0 z-50 flex items-center justify-between px-4 md:px-12 transition-all">
+            <div className="flex items-center gap-2 md:gap-4">
                 <button
                     onClick={onMenuClick}
                     className="p-2 md:hidden text-gray-400 hover:text-white bg-white/5 rounded-lg border border-white/10"
@@ -110,11 +111,11 @@ export default function TopNav({
                 </button>
 
                 {/* Account Mode Switcher */}
-                <div className="flex items-center bg-black/20 p-1 rounded-xl border border-white/5 ml-2">
+                <div className="flex items-center bg-black/20 p-1 rounded-xl border border-white/5 ml-1 md:ml-2">
                     <button
                         onClick={() => setMode("demo")}
                         className={cn(
-                            "px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-tighter transition-all flex items-center justify-center gap-2",
+                            "px-2.5 md:px-4 py-1.5 rounded-lg text-[9px] md:text-[10px] font-black uppercase tracking-tighter transition-all flex items-center justify-center gap-1.5 md:gap-2",
                             mode === "demo"
                                 ? "bg-teal text-dark-blue shadow-lg"
                                 : "text-gray-500 hover:text-gray-300"
@@ -126,7 +127,7 @@ export default function TopNav({
                     <button
                         onClick={() => setMode("real")}
                         className={cn(
-                            "px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-tighter transition-all flex items-center justify-center gap-2",
+                            "px-2.5 md:px-4 py-1.5 rounded-lg text-[9px] md:text-[10px] font-black uppercase tracking-tighter transition-all flex items-center justify-center gap-1.5 md:gap-2",
                             mode === "real"
                                 ? "bg-amber-500 text-dark-blue shadow-lg"
                                 : "text-gray-500 hover:text-gray-300"
@@ -169,9 +170,10 @@ export default function TopNav({
                     </div>
                 </div>
 
-                <div className="h-8 w-px bg-white/5 hidden sm:block" />
+                <div className="h-8 w-px bg-white/5 hidden md:block" />
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 md:gap-3">
+                    <NetworkMeter />
                     <div className="relative" ref={notificationRef}>
                         <button
                             onClick={() => { setShowNotifications(!showNotifications); setShowProfile(false); }}
