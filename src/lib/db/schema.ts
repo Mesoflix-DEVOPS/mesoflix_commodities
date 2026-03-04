@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, timestamp, boolean, integer } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, timestamp, boolean, integer, index } from 'drizzle-orm/pg-core';
 
 // Users Table
 export const users = pgTable('users', {
@@ -35,7 +35,9 @@ export const refreshTokens = pgTable('refresh_tokens', {
     expires_at: timestamp('expires_at').notNull(),
     created_at: timestamp('created_at').defaultNow(),
     revoked: boolean('revoked').default(false),
-});
+}, (table) => ({
+    userIdIdx: index('refresh_tokens_user_id_idx').on(table.user_id),
+}));
 
 // Capital.com Accounts Table (Encrypted Credentials)
 export const capitalAccounts = pgTable('capital_accounts', {
@@ -57,7 +59,9 @@ export const capitalAccounts = pgTable('capital_accounts', {
     account_type: text('account_type').default('demo'),
     created_at: timestamp('created_at').defaultNow(),
     updated_at: timestamp('updated_at').defaultNow(),
-});
+}, (table) => ({
+    userIdIdx: index('capital_accounts_user_id_idx').on(table.user_id),
+}));
 
 // Audit Logs Table
 export const auditLogs = pgTable('audit_logs', {
@@ -67,7 +71,9 @@ export const auditLogs = pgTable('audit_logs', {
     ip_address: text('ip_address'),
     user_agent: text('user_agent'),
     timestamp: timestamp('timestamp').defaultNow(),
-});
+}, (table) => ({
+    userIdIdx: index('audit_logs_user_id_idx').on(table.user_id),
+}));
 
 // Engine Settings Table
 export const engineSettings = pgTable('engine_settings', {
@@ -79,7 +85,9 @@ export const engineSettings = pgTable('engine_settings', {
     parameters: text('parameters'), // JSON string for engine-specific params
     created_at: timestamp('created_at').defaultNow(),
     updated_at: timestamp('updated_at').defaultNow(),
-});
+}, (table) => ({
+    userIdIdx: index('engine_settings_user_id_idx').on(table.user_id),
+}));
 
 // System Settings Table (Global Config & Master Credentials)
 export const systemSettings = pgTable('system_settings', {
@@ -97,7 +105,9 @@ export const notifications = pgTable('notifications', {
     type: text('type').default('info'), // 'info', 'success', 'warning', 'error'
     read: boolean('read').default(false),
     created_at: timestamp('created_at').defaultNow(),
-});
+}, (table) => ({
+    userIdIdx: index('notifications_user_id_idx').on(table.user_id),
+}));
 
 // Support Agents Table
 export const supportAgents = pgTable('support_agents', {
@@ -125,7 +135,9 @@ export const tickets = pgTable('tickets', {
     priority: text('priority').default('NORMAL'), // 'LOW', 'NORMAL', 'HIGH', 'URGENT'
     created_at: timestamp('created_at').defaultNow(),
     closed_at: timestamp('closed_at'),
-});
+}, (table) => ({
+    userIdIdx: index('tickets_user_id_idx').on(table.user_id),
+}));
 
 // Ticket Messages Table (Live Chat via WebSockets)
 export const ticketMessages = pgTable('ticket_messages', {
@@ -137,7 +149,9 @@ export const ticketMessages = pgTable('ticket_messages', {
     attachment_url: text('attachment_url'),
     read_status: boolean('read_status').default(false),
     created_at: timestamp('created_at').defaultNow(),
-});
+}, (table) => ({
+    ticketIdIdx: index('ticket_messages_ticket_id_idx').on(table.ticket_id),
+}));
 
 // Internal Ticket Notes (Agents Only)
 export const ticketNotes = pgTable('ticket_notes', {
@@ -159,7 +173,9 @@ export const platformTrades = pgTable('platform_trades', {
     pnl: text('pnl'),
     mode: text('mode').default('demo'), // 'demo' or 'live'
     created_at: timestamp('created_at').defaultNow(),
-});
+}, (table) => ({
+    userIdIdx: index('platform_trades_user_id_idx').on(table.user_id),
+}));
 
 // Closed Trades History
 export const closedTrades = pgTable('closed_trades', {
@@ -174,7 +190,9 @@ export const closedTrades = pgTable('closed_trades', {
     pnl: text('pnl').notNull(),
     mode: text('mode').default('demo'), // 'demo' or 'live'
     created_at: timestamp('created_at').defaultNow(),
-});
+}, (table) => ({
+    userIdIdx: index('closed_trades_user_id_idx').on(table.user_id),
+}));
 
 // Automation Engine Deployments (Persists State for the Dashboard)
 export const automationDeployments = pgTable('automation_deployments', {
@@ -196,7 +214,9 @@ export const automationDeployments = pgTable('automation_deployments', {
     cooldown_until: timestamp('cooldown_until'),
     created_at: timestamp('created_at').defaultNow(),
     updated_at: timestamp('updated_at').defaultNow(),
-});
+}, (table) => ({
+    userIdIdx: index('automation_deployments_user_id_idx').on(table.user_id),
+}));
 
 // Automation Trades (Strictly deleted exactly 24h after closure per PRD)
 export const automationTrades = pgTable('automation_trades', {
@@ -215,7 +235,9 @@ export const automationTrades = pgTable('automation_trades', {
     mode: text('mode').default('demo'), // 'demo' or 'live'
     created_at: timestamp('created_at').defaultNow(),
     updated_at: timestamp('updated_at').defaultNow(),
-});
+}, (table) => ({
+    userIdIdx: index('automation_trades_user_id_idx').on(table.user_id),
+}));
 
 // Academy Classes (Learn Hub Phase 2)
 export const learnClasses = pgTable('learn_classes', {

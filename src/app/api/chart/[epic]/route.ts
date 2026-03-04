@@ -26,8 +26,7 @@ export async function GET(
         const max = searchParams.get('max') || '50';
 
         const session = await getValidSession(tokenPayload.userId, mode === 'demo');
-        // Always use LIVE endpoint; getValidSession handles sub-account switching internally
-        const API_URL = LIVE_API;
+        const API_URL = session.serverUrl;
 
         // Capital.com price history: GET /prices/{epic}?resolution=HOUR&max=50
         const priceRes = await fetch(

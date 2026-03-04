@@ -1,40 +1,34 @@
 import { db } from './src/lib/db';
-import { supportAgents, learnClasses } from './src/lib/db/schema';
-import { eq } from 'drizzle-orm';
+import { sql } from 'drizzle-orm';
 
 async function updateDb() {
-    console.log('🔄 Updating database...');
+    console.log('🔄 Applying missing indexes to database...');
 
-    try {
-        // 1. Deactivate 2FA for john@gmail.com
-        const [agent] = await db.select().from(supportAgents).where(eq(supportAgents.email, 'john@gmail.com'));
+    const queries = [
+        `CREATE INDEX IF NOT EXISTS refresh_tokens_user_id_idx ON refresh_tokens (user_id);`,
+        `CREATE INDEX IF NOT EXISTS capital_accounts_user_id_idx ON capital_accounts (user_id);`,
+        `CREATE INDEX IF NOT EXISTS audit_logs_user_id_idx ON audit_logs (user_id);`,
+        `CREATE INDEX IF NOT EXISTS engine_settings_user_id_idx ON engine_settings (user_id);`,
+        `CREATE INDEX IF NOT EXISTS notifications_user_id_idx ON notifications (user_id);`,
+        `CREATE INDEX IF NOT EXISTS tickets_user_id_idx ON tickets (user_id);`,
+        `CREATE INDEX IF NOT EXISTS ticket_messages_ticket_id_idx ON ticket_messages (ticket_id);`,
+        `CREATE INDEX IF NOT EXISTS platform_trades_user_id_idx ON platform_trades (user_id);`,
+        `CREATE INDEX IF NOT EXISTS closed_trades_user_id_idx ON closed_trades (user_id);`,
+        `CREATE INDEX IF NOT EXISTS automation_deployments_user_id_idx ON automation_deployments (user_id);`,
+        `CREATE INDEX IF NOT EXISTS automation_trades_user_id_idx ON automation_trades (user_id);`
+    ];
 
-        if (agent) {
-            await db.update(supportAgents)
-                .set({ two_factor_enabled: false })
-                .where(eq(supportAgents.email, 'john@gmail.com'));
-            console.log('✅ 2FA deactivated for john@gmail.com');
-        } else {
-            console.log('⚠️ Agent john@gmail.com not found. Skipping 2FA deactivation.');
+    for (const query of queries) {
+        try {
+            console.log(`Executing: ${query}`);
+            await db.execute(sql.raw(query));
+            console.log('✅ Success');
+        } catch (error) {
+            console.error(`❌ Failed: ${query}`, error.message);
         }
-
-        // 2. Add first class directly to database
-        const classes = await db.select().from(learnClasses);
-        if (classes.length === 0) {
-            await db.insert(learnClasses).values({
-                title: "Introduction to Financial Markets",
-                description: "Master the basics of trading from scratch. This comprehensive guide covers market mechanics, types of assets, and how to start your journey.",
-                youtube_url: "https://www.youtube.com/embed/yM6s8acNla4",
-                category: "Beginner",
-            });
-            console.log('✅ First lesson added to learn_classes.');
-        } else {
-            console.log('ℹ️ Academy already has lessons. Skipping seeding.');
-        }
-
-    } catch (error) {
-        console.error('❌ Database update failed:', error);
     }
+
+    console.log('🏁 Database optimization complete.');
 }
 
 updateDb();

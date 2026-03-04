@@ -1,13 +1,14 @@
-import { db } from './db';
+import { db, withRetry } from './db';
 import { capitalAccounts, users } from './db/schema';
 import { encrypt, decrypt } from './crypto';
 import { createSession, switchActiveAccount, getAccounts } from './capital';
 import { eq } from 'drizzle-orm';
 
 const LIVE_API = 'https://api-capital.backend-capital.com/api/v1';
+const DEMO_API = 'https://demo-api-capital.backend-capital.com/api/v1';
 
 export function getApiUrl(isDemo: boolean): string {
-    return LIVE_API; // Always use the Live platform for routing
+    return isDemo ? DEMO_API : LIVE_API;
 }
 
 export interface SessionTokens {
@@ -24,10 +25,12 @@ interface CachedEntry {
 }
 
 const memCache = new Map<string, CachedEntry>();
+const credCache = new Map<string, { data: any, expiresAt: number }>();
 const SESSION_TTL_MS = 8 * 60 * 1000;
+const CRED_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
 function cacheKey(credAccountId: string, isDemo: boolean): string {
-    return `${credAccountId} -unified - ${isDemo ? 'demo' : 'live'} `;
+    return `${credAccountId}-unified-${isDemo ? 'demo' : 'live'}`;
 }
 
 async function loadSessionFromDB(credAccountId: string, isDemo: boolean): Promise<SessionTokens | null> {
@@ -103,26 +106,42 @@ export async function getValidSession(
     isDemo: boolean = false,
     forceRefresh: boolean = false,
 ): Promise<SessionTokens> {
-    const credAccount = await findCredAccount(userId);
+    // 1. Try to get credAccount from cache first
+    let credAccount;
+    const now = Date.now();
+    const cachedCred = credCache.get(userId);
+
+    if (cachedCred && cachedCred.expiresAt > now && !forceRefresh) {
+        credAccount = cachedCred.data;
+    } else {
+        credAccount = await withRetry(() => findCredAccount(userId));
+        if (credAccount) {
+            credCache.set(userId, { data: credAccount, expiresAt: now + CRED_TTL_MS });
+        }
+    }
+
     if (!credAccount) throw new Error('No Capital.com account configured.');
 
     const key = cacheKey(credAccount.id, isDemo);
 
     if (!forceRefresh) {
         const cached = memCache.get(key);
-        if (cached && cached.expiresAt > Date.now()) return cached.tokens;
+        if (cached && cached.expiresAt > now) return cached.tokens;
     }
 
     if (!forceRefresh) {
-        const dbSession = await loadSessionFromDB(credAccount.id, isDemo);
-        if (dbSession) {
-            memCache.set(key, { tokens: dbSession, expiresAt: Date.now() + SESSION_TTL_MS });
-            return dbSession;
+        const cached = await withRetry(() => loadSessionFromDB(credAccount.id, isDemo));
+        if (cached) {
+            memCache.set(key, { tokens: cached, expiresAt: now + SESSION_TTL_MS });
+            return cached;
         }
     }
 
-    const [owner] = await db.select().from(users).where(eq(users.id, credAccount.user_id)).limit(1);
-    if (!owner) throw new Error('Account owner not found.');
+    const [owner] = await withRetry(() => db.select().from(users).where(eq(users.id, credAccount.user_id)).limit(1));
+    if (!owner) {
+        console.error(`[Service] Owner not found for userId=${credAccount.user_id}`);
+        throw new Error('Account owner not found.');
+    }
 
     let apiKey: string, password: string;
     try {
@@ -140,12 +159,24 @@ export async function getValidSession(
     }
     if (!password) throw new Error('API password not set.');
 
-    // Always create session on LIVE server (where ALL accounts reside)
-    const session = await createSession(owner.email, password, apiKey, false);
+    // Try to create session on the requested environment
+    let session;
+    let usedUrl = getApiUrl(isDemo);
+    try {
+        session = await createSession(owner.email, password, apiKey, isDemo);
+    } catch (e) {
+        if (isDemo) {
+            // Fallback to Live if Demo create failed (might be Unified CFD)
+            session = await createSession(owner.email, password, apiKey, false);
+            usedUrl = LIVE_API;
+        } else {
+            throw e;
+        }
+    }
 
     // Now we must find the correct sub-account and lock this session to it
     // otherwise trades would execute on the default account!
-    const accountsData = await getAccounts(session.cst, session.xSecurityToken, false);
+    const accountsData = await getAccounts(session.cst, session.xSecurityToken, false, usedUrl);
     const accounts = accountsData?.accounts || [];
 
     if (accounts.length === 0) throw new Error('No accounts found inside session');
@@ -185,7 +216,7 @@ export async function getValidSession(
 
     // Switch the session to the designated target account
     if (session.currentAccountId !== targetAccountId) {
-        await switchActiveAccount(session.cst, session.xSecurityToken, targetAccountId, false);
+        await switchActiveAccount(session.cst, session.xSecurityToken, targetAccountId, usedUrl === DEMO_API);
     }
 
     const tokens: SessionTokens = {
@@ -193,7 +224,7 @@ export async function getValidSession(
         xSecurityToken: session.xSecurityToken,
         accountIsDemo: isDemo,
         activeAccountId: targetAccountId,
-        serverUrl: LIVE_API,
+        serverUrl: usedUrl,
     };
 
     memCache.set(key, { tokens, expiresAt: Date.now() + SESSION_TTL_MS });

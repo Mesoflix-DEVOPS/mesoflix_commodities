@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getValidSession, getApiUrl } from '@/lib/capital-service';
+import { db, withRetry } from '@/lib/db';
 import { verifyAccessToken } from '@/lib/auth';
 import { cookies } from 'next/headers';
 
@@ -20,7 +21,7 @@ export async function GET(req: NextRequest) {
         const epics = epicsParam ? epicsParam.split(',') : ['GOLD', 'OIL_CRUDE', 'EURUSD', 'BTCUSD'];
 
         // Get unified session
-        const session = await getValidSession(tokenPayload.userId);
+        const session = await withRetry(() => getValidSession(tokenPayload.userId));
         const API_BASE = getApiUrl(false);
 
         const response = await fetch(`${API_BASE}/markets?epics=${epics.join(',')}`, {

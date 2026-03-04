@@ -15,8 +15,8 @@ export async function GET(req: NextRequest) {
         if (!tokenPayload) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
         // Hit the unified LIVE server once.
-        const API_BASE = getApiUrl(false);
         const session = await getValidSession(tokenPayload.userId);
+        const API_BASE = session.serverUrl;
 
         const res = await fetch(`${API_BASE}/accounts`, {
             headers: { 'CST': session.cst, 'X-SECURITY-TOKEN': session.xSecurityToken },

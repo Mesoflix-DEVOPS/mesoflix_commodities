@@ -1,4 +1,4 @@
-import { db } from '@/lib/db';
+import { db, withRetry } from '@/lib/db';
 import { users, notifications, platformTrades } from '@/lib/db/schema';
 import { getValidSession } from '@/lib/capital-service';
 import { placeOrder, closePosition } from '@/lib/capital';
@@ -54,23 +54,23 @@ export async function POST(request: Request) {
             const result = await executeWithSession();
 
             // Push notification
-            await db.insert(notifications).values({
+            await withRetry(() => db.insert(notifications).values({
                 user_id: userId,
                 title: 'Position Opened',
                 message: `Successfully executed a ${direction} block on ${epic} for ${size} units.`,
                 type: 'success'
-            });
+            }));
 
             if (result && result.dealReference) {
                 try {
-                    await db.insert(platformTrades).values({
+                    await withRetry(() => db.insert(platformTrades).values({
                         user_id: userId,
                         deal_id: result.dealReference,
                         epic,
                         direction,
                         size: String(size),
                         mode: isDemo ? 'demo' : 'live'
-                    });
+                    }));
                 } catch (dbErr) {
                     console.error("Failed to insert locally into platformTrades:", dbErr);
                 }
@@ -78,7 +78,7 @@ export async function POST(request: Request) {
 
             try {
                 const { sql } = require('drizzle-orm');
-                await db.delete(platformTrades).where(sql`created_at < NOW() - INTERVAL '1 day'`);
+                await withRetry(() => db.delete(platformTrades).where(sql`created_at < NOW() - INTERVAL '1 day'`));
             } catch (e) {
                 console.error("Cleanup failed", e);
             }
@@ -91,12 +91,12 @@ export async function POST(request: Request) {
                 try {
                     const result = await executeWithSession(true);
 
-                    await db.insert(notifications).values({
+                    await withRetry(() => db.insert(notifications).values({
                         user_id: userId,
                         title: 'Position Opened',
                         message: `Successfully executed a ${direction} block on ${epic} for ${size} units (Auth Retry).`,
                         type: 'success'
-                    });
+                    }));
 
                     return NextResponse.json({ success: true, ...result });
                 } catch (retryErr: any) {
@@ -152,17 +152,17 @@ export async function DELETE(request: Request) {
         try {
             const result = await executeClose();
 
-            await db.insert(notifications).values({
+            await withRetry(() => db.insert(notifications).values({
                 user_id: userId,
                 title: 'Position Closed',
                 message: `Successfully closed deal ${dealId}.`,
                 type: 'info'
-            });
+            }));
 
             // Store in our database for the Transactions table
             if (requestBody && requestBody.epic && requestBody.direction) {
                 try {
-                    await db.insert(closedTrades).values({
+                    await withRetry(() => db.insert(closedTrades).values({
                         user_id: userId,
                         deal_id: dealId,
                         epic: requestBody.epic,
@@ -172,7 +172,7 @@ export async function DELETE(request: Request) {
                         close_price: String(result.level ?? 0),
                         pnl: String(requestBody.pnl || 0),
                         mode: isDemo ? 'demo' : 'live'
-                    });
+                    }));
                 } catch (dbErr) {
                     console.error("Failed to insert into closedTrades:", dbErr);
                 }
@@ -181,10 +181,10 @@ export async function DELETE(request: Request) {
             try {
                 // Cleanup platform trades older than 1 day
                 const { sql } = require('drizzle-orm');
-                await db.delete(platformTrades).where(sql`created_at < NOW() - INTERVAL '1 day'`);
+                await withRetry(() => db.delete(platformTrades).where(sql`created_at < NOW() - INTERVAL '1 day'`));
 
                 // Also cleanup closed_trades older than 1 day to ensure it respects the 24-hour retention requirement
-                await db.delete(closedTrades).where(sql`created_at < NOW() - INTERVAL '1 day'`);
+                await withRetry(() => db.delete(closedTrades).where(sql`created_at < NOW() - INTERVAL '1 day'`));
             } catch (e) {
                 console.error("Cleanup failed", e);
             }
@@ -196,16 +196,16 @@ export async function DELETE(request: Request) {
                 try {
                     const result = await executeClose(true);
 
-                    await db.insert(notifications).values({
+                    await withRetry(() => db.insert(notifications).values({
                         user_id: userId,
                         title: 'Position Closed',
                         message: `Successfully closed deal ${dealId} (Auth Retry).`,
                         type: 'info'
-                    });
+                    }));
 
                     if (requestBody && requestBody.epic && requestBody.direction) {
                         try {
-                            await db.insert(closedTrades).values({
+                            await withRetry(() => db.insert(closedTrades).values({
                                 user_id: userId,
                                 deal_id: dealId,
                                 epic: requestBody.epic,
@@ -215,7 +215,7 @@ export async function DELETE(request: Request) {
                                 close_price: String(result.level ?? 0),
                                 pnl: String(requestBody.pnl || 0),
                                 mode: isDemo ? 'demo' : 'live'
-                            });
+                            }));
                         } catch (dbErr) {
                             console.error("Failed to insert into closedTrades after retry:", dbErr);
                         }

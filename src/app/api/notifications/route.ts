@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { db, withRetry } from '@/lib/db';
 import { notifications } from '@/lib/db/schema';
 import { eq, desc, and } from 'drizzle-orm';
 import { verifyAccessToken } from '@/lib/auth';
@@ -19,10 +19,10 @@ export async function GET() {
         const userId = await getUser();
         if (!userId) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
 
-        const items = await db.select().from(notifications)
+        const items = await withRetry(() => db.select().from(notifications)
             .where(eq(notifications.user_id, userId))
             .orderBy(desc(notifications.created_at))
-            .limit(50); // limit payload size to latest 50
+            .limit(50)); // limit payload size to latest 50
 
         const unreadCount = items.filter(i => !i.read).length;
 
@@ -42,9 +42,9 @@ export async function PATCH(request: Request) {
         const { ids, markAll } = await request.json(); // ids: string[]
 
         if (markAll) {
-            await db.update(notifications)
+            await withRetry(() => db.update(notifications)
                 .set({ read: true })
-                .where(and(eq(notifications.user_id, userId), eq(notifications.read, false)));
+                .where(and(eq(notifications.user_id, userId), eq(notifications.read, false))));
         } else if (ids && Array.isArray(ids) && ids.length > 0) {
             // Note: In Drizzle, an `inArray` update might be better but for simple iterators:
             for (const id of ids) {

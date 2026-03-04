@@ -103,8 +103,8 @@ export const switchActiveAccount = async (
     }
 };
 
-export const getAccounts = async (cst: string, xSecurityToken: string, isDemo: boolean = false) => {
-    const API_URL = getApiUrl(isDemo);
+export const getAccounts = async (cst: string, xSecurityToken: string, isDemo: boolean = false, apiUrl?: string) => {
+    const API_URL = apiUrl || getApiUrl(isDemo);
     const response = await fetch(`${API_URL}/accounts`, {
         headers: {
             'X-SECURITY-TOKEN': xSecurityToken,
@@ -121,8 +121,8 @@ export const getAccounts = async (cst: string, xSecurityToken: string, isDemo: b
     return response.json();
 };
 
-export const getPositions = async (cst: string, xSecurityToken: string, isDemo: boolean = false) => {
-    const API_URL = getApiUrl(isDemo);
+export const getPositions = async (cst: string, xSecurityToken: string, isDemo: boolean = false, apiUrl?: string) => {
+    const API_URL = apiUrl || getApiUrl(isDemo);
     const response = await fetch(`${API_URL}/positions`, {
         headers: {
             'X-SECURITY-TOKEN': xSecurityToken,
@@ -141,9 +141,10 @@ export const getHistory = async (
     cst: string,
     xSecurityToken: string,
     isDemo: boolean = false,
-    options?: { from?: string | Date; to?: string | Date; max?: number }
+    options?: { from?: string | Date; to?: string | Date; max?: number },
+    apiUrl?: string
 ) => {
-    const API_URL = LIVE_API_URL; // Always use unified live server for history
+    const API_URL = apiUrl || LIVE_API_URL; // Always use unified live server for history unless specified
 
     const performFetch = async (currentFrom?: string | Date, currentTo?: string | Date) => {
         const params = new URLSearchParams();
@@ -215,8 +216,8 @@ export const getHistory = async (
     return result;
 };
 
-export const getMarketTickers = async (cst: string, xSecurityToken: string, epics: string[], isDemo: boolean = false) => {
-    const API_URL = getApiUrl(isDemo);
+export const getMarketTickers = async (cst: string, xSecurityToken: string, epics: string[], isDemo: boolean = false, apiUrl?: string) => {
+    const API_URL = apiUrl || getApiUrl(isDemo);
     const marketResponse = await fetch(`${API_URL}/markets?epics=${epics.join(',')}`, {
         headers: {
             'X-SECURITY-TOKEN': xSecurityToken,
@@ -309,9 +310,10 @@ export const getMarketPrices = async (
     epic: string,
     resolution: 'MINUTE' | 'MINUTE_5' | 'MINUTE_15' | 'HOUR' | 'HOUR_4' | 'DAY' = 'MINUTE_5',
     max: number = 200,
-    isDemo: boolean = false
+    isDemo: boolean = false,
+    apiUrl?: string
 ) => {
-    const API_URL = getApiUrl(isDemo);
+    const API_URL = apiUrl || getApiUrl(isDemo);
     const response = await fetch(`${API_URL}/prices/${epic}?resolution=${resolution}&max=${max}`, {
         headers: {
             'X-SECURITY-TOKEN': xSecurityToken,

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { db, withRetry } from '@/lib/db';
 import { users, refreshTokens, auditLogs, capitalAccounts } from '@/lib/db/schema';
 import { comparePassword, decrypt } from '@/lib/crypto';
 import { signAccessToken, generateRefreshToken, setAuthCookies } from '@/lib/auth';
@@ -16,7 +16,7 @@ export async function POST(request: Request) {
         }
 
         // 1. Find User
-        const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
+        const [user] = await withRetry(() => db.select().from(users).where(eq(users.email, email)).limit(1));
         if (!user || !user.password_hash) {
             return NextResponse.json({ message: 'Invalid email or password' }, { status: 401 });
         }
@@ -37,7 +37,7 @@ export async function POST(request: Request) {
         // 4. Attempt Capital.com Session (non-blocking - failure should not block login)
         let account = null;
         try {
-            const [acc] = await db.select().from(capitalAccounts).where(eq(capitalAccounts.user_id, user.id)).limit(1);
+            const [acc] = await withRetry(() => db.select().from(capitalAccounts).where(eq(capitalAccounts.user_id, user.id)).limit(1));
             account = acc;
 
             if (account) {

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { db, withRetry } from '@/lib/db';
 import { capitalAccounts, systemSettings, users } from '@/lib/db/schema';
 import { decrypt } from '@/lib/crypto';
 import { getValidSession } from '@/lib/capital-service';
@@ -34,7 +34,7 @@ export async function GET(request: Request) {
         const userId = tokenPayload.userId;
 
         // Fetch user from DB to get accurate name/email
-        const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+        const [user] = await withRetry(() => db.select().from(users).where(eq(users.id, userId)).limit(1));
 
         if (!user) {
             return NextResponse.json({ message: 'User not found' }, { status: 404 });
@@ -58,9 +58,9 @@ export async function GET(request: Request) {
             // account switching via PUT /session internally.
 
             const [accountsData, positionsData, historyData] = await Promise.all([
-                getAccounts(session.cst, session.xSecurityToken, isDemo),
-                getPositions(session.cst, session.xSecurityToken, isDemo),
-                getHistory(session.cst, session.xSecurityToken, isDemo)
+                getAccounts(session.cst, session.xSecurityToken, isDemo, session.serverUrl),
+                getPositions(session.cst, session.xSecurityToken, isDemo, session.serverUrl),
+                getHistory(session.cst, session.xSecurityToken, isDemo, { max: 50 }, session.serverUrl)
             ]);
 
             const accounts = (accountsData.accounts || []).map((a: any) => ({
@@ -96,9 +96,9 @@ export async function GET(request: Request) {
                     const isDemo2 = modeInput === 'demo';
                     const session = await getValidSession(userId, isDemo2, true);
                     const [accountsData, positionsData, historyData] = await Promise.all([
-                        getAccounts(session.cst, session.xSecurityToken, isDemo2),
-                        getPositions(session.cst, session.xSecurityToken, isDemo2),
-                        getHistory(session.cst, session.xSecurityToken, isDemo2)
+                        getAccounts(session.cst, session.xSecurityToken, isDemo2, session.serverUrl),
+                        getPositions(session.cst, session.xSecurityToken, isDemo2, session.serverUrl),
+                        getHistory(session.cst, session.xSecurityToken, isDemo2, { max: 50 }, session.serverUrl)
                     ]);
                     const accounts = (accountsData.accounts || []).map((a: any) => ({
                         ...a,

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { db, withRetry } from "@/lib/db";
 import { automationDeployments, automationTrades } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getValidSession } from "@/lib/capital-service";
@@ -13,8 +13,8 @@ export async function POST(req: Request) {
         if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         const userId = session.user.id;
 
-        const activeDeployments = await db.select().from(automationDeployments)
-            .where(and(eq(automationDeployments.user_id, userId), eq(automationDeployments.status, "Running")));
+        const activeDeployments = await withRetry(() => db.select().from(automationDeployments)
+            .where(and(eq(automationDeployments.user_id, userId), eq(automationDeployments.status, "Running"))));
 
         if (!activeDeployments.length) return NextResponse.json({ message: "No active engines", executed: 0 });
 
@@ -28,7 +28,7 @@ export async function POST(req: Request) {
                 const { cst, xSecurityToken: xst } = capSession;
 
                 // Fetch Live Positions for THIS account
-                const { positions: capPositions } = await getPositions(cst, xst, dep.mode === 'demo');
+                const { positions: capPositions } = await getPositions(cst, xst, dep.mode === 'demo', capSession.serverUrl);
 
                 // Check Cooldown
                 if (dep.cooldown_until && new Date() < new Date(dep.cooldown_until)) continue;
@@ -41,7 +41,7 @@ export async function POST(req: Request) {
                 else if (dep.engine_id === "aurum-momentum") { resolution = "HOUR"; engineClass = AurumMomentumEngine; }
                 else if (dep.engine_id === "aurum-apex") { resolution = "HOUR_4"; engineClass = AurumApexEngine; }
 
-                const priceRes = await getMarketPrices(cst, xst, epic, resolution, 100, dep.mode === 'demo');
+                const priceRes = await getMarketPrices(cst, xst, epic, resolution, 100, dep.mode === 'demo', capSession.serverUrl);
                 if (!priceRes || !priceRes.prices) continue;
 
                 const candles: Candle[] = priceRes.prices.map((p: any) => ({
@@ -67,23 +67,23 @@ export async function POST(req: Request) {
                 for (const trade of openTrades) {
                     const stillOpen = capPositions.find((p: any) => p.dealId === trade.deal_id);
                     if (!stillOpen) {
-                        const history = await getHistory(cst, xst, dep.mode === 'demo', { max: 10 });
+                        const history = await getHistory(cst, xst, dep.mode === 'demo', { max: 10 }, capSession.serverUrl);
                         const historyItem = history?.activities?.find((a: any) => a.dealId === trade.deal_id && a.action === "POSITION_CLOSED");
                         const finalPnl = historyItem ? parseFloat(historyItem.result) : 0;
 
                         if (finalPnl < 0) {
                             const cooldown = new Date();
                             cooldown.setMinutes(cooldown.getMinutes() + 5);
-                            await db.update(automationDeployments).set({ cooldown_until: cooldown }).where(eq(automationDeployments.id, dep.id));
+                            await withRetry(() => db.update(automationDeployments).set({ cooldown_until: cooldown }).where(eq(automationDeployments.id, dep.id)));
                         }
 
                         const currentTotal = parseFloat(dep.pnl || "0");
-                        await db.update(automationDeployments).set({ pnl: (currentTotal + finalPnl).toString() }).where(eq(automationDeployments.id, dep.id));
-                        await db.update(automationTrades).set({
+                        await withRetry(() => db.update(automationDeployments).set({ pnl: (currentTotal + finalPnl).toString() }).where(eq(automationDeployments.id, dep.id)));
+                        await withRetry(() => db.update(automationTrades).set({
                             pnl: finalPnl.toString(),
                             close_price: latestPrice.toString(),
                             status: "Closed"
-                        }).where(eq(automationTrades.id, trade.id));
+                        }).where(eq(automationTrades.id, trade.id)));
                         continue;
                     }
 
@@ -92,8 +92,31 @@ export async function POST(req: Request) {
                         ? (latestPrice - openPrice) * parseFloat(trade.size)
                         : (openPrice - latestPrice) * parseFloat(trade.size);
 
+                    // Scalp Exit Optimization: 
+                    // If scalp engine and in reasonable profit (0.15% price move), close immediately
+                    const priceMovePct = Math.abs(latestPrice - openPrice) / openPrice;
+                    const isReasonableProfit = unrealized > 0 && priceMovePct >= 0.0015;
+
+                    if (dep.engine_id === "aurum-velocity" && isReasonableProfit) {
+                        try {
+                            console.log(`[Runner] Scalp Exit triggered for trade ${trade.deal_id} at ${priceMovePct.toFixed(4)}% move.`);
+                            await closePosition(cst, xst, trade.deal_id, dep.mode === 'demo', capSession.serverUrl);
+                            // Set status to closed so it skips the sync update below and gets cleaned up next tick
+                            await withRetry(() => db.update(automationTrades).set({
+                                status: "Closed",
+                                pnl: unrealized.toString(),
+                                close_price: latestPrice.toString()
+                            }).where(eq(automationTrades.id, trade.id)));
+                            continue;
+                        } catch (e) {
+                            console.error(`[Runner] Failed to auto-close scalp:`, e);
+                        }
+                    }
+
                     // Real-time Sync: Update the trade's PNL in the DB so it reflects in the dashboard
-                    await db.update(automationTrades).set({ pnl: unrealized.toString() }).where(eq(automationTrades.id, trade.id));
+                    if (Math.abs(unrealized - parseFloat(trade.pnl || "0")) > 0.01) {
+                        await withRetry(() => db.update(automationTrades).set({ pnl: unrealized.toString() }).where(eq(automationTrades.id, trade.id)));
+                    }
 
                     basketPnl += unrealized;
                 }
@@ -102,44 +125,43 @@ export async function POST(req: Request) {
                 const targetProfit = parseFloat(dep.target_profit || "999999");
                 if (basketPnl >= targetProfit) {
                     for (const t of openTrades) {
-                        try { await closePosition(cst, xst, t.deal_id, dep.mode === 'demo'); } catch { }
+                        try { await closePosition(cst, xst, t.deal_id, dep.mode === 'demo', capSession.serverUrl); } catch { }
                     }
-                    await db.update(automationDeployments).set({ status: "Target Achieved", last_decision_reason: `Target of $${targetProfit} reached.` }).where(eq(automationDeployments.id, dep.id));
+                    await withRetry(() => db.update(automationDeployments).set({ status: "Target Achieved", last_decision_reason: `Target of $${targetProfit} reached.` }).where(eq(automationDeployments.id, dep.id)));
                     continue;
                 }
 
                 // 3. ENTRY & LIVE PRICE
-                const tickerRes = await getMarketTickers(cst, xst, [epic], dep.mode === 'demo');
+                const tickerRes = await getMarketTickers(cst, xst, [epic], dep.mode === 'demo', capSession.serverUrl);
                 const marketInfo = tickerRes?.markets?.[0]?.snapshot;
                 const currentBid = marketInfo?.bid || latestPrice;
                 const currentOffer = marketInfo?.offer || latestPrice;
                 const currentSpread = Math.abs(currentOffer - currentBid);
 
                 const signal = engineClass.analyze(candles, currentSpread, dep.risk_level || 'Balanced');
-                if (signal.direction !== "NEUTRAL" && openTrades.length < 3) {
-                    const capital = parseFloat(dep.allocated_capital);
+
+                // Position Limiting Logic: 1 position per $500 allocated capital
+                const capital = parseFloat(dep.allocated_capital);
+                const maxPositions = Math.max(1, Math.floor(capital / 500));
+
+                if (signal.direction !== "NEUTRAL" && openTrades.length < maxPositions) {
                     const riskPerTrade = capital * (signal.riskPercentage / 100);
 
                     // Dynamic Size Calculation based on Stop Loss distance
-                    // Formula: Size = (Capital * Risk%) / |Entry - SL|
-                    const entryPrice = signal.direction === "BUY" ? currentBid : currentOffer;
-                    const slDistance = Math.abs(entryPrice - (signal.stopLoss || entryPrice - 5));
+                    const entryPriceForSize = signal.direction === "BUY" ? currentBid : currentOffer;
+                    const slDistance = Math.abs(entryPriceForSize - (signal.stopLoss || entryPriceForSize - 5));
 
-                    // Min Lot Size for GOLD is typically 0.1 on many CFD platforms, 
-                    // but we floor to 2 decimal places to be safe and precise.
                     let calculatedSize = slDistance > 0 ? riskPerTrade / slDistance : 0.1;
-
-                    // Cap and Floor for safety
                     const size = Math.max(0.1, parseFloat(calculatedSize.toFixed(2)));
 
                     const orderRes = await placeOrder(cst, xst, epic, signal.direction, size, dep.mode === 'demo', {
                         takeProfit: signal.targetPrice,
                         stopLoss: signal.stopLoss
-                    });
+                    }, capSession.serverUrl);
 
                     if (orderRes && orderRes.dealReference) {
                         const entryPrice = signal.direction === "BUY" ? currentBid : currentOffer;
-                        await db.insert(automationTrades).values({
+                        await withRetry(() => db.insert(automationTrades).values({
                             user_id: userId,
                             deployment_id: dep.id,
                             engine_id: dep.engine_id,
@@ -151,10 +173,10 @@ export async function POST(req: Request) {
                             pnl: "0",
                             mode: dep.mode || "demo",
                             status: "Open"
-                        });
+                        }));
                     }
                 } else {
-                    await db.update(automationDeployments).set({ last_decision_reason: signal.reasoning }).where(eq(automationDeployments.id, dep.id));
+                    await withRetry(() => db.update(automationDeployments).set({ last_decision_reason: signal.reasoning }).where(eq(automationDeployments.id, dep.id)));
                 }
             } catch (innerError: any) {
                 console.error(`[RunnerAPI Engine Error for ${dep.engine_id}]:`, innerError);

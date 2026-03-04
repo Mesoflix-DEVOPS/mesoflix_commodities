@@ -56,9 +56,9 @@ export async function GET(req: NextRequest) {
                     const currentSession = await getValidSession(userId, isDemo);
 
                     const [accountsData, positionsData, marketData] = await Promise.all([
-                        getAccounts(currentSession.cst, currentSession.xSecurityToken, false),
-                        getPositions(currentSession.cst, currentSession.xSecurityToken, false),
-                        getMarketTickers(currentSession.cst, currentSession.xSecurityToken, epics, isDemo)
+                        getAccounts(currentSession.cst, currentSession.xSecurityToken, isDemo, currentSession.serverUrl),
+                        getPositions(currentSession.cst, currentSession.xSecurityToken, isDemo, currentSession.serverUrl),
+                        getMarketTickers(currentSession.cst, currentSession.xSecurityToken, epics, isDemo, currentSession.serverUrl)
                     ]);
 
                     // Send market data
@@ -79,11 +79,10 @@ export async function GET(req: NextRequest) {
                         }
                     }
 
-                    // Send balances separated by mode depending on current session
+                    // Send balances
                     if (accountsData?.accounts) {
                         const activeAccountDetails = accountsData.accounts.find((a: any) => a.accountId === currentSession.activeAccountId);
                         if (activeAccountDetails) {
-                            // Provide simple structure mimicking /api/balance route
                             const balPayload = isDemo
                                 ? { hasDemo: true, hasLive: true, demoBalance: activeAccountDetails.balance, realBalance: null }
                                 : { hasDemo: true, hasLive: true, realBalance: activeAccountDetails.balance, demoBalance: null };
@@ -97,21 +96,19 @@ export async function GET(req: NextRequest) {
 
                 } catch (error) {
                     const err = error as any;
-                    console.error("[Stream API] Polling loop error details:", err.message);
-                    // Silent fail on minor polling errors to not aggressively kill stream
-                    if (err.message?.includes('401') || err.message?.includes('session')) {
-                        console.error("[Stream API] Session expired, closing stream");
-                        // Token expiration, force close to trigger auto-reconnect from client side
+                    console.error("[Stream API] Polling loop error details:", err.message || err);
+                    if (err.message?.includes('401') || err.message?.toLowerCase().includes('session')) {
+                        console.error("[Stream API] Session expired or unauthorized, closing stream");
                         sendEvent('error', { message: 'Session expired during polling' });
                         cleanup();
                     }
                 }
             };
 
-            // Poll immediately, then every 3 seconds
+            // Poll immediately, then every 10 seconds (reduced from 3s to stabilize DB)
             await pollData();
             if (!isClosed) {
-                pollingTimer = setInterval(pollData, 3000);
+                pollingTimer = setInterval(pollData, 10000);
             }
 
             req.signal.addEventListener('abort', cleanup);

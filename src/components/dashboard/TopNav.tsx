@@ -185,7 +185,7 @@ export default function TopNav({
 
                         {/* Notifications Panel */}
                         {showNotifications && (
-                            <div className="md:absolute md:right-0 md:mt-3 fixed inset-x-4 top-[80px] md:top-auto md:w-80 max-h-[400px] overflow-hidden flex flex-col bg-[#0E1B2A] border border-white/10 rounded-2xl shadow-2xl animate-in fade-in zoom-in-95 duration-200 z-50">
+                            <div className="md:absolute md:right-0 md:mt-3 max-md:fixed max-md:inset-x-4 max-md:top-[80px] md:w-80 max-h-[400px] overflow-hidden flex flex-col bg-[#0E1B2A] border border-white/10 rounded-2xl shadow-2xl animate-in fade-in zoom-in-95 duration-200 z-50">
                                 <div className="px-4 py-3 border-b border-white/5 flex items-center justify-between z-10 bg-[#0E1B2A]">
                                     <div>
                                         <p className="text-xs text-gray-500 font-bold uppercase tracking-widest mb-1">Activity Log</p>

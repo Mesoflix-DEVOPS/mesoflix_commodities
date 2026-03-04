@@ -159,9 +159,9 @@ export class AurumVelocityEngine {
         const isBullish = latest.close > vwap && ema9 > ema21;
         const isBearish = latest.close < vwap && ema9 < ema21;
 
-        // BUY Logic: Price > VWAP && EMA20 > EMA50 && RSI(7) > 50
-        if (isBullish && rsi7 > 50 && spread < spreadThreshold && minVolatility) {
-            const confidence = rsi7 > 60 && volumeSpike ? 95 : 85;
+        // BUY Logic: Price > VWAP && EMA9 > EMA21 && RSI(7) > 55 && Volume Spike
+        if (isBullish && rsi7 > 55 && volumeSpike && spread < spreadThreshold && minVolatility) {
+            const confidence = rsi7 > 65 ? 98 : 92;
             let riskPercentage = 2.5;
             if (riskLevel === 'Conservative') riskPercentage = 1.0;
             if (riskLevel === 'Aggressive') riskPercentage = 5.0;
@@ -171,14 +171,14 @@ export class AurumVelocityEngine {
                 confidence,
                 riskPercentage,
                 stopLoss: latest.close - (atr * 1.5),
-                targetPrice: latest.close + (atr * 3),
-                reasoning: `Bullish Sequence: Price holds above VWAP ($${vwap.toFixed(2)}) and EMA(9) > EMA(21). RSI is healthy at ${rsi7.toFixed(1)}.`
+                targetPrice: latest.close + (atr * 1.5), // Faster scalp target
+                reasoning: `Sniper BUY: VWAP/EMA alignment confirmed with volume spike and RSI ${rsi7.toFixed(1)}.`
             };
         }
 
-        // SELL Logic: Price < VWAP && EMA20 < EMA50 && RSI(7) < 50
-        if (isBearish && rsi7 < 50 && spread < spreadThreshold && minVolatility) {
-            const confidence = rsi7 < 40 && volumeSpike ? 95 : 85;
+        // SELL Logic: Price < VWAP && EMA9 < EMA21 && RSI(7) < 45 && Volume Spike
+        if (isBearish && rsi7 < 45 && volumeSpike && spread < spreadThreshold && minVolatility) {
+            const confidence = rsi7 < 35 ? 98 : 92;
             let riskPercentage = 2.5;
             if (riskLevel === 'Conservative') riskPercentage = 1.0;
             if (riskLevel === 'Aggressive') riskPercentage = 5.0;
@@ -188,8 +188,8 @@ export class AurumVelocityEngine {
                 confidence,
                 riskPercentage,
                 stopLoss: latest.close + (atr * 1.5),
-                targetPrice: latest.close - (atr * 3),
-                reasoning: `Bearish Sequence: Price rejected by VWAP ($${vwap.toFixed(2)}) and EMA(9) < EMA(21). RSI is weak at ${rsi7.toFixed(1)}.`
+                targetPrice: latest.close - (atr * 1.5), // Faster scalp target
+                reasoning: `Sniper SELL: VWAP/EMA rejection confirmed with volume spike and RSI ${rsi7.toFixed(1)}.`
             };
         }
 
