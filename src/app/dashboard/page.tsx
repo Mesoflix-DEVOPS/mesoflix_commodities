@@ -51,6 +51,8 @@ function DashboardPageInner() {
     const [liveHistory, setLiveHistory] = useState<any[]>([]);
     const [bulkClosing, setBulkClosing] = useState(false);
     const [showBulkMenu, setShowBulkMenu] = useState(false);
+    const [selectedTrade, setSelectedTrade] = useState<any>(null);
+    const [closingTrade, setClosingTrade] = useState(false);
     const bulkMenuRef = useRef<HTMLDivElement>(null);
 
     const fetchData = useCallback((isSilent = false) => {
