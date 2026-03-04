@@ -35,6 +35,7 @@ export async function POST(request: Request) {
 
         const executeWithSession = async (forceRefresh = false) => {
             const session = await getValidSession(userId, isDemo, forceRefresh);
+            console.log(`[Trade API] Executing order on account ${session.activeAccountId} via ${session.serverUrl}`);
             const accountIsDemo = session.accountIsDemo ?? false;
             return placeOrder(
                 session.cst, session.xSecurityToken,
@@ -44,7 +45,8 @@ export async function POST(request: Request) {
                     takeProfit: takeProfit ? parseFloat(takeProfit) : null,
                     stopLoss: stopLoss ? parseFloat(stopLoss) : null,
                     trailingStop: Boolean(trailingStop),
-                }
+                },
+                session.serverUrl
             );
         };
 
@@ -142,8 +144,9 @@ export async function DELETE(request: Request) {
 
         const executeClose = async (forceRefresh = false) => {
             const session = await getValidSession(userId, isDemo, forceRefresh);
+            console.log(`[Trade API] Closing deal ${dealId} on account ${session.activeAccountId} via ${session.serverUrl}`);
             const accountIsDemo = session.accountIsDemo ?? false;
-            return closePosition(session.cst, session.xSecurityToken, dealId, accountIsDemo);
+            return closePosition(session.cst, session.xSecurityToken, dealId, accountIsDemo, session.serverUrl);
         };
 
         try {

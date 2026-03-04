@@ -237,14 +237,15 @@ export const placeOrder = async (
     epic: string,
     direction: 'BUY' | 'SELL',
     size: number,
-    accountIsDemo: boolean = false, // Kept to satisfy type signature, but API_URL is fixed
+    accountIsDemo: boolean = false,
     options?: {
         takeProfit?: number | null;
         stopLoss?: number | null;
         trailingStop?: boolean;
-    }
+    },
+    apiUrl?: string
 ) => {
-    const API_URL = getApiUrl(accountIsDemo);
+    const API_URL = apiUrl || getApiUrl(accountIsDemo);
 
     const body: Record<string, any> = {
         epic,
@@ -281,9 +282,10 @@ export const closePosition = async (
     cst: string,
     xSecurityToken: string,
     dealId: string,
-    accountIsDemo: boolean = false
+    accountIsDemo: boolean = false,
+    apiUrl?: string
 ) => {
-    const API_URL = getApiUrl(accountIsDemo);
+    const API_URL = apiUrl || getApiUrl(accountIsDemo);
 
     const response = await fetch(`${API_URL}/positions/${dealId}`, {
         method: 'DELETE',

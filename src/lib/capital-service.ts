@@ -166,7 +166,9 @@ export async function getValidSession(
 
     const rAcc = realAccs[0] || accounts[0];
     const dAcc = demoAccs[0] || accounts[1] || accounts[0];
-    const targetAccountId = isDemo ? dAcc.accountId : rAcc.accountId;
+
+    // Priority: 1. Previously selected ID in database, 2. Dynamic heuristic
+    const targetAccountId = credAccount.selected_capital_account_id || (isDemo ? dAcc.accountId : rAcc.accountId);
 
     // Switch the session to the designated target account
     if (session.currentAccountId !== targetAccountId) {
