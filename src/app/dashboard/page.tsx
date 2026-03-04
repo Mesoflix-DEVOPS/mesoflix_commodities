@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import {
     TrendingUp,
     TrendingDown,
@@ -17,7 +17,8 @@ import {
     Filter,
     XCircle,
     CheckCircle2,
-    MinusCircle
+    MinusCircle,
+    ChevronDown
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -47,10 +48,10 @@ function DashboardPageInner() {
     const { mode, balanceData } = useMarketData();
     const [loading, setLoading] = useState(true);
     const [data, setData] = useState<any>(null);
-    const [selectedTrade, setSelectedTrade] = useState<any>(null);
-    const [closingTrade, setClosingTrade] = useState(false);
     const [liveHistory, setLiveHistory] = useState<any[]>([]);
     const [bulkClosing, setBulkClosing] = useState(false);
+    const [showBulkMenu, setShowBulkMenu] = useState(false);
+    const bulkMenuRef = useRef<HTMLDivElement>(null);
 
     const fetchData = useCallback((isSilent = false) => {
         if (!isSilent) setLoading(true);
@@ -97,6 +98,17 @@ function DashboardPageInner() {
 
         return () => es.close();
     }, [fetchData, mode]);
+
+    // Handle outside click to close dropdowns
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (bulkMenuRef.current && !bulkMenuRef.current.contains(event.target as Node)) {
+                setShowBulkMenu(false);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
 
     const handleCloseTrade = async () => {
         if (!selectedTrade?.dealId) return;
@@ -170,6 +182,7 @@ function DashboardPageInner() {
         alert(`Bulk close complete: ${successCount} succeeded, ${failCount} failed.`);
         fetchData(true);
         setBulkClosing(false);
+        setShowBulkMenu(false);
     };
 
     // -----------------------------------------------------------------------
@@ -480,39 +493,52 @@ function DashboardPageInner() {
             {/* Section D + E: Positions Table + Risk Chart */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 pt-4">
                 {/* Active Positions Table */}
-                <div className="bg-[#0E1B2A] rounded-[2.5rem] border border-white/5 overflow-hidden shadow-xl lg:col-span-2 flex flex-col h-[600px]">
-                    <div className="p-8 border-b border-white/5 flex justify-between items-center shrink-0">
+                <div className="bg-[#0E1B2A] rounded-[2.5rem] border border-white/5 overflow-hidden shadow-xl lg:col-span-2 flex flex-col h-[350px] sm:h-[400px] md:h-[450px]">
+                    <div className="p-5 md:p-6 border-b border-white/5 flex justify-between items-center shrink-0">
                         <div>
-                            <h3 className="text-lg font-bold text-white tracking-tight">Active Execution</h3>
-                            <p className="text-[10px] text-gray-500 font-black uppercase tracking-widest mt-0.5">{mode} account</p>
+                            <h3 className="text-base font-bold text-white tracking-tight">Active Execution</h3>
+                            <p className="text-[9px] text-gray-500 font-black uppercase tracking-widest mt-0.5">{mode} account</p>
                         </div>
                         <div className="flex items-center gap-2">
                             {positions.length > 0 && (
-                                <div className="flex bg-black/20 p-1 rounded-xl border border-white/5 mr-2">
+                                <div className="relative" ref={bulkMenuRef}>
                                     <button
-                                        onClick={() => handleBulkClose('all')}
+                                        onClick={() => setShowBulkMenu(!showBulkMenu)}
                                         disabled={bulkClosing}
-                                        className="px-3 py-1.5 text-[9px] font-black uppercase tracking-tighter text-white hover:text-red-400 transition-colors flex items-center gap-1.5"
+                                        className="flex items-center gap-2 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-all group scale-95 md:scale-100"
                                     >
-                                        <XCircle size={12} /> All
+                                        <span className="text-[9px] font-black uppercase tracking-widest text-teal group-hover:text-white transition-colors">Close Positions</span>
+                                        <ChevronDown size={12} className={cn("text-gray-500 transition-transform duration-300", showBulkMenu && "rotate-180")} />
                                     </button>
-                                    <button
-                                        onClick={() => handleBulkClose('profit')}
-                                        disabled={bulkClosing}
-                                        className="px-3 py-1.5 text-[9px] font-black uppercase tracking-tighter text-teal hover:bg-teal/5 rounded-lg transition-colors flex items-center gap-1.5 border-l border-white/5"
-                                    >
-                                        <CheckCircle2 size={12} /> Profits
-                                    </button>
-                                    <button
-                                        onClick={() => handleBulkClose('loss')}
-                                        disabled={bulkClosing}
-                                        className="px-3 py-1.5 text-[9px] font-black uppercase tracking-tighter text-red-500 hover:bg-red-500/5 rounded-lg transition-colors flex items-center gap-1.5 border-l border-white/5"
-                                    >
-                                        <MinusCircle size={12} /> Losses
-                                    </button>
+
+                                    {showBulkMenu && (
+                                        <div className="absolute right-0 mt-3 w-44 bg-[#0F1D2F]/90 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl p-1.5 animate-in fade-in zoom-in-95 duration-200 z-[70]">
+                                            <button
+                                                onClick={() => handleBulkClose('all')}
+                                                className="w-full flex items-center gap-2.5 px-3 py-2.5 text-[9px] font-black uppercase tracking-widest text-white hover:bg-white/5 rounded-xl transition-all"
+                                            >
+                                                <XCircle size={13} className="text-red-400" />
+                                                All Positions
+                                            </button>
+                                            <button
+                                                onClick={() => handleBulkClose('profit')}
+                                                className="w-full flex items-center gap-2.5 px-3 py-2.5 text-[9px] font-black uppercase tracking-widest text-teal hover:bg-teal/5 rounded-xl transition-all"
+                                            >
+                                                <CheckCircle2 size={13} />
+                                                Profits Only
+                                            </button>
+                                            <button
+                                                onClick={() => handleBulkClose('loss')}
+                                                className="w-full flex items-center gap-2.5 px-3 py-2.5 text-[9px] font-black uppercase tracking-widest text-red-500 hover:bg-red-500/5 rounded-xl transition-all"
+                                            >
+                                                <MinusCircle size={13} />
+                                                Losses Only
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
                             )}
-                            <span className={cn("text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border",
+                            <span className={cn("text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full border",
                                 positions.length > 0 ? 'text-teal border-teal/30 bg-teal/10' : 'text-gray-600 border-white/10'
                             )}>
                                 {positions.length} Open
@@ -523,12 +549,12 @@ function DashboardPageInner() {
                         <div className="overflow-x-auto">
                             <table className="w-full text-left text-sm border-collapse">
                                 <thead>
-                                    <tr className="text-[10px] text-gray-600 uppercase tracking-widest bg-black/10">
-                                        <th className="px-8 py-4 font-black">Asset</th>
-                                        <th className="px-8 py-4 font-black">Direction</th>
-                                        <th className="px-8 py-4 font-black">Size</th>
-                                        <th className="px-8 py-4 font-black">Entry</th>
-                                        <th className="px-8 py-4 font-black text-right">Unreal. P/L</th>
+                                    <tr className="text-[9px] text-gray-600 uppercase tracking-widest bg-black/10">
+                                        <th className="px-4 py-3 font-black">Asset</th>
+                                        <th className="px-4 py-3 font-black">Direction</th>
+                                        <th className="px-4 py-3 font-black">Size</th>
+                                        <th className="px-4 py-3 font-black">Entry</th>
+                                        <th className="px-4 py-3 font-black text-right">Unreal. P/L</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -536,21 +562,21 @@ function DashboardPageInner() {
                                         <tr key={idx}
                                             onClick={() => setSelectedTrade(pos)}
                                             className="border-b border-white/5 hover:bg-white/[0.05] cursor-pointer transition-colors group">
-                                            <td className="px-8 py-5">
-                                                <div className="flex items-center gap-3">
-                                                    <div className={cn("w-2 h-2 rounded-full shrink-0 group-hover:scale-125 transition-transform", pos.direction === 'BUY' ? 'bg-teal' : 'bg-red-500')} />
-                                                    <span className="font-bold text-white uppercase tracking-tight text-sm">{pos.name}</span>
+                                            <td className="px-4 py-3">
+                                                <div className="flex items-center gap-2">
+                                                    <div className={cn("w-1.5 h-1.5 rounded-full shrink-0 group-hover:scale-125 transition-transform", pos.direction === 'BUY' ? 'bg-teal' : 'bg-red-500')} />
+                                                    <span className="font-bold text-white uppercase tracking-tight text-[13px]">{pos.name}</span>
                                                 </div>
                                             </td>
-                                            <td className="px-8 py-5">
-                                                <span className={cn("text-[10px] font-black uppercase px-2 py-1 rounded-lg tracking-widest",
+                                            <td className="px-4 py-3">
+                                                <span className={cn("text-[9px] font-black uppercase px-2 py-0.5 rounded-lg tracking-widest",
                                                     pos.direction === 'BUY' ? 'text-teal bg-teal/10' : 'text-red-400 bg-red-500/10'
                                                 )}>{pos.direction}</span>
                                             </td>
-                                            <td className="px-8 py-5 text-gray-400 font-bold font-mono">{pos.size}</td>
-                                            <td className="px-8 py-5 font-mono text-gray-300">{Number(pos.level).toFixed(4)}</td>
-                                            <td className="px-8 py-5 text-right relative">
-                                                <span className={cn("font-black font-mono text-base", pos.upl >= 0 ? "text-teal" : "text-red-500")}>
+                                            <td className="px-4 py-3 text-gray-400 font-bold font-mono text-xs">{pos.size}</td>
+                                            <td className="px-4 py-3 font-mono text-gray-300 text-xs">{Number(pos.level).toFixed(4)}</td>
+                                            <td className="px-4 py-3 text-right relative">
+                                                <span className={cn("font-black font-mono text-sm", pos.upl >= 0 ? "text-teal" : "text-red-500")}>
                                                     {pos.upl >= 0 ? "+" : ""}{Number(pos.upl).toFixed(2)}
                                                 </span>
                                                 {/* Hover indicator */}
@@ -574,18 +600,18 @@ function DashboardPageInner() {
                 </div>
 
                 {/* Section E: Risk Pie Chart */}
-                <div className="bg-[#0E1B2A] rounded-[2.5rem] border border-white/5 p-8 shadow-xl flex flex-col h-[600px]">
-                    <h3 className="text-sm font-black text-teal uppercase tracking-[0.2em] mb-6 flex items-center gap-2 px-2">
+                <div className="bg-[#0E1B2A] rounded-[2.5rem] border border-white/5 p-6 md:p-8 shadow-xl flex flex-col h-[300px] sm:h-[350px] md:h-[450px]">
+                    <h3 className="text-[10px] font-black text-teal uppercase tracking-[0.2em] mb-4 flex items-center gap-2 px-1">
                         <Shield size={14} /> Risk Analysis
                     </h3>
 
-                    <div className="flex-1 flex flex-col items-center justify-center p-4 bg-white/5 rounded-3xl relative min-h-[200px] min-w-0">
-                        <ResponsiveContainer width="100%" height={160} minWidth={1}>
+                    <div className="flex-1 flex flex-col items-center justify-center p-2 bg-white/5 rounded-[2rem] relative min-h-0 min-w-0">
+                        <ResponsiveContainer width="100%" height={120} minWidth={1}>
                             <RePieChart>
                                 <Pie
                                     data={riskByAsset}
-                                    innerRadius={50}
-                                    outerRadius={70}
+                                    innerRadius={35}
+                                    outerRadius={50}
                                     paddingAngle={4}
                                     dataKey="value"
                                     animationDuration={1000}
@@ -601,8 +627,8 @@ function DashboardPageInner() {
                                 />
                             </RePieChart>
                         </ResponsiveContainer>
-                        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                            <span className="text-[9px] text-gray-500 font-black uppercase tracking-widest">Exposure</span>
+                        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none translate-y-1">
+                            <span className="text-[8px] text-gray-500 font-black uppercase tracking-widest">Exposure</span>
                         </div>
                     </div>
 
