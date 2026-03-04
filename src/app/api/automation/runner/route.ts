@@ -37,7 +37,7 @@ export async function POST(req: Request) {
                 let resolution: any = "MINUTE_5";
                 let engineClass: any = AurumVelocityEngine;
 
-                if (dep.engine_id === "aurum-velocity") { resolution = "MINUTE_5"; engineClass = AurumVelocityEngine; }
+                if (dep.engine_id === "aurum-velocity") { resolution = "MINUTE"; engineClass = AurumVelocityEngine; }
                 else if (dep.engine_id === "aurum-momentum") { resolution = "HOUR"; engineClass = AurumMomentumEngine; }
                 else if (dep.engine_id === "aurum-apex") { resolution = "HOUR_4"; engineClass = AurumApexEngine; }
 

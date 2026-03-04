@@ -138,8 +138,8 @@ export class AurumVelocityEngine {
 
         const latest = candles[candles.length - 1];
         const vwap = calculateVWAP(candles);
-        const ema20 = calculateEMA(candles, 20);
-        const ema50 = calculateEMA(candles, 50);
+        const ema9 = calculateEMA(candles, 9);
+        const ema21 = calculateEMA(candles, 21);
         const rsi7 = calculateRSI(candles, 7);
         const atr = calculateATR(candles, 14);
 
@@ -147,7 +147,7 @@ export class AurumVelocityEngine {
         const avgVol = candles.slice(-21, -1).reduce((sum, c) => sum + (c.volume || 0), 0) / 20;
         const volumeSpike = latest.volume > (avgVol * 1.5);
 
-        if (!vwap || !ema20 || !ema50 || !rsi7 || !atr) {
+        if (!vwap || !ema9 || !ema21 || !rsi7 || !atr) {
             return { direction: 'NEUTRAL', confidence: 0, riskPercentage: 0, reasoning: "Indicator calculation failure" };
         }
 
@@ -156,8 +156,8 @@ export class AurumVelocityEngine {
         const minVolatility = atr > 0.03; // Lowered to ensure execution in slower sessions
 
         // Signal Logic
-        const isBullish = latest.close > vwap && ema20 > ema50;
-        const isBearish = latest.close < vwap && ema20 < ema50;
+        const isBullish = latest.close > vwap && ema9 > ema21;
+        const isBearish = latest.close < vwap && ema9 < ema21;
 
         // BUY Logic: Price > VWAP && EMA20 > EMA50 && RSI(7) > 50
         if (isBullish && rsi7 > 50 && spread < spreadThreshold && minVolatility) {
@@ -172,7 +172,7 @@ export class AurumVelocityEngine {
                 riskPercentage,
                 stopLoss: latest.close - (atr * 1.5),
                 targetPrice: latest.close + (atr * 3),
-                reasoning: `Bullish Sequence: Price holds above VWAP ($${vwap.toFixed(2)}) and EMA(20) > EMA(50). RSI is healthy at ${rsi7.toFixed(1)}.`
+                reasoning: `Bullish Sequence: Price holds above VWAP ($${vwap.toFixed(2)}) and EMA(9) > EMA(21). RSI is healthy at ${rsi7.toFixed(1)}.`
             };
         }
 
@@ -189,7 +189,7 @@ export class AurumVelocityEngine {
                 riskPercentage,
                 stopLoss: latest.close + (atr * 1.5),
                 targetPrice: latest.close - (atr * 3),
-                reasoning: `Bearish Sequence: Price rejected by VWAP ($${vwap.toFixed(2)}) and EMA(20) < EMA(50). RSI is weak at ${rsi7.toFixed(1)}.`
+                reasoning: `Bearish Sequence: Price rejected by VWAP ($${vwap.toFixed(2)}) and EMA(9) < EMA(21). RSI is weak at ${rsi7.toFixed(1)}.`
             };
         }
 
