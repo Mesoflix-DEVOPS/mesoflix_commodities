@@ -73,6 +73,23 @@ export default function TopNav({
         }
     };
 
+    const handleAccountSelect = async (acc: any) => {
+        try {
+            const res = await fetch('/api/capital/select', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    accountId: acc.accountId,
+                    accountType: acc.accountType
+                })
+            });
+            if (res.ok) {
+                // Refresh stream and all relative context UI
+                window.location.reload();
+            }
+        } catch (e) { console.error("Switch failed", e); }
+    };
+
     const getIconForType = (type: string) => {
         switch (type) {
             case 'success': return <CheckCircle2 size={16} className="text-green-400" />;

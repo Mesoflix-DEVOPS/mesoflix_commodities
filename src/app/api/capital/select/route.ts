@@ -15,17 +15,19 @@ export async function POST(req: NextRequest) {
         const tokenPayload = await verifyAccessToken(accessToken);
         if (!tokenPayload) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-        const { accountId } = await req.json();
+        const { accountId, accountType } = await req.json();
         if (!accountId) return NextResponse.json({ error: 'Account ID required' }, { status: 400 });
 
         const userId = tokenPayload.userId;
+        const isDemo = accountType === 'SPREADBET' || (accountId && accountId.toLowerCase().includes('demo'));
 
         // Update the active account row with the selected sub-account ID
         // Note: we assume the user has at least one capital account row.
         // We update the 'is_active' row for that user.
         await db.update(capitalAccounts)
             .set({
-                selected_capital_account_id: accountId,
+                [isDemo ? 'selected_demo_account_id' : 'selected_real_account_id']: accountId,
+                selected_capital_account_id: accountId, // Keep legacy in sync
                 updated_at: new Date()
             })
             .where(and(eq(capitalAccounts.user_id, userId), eq(capitalAccounts.is_active, true)));

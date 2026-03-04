@@ -22,15 +22,6 @@ export async function GET(req: NextRequest) {
     const epicsParam = searchParams.get('epics');
     const epics = epicsParam ? epicsParam.split(',') : ['GOLD', 'OIL_CRUDE', 'EURUSD', 'BTCUSD'];
 
-    let session: any;
-    try {
-        session = await getValidSession(userId, isDemo);
-    } catch (err: any) {
-        return new Response(`event: error\ndata: ${JSON.stringify({ message: err.message })}\n\n`, {
-            headers: { 'Content-Type': 'text/event-stream' }
-        });
-    }
-
     const stream = new ReadableStream({
         async start(controller) {
             let isClosed = false;
@@ -46,6 +37,12 @@ export async function GET(req: NextRequest) {
                 }
             };
 
+            const cleanup = () => {
+                isClosed = true;
+                if (pollingTimer) clearInterval(pollingTimer);
+                try { controller.close(); } catch { }
+            };
+
             // Send initial ping to confirm connection
             sendEvent('connected', { status: 'ok' });
 
@@ -54,10 +51,14 @@ export async function GET(req: NextRequest) {
                 try {
                     const { getAccounts, getPositions, getMarketTickers } = await import('@/lib/capital');
 
+                    // Every poll, we ensure the session is still aligned with the requested mode.
+                    // getValidSession will handle account switching if necessary.
+                    const currentSession = await getValidSession(userId, isDemo);
+
                     const [accountsData, positionsData, marketData] = await Promise.all([
-                        getAccounts(session.cst, session.xSecurityToken, false),
-                        getPositions(session.cst, session.xSecurityToken, false),
-                        getMarketTickers(session.cst, session.xSecurityToken, epics, isDemo)
+                        getAccounts(currentSession.cst, currentSession.xSecurityToken, false),
+                        getPositions(currentSession.cst, currentSession.xSecurityToken, false),
+                        getMarketTickers(currentSession.cst, currentSession.xSecurityToken, epics, isDemo)
                     ]);
 
                     // Send market data
@@ -80,7 +81,7 @@ export async function GET(req: NextRequest) {
 
                     // Send balances separated by mode depending on current session
                     if (accountsData?.accounts) {
-                        const activeAccountDetails = accountsData.accounts.find((a: any) => a.accountId === session.activeAccountId);
+                        const activeAccountDetails = accountsData.accounts.find((a: any) => a.accountId === currentSession.activeAccountId);
                         if (activeAccountDetails) {
                             // Provide simple structure mimicking /api/balance route
                             const balPayload = isDemo
@@ -102,20 +103,15 @@ export async function GET(req: NextRequest) {
                         console.error("[Stream API] Session expired, closing stream");
                         // Token expiration, force close to trigger auto-reconnect from client side
                         sendEvent('error', { message: 'Session expired during polling' });
-                        isClosed = true;
                         cleanup();
                     }
                 }
             };
 
             // Poll immediately, then every 3 seconds
-            pollData();
-            pollingTimer = setInterval(pollData, 3000);
-
-            function cleanup() {
-                isClosed = true;
-                if (pollingTimer) clearInterval(pollingTimer);
-                try { controller.close(); } catch { }
+            await pollData();
+            if (!isClosed) {
+                pollingTimer = setInterval(pollData, 3000);
             }
 
             req.signal.addEventListener('abort', cleanup);

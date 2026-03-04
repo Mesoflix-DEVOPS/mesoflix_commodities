@@ -49,7 +49,9 @@ export const capitalAccounts = pgTable('capital_accounts', {
     encrypted_api_secret: text('encrypted_api_secret'),
     encrypted_session_tokens: text('encrypted_session_tokens'), // Cached {cst, xSecurityToken}
     session_mode: text('session_mode'), // 'demo' or 'live'
-    selected_capital_account_id: text('selected_capital_account_id'), // The specific account selected via dropdown
+    selected_capital_account_id: text('selected_capital_account_id'), // Legacy/Shared field
+    selected_real_account_id: text('selected_real_account_id'), // The preferred Real account
+    selected_demo_account_id: text('selected_demo_account_id'), // The preferred Demo account
     session_updated_at: timestamp('session_updated_at'),
     capital_account_id: text('capital_account_id'),
     account_type: text('account_type').default('demo'),

@@ -37,7 +37,8 @@ async function loadSessionFromDB(credAccountId: string, isDemo: boolean): Promis
                 encrypted_session_tokens: capitalAccounts.encrypted_session_tokens,
                 session_updated_at: capitalAccounts.session_updated_at,
                 session_mode: capitalAccounts.session_mode,
-                selected_capital_account_id: capitalAccounts.selected_capital_account_id,
+                selected_real_account_id: capitalAccounts.selected_real_account_id,
+                selected_demo_account_id: capitalAccounts.selected_demo_account_id,
             })
             .from(capitalAccounts)
             .where(eq(capitalAccounts.id, credAccountId))
@@ -58,7 +59,7 @@ async function loadSessionFromDB(credAccountId: string, isDemo: boolean): Promis
             cst: parsed.cst,
             xSecurityToken: parsed.xSecurityToken,
             accountIsDemo: isDemo,
-            activeAccountId: row.selected_capital_account_id,
+            activeAccountId: isDemo ? row.selected_demo_account_id : row.selected_real_account_id,
             serverUrl: LIVE_API,
         };
     } catch (e: any) {
@@ -76,7 +77,8 @@ async function saveSessionToDB(credAccountId: string, tokens: SessionTokens): Pr
             })),
             session_updated_at: new Date(),
             session_mode: tokens.accountIsDemo ? 'demo' : 'live',
-            selected_capital_account_id: tokens.activeAccountId,
+            [tokens.accountIsDemo ? 'selected_demo_account_id' : 'selected_real_account_id']: tokens.activeAccountId,
+            selected_capital_account_id: tokens.activeAccountId, // Keep legacy in sync
         }).where(eq(capitalAccounts.id, credAccountId));
     } catch (e: any) { }
 }
@@ -167,8 +169,19 @@ export async function getValidSession(
     const rAcc = realAccs[0] || accounts[0];
     const dAcc = demoAccs[0] || accounts[1] || accounts[0];
 
-    // Priority: 1. Previously selected ID in database, 2. Dynamic heuristic
-    const targetAccountId = credAccount.selected_capital_account_id || (isDemo ? dAcc.accountId : rAcc.accountId);
+    // Priority: 1. Mode-specific preferred ID in database, 2. Dynamic heuristic
+    let targetAccountId = isDemo ? credAccount.selected_demo_account_id : credAccount.selected_real_account_id;
+
+    // Validate that the selected account matches the requested mode
+    const isValidForMode = isDemo
+        ? demoAccs.some((a: any) => a.accountId === targetAccountId)
+        : realAccs.some((a: any) => a.accountId === targetAccountId);
+
+    if (!targetAccountId || !isValidForMode) {
+        targetAccountId = isDemo ? dAcc.accountId : rAcc.accountId;
+    }
+
+    if (!targetAccountId) throw new Error("Could not determine target account ID");
 
     // Switch the session to the designated target account
     if (session.currentAccountId !== targetAccountId) {
