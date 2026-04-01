@@ -21,12 +21,9 @@ const Footer = () => {
                             </h3>
                         </div>
                         <p className="text-gray-500 dark:text-gray-400 text-sm leading-relaxed max-w-xs">
-                            Authorized Introducing Broker providing cutting-edge automation for the modern trader. Institutional liquidity meets retail simplicity.
+                            Introducing Broker providing cutting-edge automation for the modern trader. Deep liquidity meets retail simplicity.
                         </p>
-                        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gold/10 border border-gold/20 text-gold text-[10px] font-bold uppercase tracking-widest">
-                            <ShieldCheck size={14} />
-                            FCA & ASIC Regulated Partners
-                        </div>
+
                     </div>
 
                     {/* Ecosystem Links */}
@@ -82,7 +79,7 @@ const Footer = () => {
                         &copy; {new Date().getFullYear()} <span className="text-dark-blue dark:text-white">Mesoflix | Introducing Broker</span>. All Rights Reserved.
                     </p>
                     <p className="text-gray-400 text-[10px] max-w-md text-center md:text-right leading-relaxed font-medium">
-                        Trading carries significant risk. Mesoflix is an authorized Introducing Broker. All trades are executed via Capital.com. High leverage can work against you.
+                        Trading carries significant risk. Mesoflix is an Introducing Broker. All trades are executed via Capital.com. High leverage can work against you. CFDs are complex instruments and come with a high risk of losing money rapidly due to leverage. 81.7% of retail investor accounts lose money.
                     </p>
                 </div>
             </div>

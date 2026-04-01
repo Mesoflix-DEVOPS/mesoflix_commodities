@@ -167,7 +167,7 @@ const Navbar = () => {
                                     <div className="h-px bg-dark-blue/10 dark:bg-white/10 flex-1"></div>
                                 </div>
                                 <p className="text-[9px] text-center text-gray-500 uppercase tracking-widest leading-relaxed">
-                                    Authorized Introducing Broker <br /> Powered by Capital.com API
+                                    Introducing Broker <br /> Powered by Capital.com API
                                 </p>
                             </div>
                         </div>

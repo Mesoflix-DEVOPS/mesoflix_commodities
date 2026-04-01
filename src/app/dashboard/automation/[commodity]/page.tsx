@@ -6,7 +6,6 @@ import { ArrowLeft, Cpu, Activity, ShieldAlert, BarChart3, Settings2, Play, Paus
 import { cn } from "@/lib/utils";
 import { useAutomation, EngineState, EngineDetails } from "@/contexts/AutomationContext";
 import { useMarketData } from "@/contexts/MarketDataContext";
-import DeployModal from "./DeployModal";
 
 // Data Structure defined by PRD
 const MARKET_DATA: Record<string, any> = {
@@ -63,12 +62,9 @@ export default function CommodityAutomationPage({ params }: { params: Promise<{ 
     const market = MARKET_DATA[commId];
     const { engines, deployEngine, updateEngineState } = useAutomation();
     const { marketData } = useMarketData();
-    const live = marketData[market?.epic];
-
-    const [deployModalOpen, setDeployModalOpen] = useState(false);
-    const [selectedEngine, setSelectedEngine] = useState<any>(null);
     const [flash, setFlash] = useState<"up" | "down" | null>(null);
     const prevPrice = useRef<number | null>(null);
+    const live = marketData[market?.epic];
 
     const price = live?.bid ?? 0;
     const changePct = live?.changePct ?? 0;
@@ -85,29 +81,6 @@ export default function CommodityAutomationPage({ params }: { params: Promise<{ 
     if (!market) {
         return <div className="p-12 text-center text-gray-500">Market not found.</div>;
     }
-
-    const openDeploy = (engine: any) => {
-        setSelectedEngine(engine);
-        setDeployModalOpen(true);
-    };
-
-    const handleConfirmDeploy = (capital: number, stopLoss: number, multiplier: number) => {
-        deployEngine({
-            id: selectedEngine.id,
-            name: selectedEngine.name,
-            commodity: commId,
-            state: "Running",
-            allocatedCapital: capital,
-            stopLossCap: stopLoss,
-            riskMultiplier: multiplier,
-            targetProfit: 100, // Default target
-            dailyStopLoss: stopLoss, // Use stoploss for daily cap too
-            riskLevel: "Balanced", // Default level
-            mode: "demo",
-            pnl: 0
-        });
-        setDeployModalOpen(false);
-    };
 
     const displayPrice = price > 0
         ? (market.epic.includes("USD") && !market.epic.includes("BTC") ? price.toFixed(4) : `$${price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)
@@ -265,17 +238,11 @@ export default function CommodityAutomationPage({ params }: { params: Promise<{ 
                                 <div className="p-6 border-t border-white/5 bg-black/20">
                                     {!isDeployed ? (
                                         <div className="flex gap-3">
-                                            <button
-                                                onClick={() => openDeploy(eng)}
-                                                className="flex-1 bg-teal text-black font-black py-3 rounded-xl hover:bg-[#00e6c7] transition-colors"
-                                            >
-                                                Deploy Engine
-                                            </button>
                                             <Link
                                                 href={`/dashboard/automation/${commId}/${eng.id}`}
-                                                className="px-4 bg-white/5 text-white font-bold rounded-xl flex items-center justify-center hover:bg-white/10 transition-colors border border-white/10"
+                                                className="flex-1 bg-teal text-black font-black py-3 rounded-xl hover:bg-[#00e6c7] transition-colors flex items-center justify-center"
                                             >
-                                                Analytics
+                                                Deploy Engine
                                             </Link>
                                         </div>
                                     ) : (
@@ -328,13 +295,6 @@ export default function CommodityAutomationPage({ params }: { params: Promise<{ 
                     })}
                 </div>
             </div>
-
-            <DeployModal
-                isOpen={deployModalOpen}
-                onClose={() => setDeployModalOpen(false)}
-                engine={selectedEngine}
-                onConfirm={handleConfirmDeploy}
-            />
         </div>
     );
 }

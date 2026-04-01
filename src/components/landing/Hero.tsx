@@ -14,14 +14,14 @@ const Hero = () => {
                 <div className="space-y-8 animate-fade-in-up text-center lg:text-left">
                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gold/10 border border-gold/20 text-gold text-xs font-bold uppercase tracking-widest">
                         <ShieldCheck size={14} />
-                        Authorized Introducing Broker
+                        Introducing Broker
                     </div>
                     <h1 className="text-4xl sm:text-5xl md:text-7xl font-extrabold text-dark-blue dark:text-white leading-tight tracking-tight">
                         Master <span className="text-golden">Forex & Commodities</span> Automation
                     </h1>
 
                     <p className="text-lg md:text-xl text-gray-600 dark:text-gray-300 max-w-xl mx-auto lg:mx-0 leading-relaxed">
-                        The ultimate intelligence layer for professional traders. Directly integrated with <span className="font-semibold text-dark-blue dark:text-white">Capital.com API</span> for institutional-grade execution on global currencies and raw materials.
+                        The ultimate intelligence layer for professional traders. Directly integrated with <span className="font-semibold text-dark-blue dark:text-white">Capital.com API</span> for quality execution on global currencies and raw materials.
                     </p>
 
                     <div className="flex flex-col sm:flex-row gap-4 pt-4 justify-center lg:justify-start">
@@ -68,7 +68,7 @@ const Hero = () => {
                                     <BarChart3 size={32} className="text-dark-blue" />
                                 </div>
                                 <h3 className="text-3xl font-bold text-white mb-2 tracking-tight">Prime Access</h3>
-                                <p className="text-teal font-medium tracking-wide mb-8">IB Institutional Liquidity</p>
+                                <p className="text-teal font-medium tracking-wide mb-8">IB Deep Liquidity</p>
                                 <div className="space-y-3">
                                     <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
                                         <div className="w-4/5 h-full bg-golden-gradient animate-pulse"></div>

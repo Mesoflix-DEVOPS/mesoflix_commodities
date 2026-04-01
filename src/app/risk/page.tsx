@@ -4,7 +4,7 @@ export default function RiskPage() {
             <div className="max-w-4xl mx-auto bg-white dark:bg-gray-900 p-8 md:p-12 rounded-2xl shadow-xl prose dark:prose-invert">
                 <h1>Risk Disclosure</h1>
                 <p className="border-l-4 border-red-500 pl-4 py-2 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 font-bold mb-8">
-                    Trading commodities carries a high level of risk and may not be suitable for all investors.
+                    CFDs are complex instruments and come with a high risk of losing money rapidly due to leverage. 81.7% of retail investor accounts lose money. Trading commodities carries a high level of risk and may not be suitable for all investors.
                 </p>
 
                 <h2>1. General Risk</h2>

@@ -42,11 +42,12 @@ export default function EngineAnalyticsPage({ params }: { params: Promise<{ comm
     const engineName = engineId.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
 
     // Local State for Controls
-    const [allocatedCapital, setAllocatedCapital] = useState(deployment?.allocatedCapital || 5000);
+    const [allocatedCapital, setAllocatedCapital] = useState(deployment?.allocatedCapital || 500);
     const [targetProfit, setTargetProfit] = useState(deployment?.targetProfit || 100);
     const [dailyStopLoss, setDailyStopLoss] = useState(deployment?.dailyStopLoss || 250);
     const [riskLevel, setRiskLevel] = useState(deployment?.riskLevel || "Balanced");
     const [liveTrades, setLiveTrades] = useState<any[]>([]);
+    const [stats, setStats] = useState({ winRate: "0%", profitFactor: "0.0", totalTrades: 0, netPnl: "0.00" });
 
     useEffect(() => {
         if (deployment) {
@@ -57,24 +58,32 @@ export default function EngineAnalyticsPage({ params }: { params: Promise<{ comm
         }
     }, [deployment]);
 
-    // Fetch Trades
+    // Fetch Trades and Stats
     useEffect(() => {
-        const fetchTrades = async () => {
-            const res = await fetch(`/api/automation/trades?engine_id=${engineId}&mode=${deployment?.mode || 'demo'}`);
-            if (res.ok) {
-                const data = await res.json();
+        const fetchData = async () => {
+            const [tradesRes, statsRes] = await Promise.all([
+                fetch(`/api/automation/trades?engine_id=${engineId}&mode=${deployment?.mode || 'demo'}`),
+                fetch(`/api/automation/stats?engine_id=${engineId}`)
+            ]);
+
+            if (tradesRes.ok) {
+                const data = await tradesRes.json();
                 setLiveTrades(data.trades || []);
             }
+            if (statsRes.ok) {
+                const data = await statsRes.json();
+                setStats(data);
+            }
         };
-        fetchTrades();
-        const interval = setInterval(fetchTrades, 10000);
+
+        fetchData();
+        const interval = setInterval(fetchData, 5000); // Faster refresh for real-time feel
         return () => clearInterval(interval);
     }, [engineId, deployment?.mode]);
 
-    // Heartbeat: Trigger the runner every 30s to keep the engine ticking
+    // Heartbeat: Trigger the runner every 15s for Gold (more active)
     useEffect(() => {
-        if (!deployment || deployment.state !== "Running") return;
-
+        // Ping even if not running to trigger cleanup/sync
         const pingRunner = async () => {
             try {
                 await fetch('/api/automation/runner', { method: 'POST' });
@@ -83,11 +92,10 @@ export default function EngineAnalyticsPage({ params }: { params: Promise<{ comm
             }
         };
 
-        // Initial ping
         pingRunner();
-        const interval = setInterval(pingRunner, 30000);
+        const interval = setInterval(pingRunner, 15000);
         return () => clearInterval(interval);
-    }, [deployment?.state]);
+    }, []);
 
     const handleDeploy = () => {
         deployEngine({
@@ -110,24 +118,6 @@ export default function EngineAnalyticsPage({ params }: { params: Promise<{ comm
 
     const chartData = useMemo(() => generateEquityCurve(allocatedCapital), [allocatedCapital]);
 
-    // Calculate Metrics from liveTrades
-    const metrics = useMemo(() => {
-        if (liveTrades.length === 0) return { winRate: "0%", profitFactor: "0.0", totalTrades: 0, netPnl: 0 };
-        const closedTrades = liveTrades.filter((t: any) => t.status === 'Closed' || t.close_price);
-        const openTrades = liveTrades.filter((t: any) => t.status === 'Open' || !t.close_price);
-
-        const wins = closedTrades.filter((t: any) => parseFloat(t.pnl) > 0);
-        const winRate = closedTrades.length > 0 ? ((wins.length / closedTrades.length) * 100).toFixed(1) + "%" : "0%";
-
-        const grossProfit = closedTrades.filter((t: any) => parseFloat(t.pnl) > 0).reduce((sum, t) => sum + parseFloat(t.pnl), 0);
-        const grossLoss = Math.abs(closedTrades.filter((t: any) => parseFloat(t.pnl) < 0).reduce((sum, t) => sum + parseFloat(t.pnl), 0));
-        const profitFactor = grossLoss === 0 ? (grossProfit > 0 ? "MAX" : "0.0") : (grossProfit / grossLoss).toFixed(2);
-
-        const netPnl = liveTrades.reduce((sum, t) => sum + parseFloat(t.pnl), 0);
-
-        return { winRate, profitFactor, totalTrades: openTrades.length, netPnl };
-    }, [liveTrades]);
-
     return (
         <div className="space-y-8 animate-in fade-in duration-500 pb-24">
             {/* Header / Navigation */}
@@ -149,7 +139,7 @@ export default function EngineAnalyticsPage({ params }: { params: Promise<{ comm
                                 {deployment?.state || "Not Deployed"}
                             </span>
                         </div>
-                        <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">Aurum Velocity Hybrid Scalper</p>
+                        <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">Aurum Pro Algorithmic Execution</p>
                     </div>
                 </div>
             </div>
@@ -315,9 +305,9 @@ export default function EngineAnalyticsPage({ params }: { params: Promise<{ comm
                     {/* KPI Metrics */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         {[
-                            { label: "Win Rate", value: metrics.winRate, icon: Target, color: "text-teal" },
-                            { label: "Active Trades", value: metrics.totalTrades, icon: Activity, color: "text-white" },
-                            { label: "Profit Factor", value: metrics.profitFactor, icon: TrendingUp, color: "text-teal" },
+                            { label: "Win Rate", value: stats.winRate, icon: Target, color: "text-teal" },
+                            { label: "Active Trades", value: stats.totalTrades, icon: Activity, color: "text-white" },
+                            { label: "Profit Factor", value: stats.profitFactor, icon: TrendingUp, color: "text-teal" },
                             { label: "Risk Halted", value: "0", icon: Shield, color: "text-blue-400" },
                         ].map((stat, i) => (
                             <div key={i} className="bg-[#0A1622] rounded-3xl p-6 border border-white/5">

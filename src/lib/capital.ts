@@ -304,6 +304,67 @@ export const closePosition = async (
     return response.json();
 };
 
+export const updatePosition = async (
+    cst: string,
+    xSecurityToken: string,
+    dealId: string,
+    options: {
+        stopLevel?: number | null;
+        profitLevel?: number | null;
+        trailingStop?: boolean;
+    },
+    accountIsDemo: boolean = false,
+    apiUrl?: string
+) => {
+    const API_URL = apiUrl || getApiUrl(accountIsDemo);
+
+    const body: Record<string, any> = {};
+    if (options.stopLevel !== undefined) body.stopLevel = options.stopLevel;
+    if (options.profitLevel !== undefined) body.profitLevel = options.profitLevel;
+    if (options.trailingStop !== undefined) body.trailingStop = options.trailingStop;
+
+    const response = await fetch(`${API_URL}/positions/${dealId}`, {
+        method: 'PUT',
+        headers: {
+            'X-SECURITY-TOKEN': xSecurityToken,
+            'CST': cst,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`Failed to update position ${dealId}: ${response.status} - ${text}`);
+    }
+
+    return response.json();
+};
+
+export const getConfirm = async (
+    cst: string,
+    xSecurityToken: string,
+    dealReference: string,
+    accountIsDemo: boolean = false,
+    apiUrl?: string
+) => {
+    const API_URL = apiUrl || getApiUrl(accountIsDemo);
+
+    const response = await fetch(`${API_URL}/confirms/${dealReference}`, {
+        headers: {
+            'X-SECURITY-TOKEN': xSecurityToken,
+            'CST': cst,
+        },
+    });
+
+    if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`Failed to fetch confirmation for ${dealReference}: ${response.status} - ${text}`);
+    }
+
+    return response.json();
+};
+
 export const getMarketPrices = async (
     cst: string,
     xSecurityToken: string,

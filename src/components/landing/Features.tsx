@@ -5,7 +5,7 @@ const Features = () => {
         {
             icon: <TrendingUp size={40} className="text-teal" />,
             title: "Advanced AI Signals",
-            description: "Institutional-grade signals across Gold, Silver, and major Forex pairs (EUR/USD, GBP/USD)."
+            description: "Quality execution signals across Gold, Silver, and major Forex pairs (EUR/USD, GBP/USD)."
         },
         {
             icon: <Zap size={40} className="text-teal" />,
@@ -15,7 +15,7 @@ const Features = () => {
         {
             icon: <ShieldCheck size={40} className="text-teal" />,
             title: "Regulated Access",
-            description: "Authorized Introducing Broker connection. Your data and trades are highly secured."
+            description: "Introducing Broker connection. Your data and trades are highly secured."
         },
         {
             icon: <Globe size={40} className="text-teal" />,
@@ -29,7 +29,7 @@ const Features = () => {
         },
         {
             icon: <BarChart3 size={40} className="text-teal" />,
-            title: "Institutional Liquidity",
+            title: "Deep Liquidity",
             description: "Benefit from the deep liquidity pools provided by our Capital.com integration."
         }
     ];

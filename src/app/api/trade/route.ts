@@ -37,7 +37,8 @@ export async function POST(request: Request) {
             const session = await getValidSession(userId, isDemo, forceRefresh);
             console.log(`[Trade API] Executing order on account ${session.activeAccountId} via ${session.serverUrl}`);
             const accountIsDemo = session.accountIsDemo ?? false;
-            return placeOrder(
+
+            const result = await placeOrder(
                 session.cst, session.xSecurityToken,
                 epic, direction, parseFloat(size),
                 accountIsDemo,
@@ -48,10 +49,26 @@ export async function POST(request: Request) {
                 },
                 session.serverUrl
             );
+
+            let dealId = result.dealReference;
+            if (result && result.dealReference) {
+                try {
+                    const { getConfirm } = require('@/lib/capital');
+                    await new Promise(res => setTimeout(res, 500));
+                    const confirmRes = await getConfirm(session.cst, session.xSecurityToken, result.dealReference, accountIsDemo, session.serverUrl);
+                    if (confirmRes && confirmRes.dealId) {
+                        dealId = confirmRes.dealId;
+                    }
+                } catch (e) {
+                    console.error("[Trade API] Failed to get confirmation, using dealReference", e);
+                }
+            }
+
+            return { result, dealId };
         };
 
         try {
-            const result = await executeWithSession();
+            const { result, dealId } = await executeWithSession();
 
             // Push notification
             await withRetry(() => db.insert(notifications).values({
@@ -61,11 +78,11 @@ export async function POST(request: Request) {
                 type: 'success'
             }));
 
-            if (result && result.dealReference) {
+            if (dealId) {
                 try {
                     await withRetry(() => db.insert(platformTrades).values({
                         user_id: userId,
-                        deal_id: result.dealReference,
+                        deal_id: dealId,
                         epic,
                         direction,
                         size: String(size),
@@ -89,7 +106,7 @@ export async function POST(request: Request) {
             // Auto-retry with fresh session on auth errors
             if (err.message.includes('401') || err.message.toLowerCase().includes('session') || err.message.toLowerCase().includes('unauthorized')) {
                 try {
-                    const result = await executeWithSession(true);
+                    const { result: retryResult, dealId: retryDealId } = await executeWithSession(true);
 
                     await withRetry(() => db.insert(notifications).values({
                         user_id: userId,
@@ -98,7 +115,20 @@ export async function POST(request: Request) {
                         type: 'success'
                     }));
 
-                    return NextResponse.json({ success: true, ...result });
+                    if (retryDealId) {
+                        try {
+                            await withRetry(() => db.insert(platformTrades).values({
+                                user_id: userId,
+                                deal_id: retryDealId,
+                                epic,
+                                direction,
+                                size: String(size),
+                                mode: isDemo ? 'demo' : 'live'
+                            }));
+                        } catch (dbErr) { }
+                    }
+
+                    return NextResponse.json({ success: true, ...retryResult, dealId: retryDealId });
                 } catch (retryErr: any) {
                     return NextResponse.json({ error: `Trade failed after retry: ${retryErr.message}` }, { status: 502 });
                 }

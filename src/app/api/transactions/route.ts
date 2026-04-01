@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { users, closedTrades } from '@/lib/db/schema';
+import { eq, desc, and, gte } from 'drizzle-orm';
+import { automationTrades, closedTrades, users } from '@/lib/db/schema';
 import { getValidSession } from '@/lib/capital-service';
 import { verifyAccessToken } from '@/lib/auth';
-import { eq, desc, and, gte } from 'drizzle-orm';
 import { cookies } from 'next/headers';
 
 export const dynamic = 'force-dynamic';
@@ -33,9 +33,10 @@ export async function GET(request: Request) {
         const fromDate: Date = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
         // Fetch History from our internal tables
-        let historyData: any[] = [];
+        let normalTrades: any[] = [];
+        let autoTrades: any[] = [];
         try {
-            historyData = await db.select()
+            normalTrades = await db.select()
                 .from(closedTrades)
                 .where(
                     and(
@@ -46,6 +47,20 @@ export async function GET(request: Request) {
                 )
                 .orderBy(desc(closedTrades.created_at))
                 .limit(500);
+
+            autoTrades = await db.select()
+                .from(automationTrades)
+                .where(
+                    and(
+                        eq(automationTrades.user_id, userId),
+                        eq(automationTrades.mode, isDemo ? 'demo' : 'live'),
+                        eq(automationTrades.status, 'Closed'),
+                        gte(automationTrades.updated_at, fromDate)
+                    )
+                )
+                .orderBy(desc(automationTrades.updated_at))
+                .limit(500);
+
         } catch (err: any) {
             console.error('[Transactions API] Error fetching history:', err);
             return NextResponse.json({
@@ -55,23 +70,36 @@ export async function GET(request: Request) {
         }
 
         // Map them cleanly for the frontend table
-        const formattedTransactions = historyData.map((trade: any) => {
-            return {
-                id: trade.deal_id,
-                date: trade.created_at,
-                epic: trade.epic,
-                direction: trade.direction,
-                size: parseFloat(trade.size),
-                openPrice: parseFloat(trade.open_price),
-                closePrice: parseFloat(trade.close_price),
-                pnl: parseFloat(trade.pnl),
-                description: `Position Closed`,
-                channel: "Web" // default
-            };
-        });
+        const formattedNormal = normalTrades.map((trade: any) => ({
+            id: trade.deal_id,
+            date: trade.created_at,
+            epic: trade.epic,
+            direction: trade.direction,
+            size: parseFloat(trade.size),
+            openPrice: parseFloat(trade.open_price),
+            closePrice: parseFloat(trade.close_price),
+            pnl: parseFloat(trade.pnl),
+            description: `Manual Position Closed`,
+            channel: "Web"
+        }));
+
+        const formattedAuto = autoTrades.map((trade: any) => ({
+            id: trade.deal_id,
+            date: trade.updated_at, // time it was closed
+            epic: trade.epic,
+            direction: trade.direction,
+            size: parseFloat(trade.size),
+            openPrice: parseFloat(trade.open_price),
+            closePrice: parseFloat(trade.close_price),
+            pnl: parseFloat(trade.pnl),
+            description: `Automated Position Closed (${trade.engine_id})`,
+            channel: "Bot"
+        }));
+
+        const combined = [...formattedNormal, ...formattedAuto].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
         return NextResponse.json({
-            transactions: formattedTransactions
+            transactions: combined
         });
 
     } catch (error: any) {
