@@ -32,7 +32,7 @@ export default function SupportPage() {
                             icon={<Mail className="text-teal" size={32} />}
                             title="Email Us"
                             description="Direct support for technical questions."
-                            contact="support@mesoflix.com"
+                            contact="support@mesoflixlabs.com"
                         />
                         <SupportCard
                             icon={<MessageSquare className="text-gold" size={32} />}
@@ -44,7 +44,7 @@ export default function SupportPage() {
                             icon={<Phone className="text-teal" size={32} />}
                             title="Phone Support"
                             description="Priority assistance for VIP accounts."
-                            contact="+1 (555) 000-0000"
+                            contact="+254 723 913 800"
                         />
                     </div>
 

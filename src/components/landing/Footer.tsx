@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Facebook, Twitter, Instagram, Linkedin, ShieldCheck, Mail, Globe, ArrowRight } from 'lucide-react';
+import { Facebook, Twitter, Instagram, Linkedin, ShieldCheck, Mail, Globe, ArrowRight, Phone } from 'lucide-react';
 
 const Footer = () => {
     return (
@@ -63,7 +63,11 @@ const Footer = () => {
                         <div className="space-y-3">
                             <div className="flex items-center gap-3 text-xs text-gray-500 font-bold uppercase tracking-widest">
                                 <Mail size={14} className="text-teal" />
-                                support@mesoflix.com
+                                support@mesoflixlabs.com
+                            </div>
+                            <div className="flex items-center gap-3 text-xs text-gray-500 font-bold uppercase tracking-widest">
+                                <Phone size={14} className="text-teal" />
+                                +254 723 913 800
                             </div>
                             <div className="flex items-center gap-3 text-xs text-gray-500 font-bold uppercase tracking-widest">
                                 <Globe size={14} className="text-teal" />
