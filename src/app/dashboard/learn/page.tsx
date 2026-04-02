@@ -63,12 +63,7 @@ const topics = [
         icon: Activity,
         badge: null,
     },
-    {
-        id: "silver",
-        label: "Silver (XAG/USD)",
-        icon: TrendingUp,
-        badge: null,
-    },
+
     {
         id: "natural-gas",
         label: "Natural Gas",
@@ -100,7 +95,7 @@ const topics = [
 const faqs = [
     {
         q: "What is Mesoflix?",
-        a: "Mesoflix is an advanced commodity trading intelligence platform that integrates with Capital.com's live market infrastructure. It allows users to trade commodities like Gold, Silver, and Oil, both manually and through automated AI-powered trading engines — all from one unified dashboard.",
+        a: "Mesoflix is an advanced commodity trading intelligence platform that integrates with Capital.com's live market infrastructure. It allows users to trade commodities like Gold, Crude Oil, and Natural Gas, both manually and through automated AI-powered trading engines — all from one unified dashboard.",
     },
     {
         q: "Do I need my own Capital.com account?",
@@ -112,7 +107,7 @@ const faqs = [
     },
     {
         q: "What commodities can I trade?",
-        a: "We currently offer Gold (XAU/USD), Silver (XAG/USD), Crude Oil WTI, Brent Crude, and Natural Gas. We continuously add new instruments based on market demand.",
+        a: "We currently offer Gold (XAU/USD), Crude Oil WTI, Brent Crude, and Natural Gas. We continuously add new instruments based on market demand.",
     },
     {
         q: "How do automated trading engines work?",
@@ -277,7 +272,7 @@ const content: Record<string, { title: string; body: React.ReactNode }> = {
                 </p>
                 <div className="grid md:grid-cols-2 gap-4">
                     {[
-                        { name: "Precious Metals", items: ["Gold (XAU/USD)", "Silver (XAG/USD)", "Platinum", "Palladium"], color: "yellow", icon: "🥇" },
+                        { name: "Precious Metals", items: ["Gold (XAU/USD)", "Platinum", "Palladium"], color: "yellow", icon: "🥇" },
                         { name: "Energy", items: ["Crude Oil WTI", "Brent Crude", "Natural Gas", "Heating Oil"], color: "orange", icon: "⛽" },
                         { name: "Agriculture", items: ["Wheat", "Corn", "Soybeans", "Cotton"], color: "green", icon: "🌾" },
                         { name: "Industrial Metals", items: ["Copper", "Aluminium", "Zinc", "Nickel"], color: "blue", icon: "🛠️" },
@@ -383,55 +378,7 @@ const content: Record<string, { title: string; body: React.ReactNode }> = {
             </div>
         ),
     },
-    "silver": {
-        title: "Silver (XAG/USD) — The Industrial Metal",
-        body: (
-            <div className="space-y-6">
-                <div className="bg-gray-400/10 border border-gray-400/20 rounded-xl p-4 flex gap-3">
-                    <span className="text-2xl">🥈</span>
-                    <div>
-                        <p className="text-gray-300 font-semibold">XAG/USD</p>
-                        <p className="text-sm text-gray-400">Price of one troy ounce of silver, denominated in US dollars.</p>
-                    </div>
-                </div>
-                <p className="text-gray-300 leading-relaxed">
-                    Silver is unique among precious metals because it serves a dual role: it is both a financial safe-haven asset (like gold) and a critical industrial metal used in solar panels, electronics, and electric vehicles.
-                </p>
-                <div className="bg-white/5 rounded-xl border border-white/10 p-5 space-y-3">
-                    <h3 className="font-semibold text-white">Silver vs Gold</h3>
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm text-gray-300">
-                            <thead>
-                                <tr className="border-b border-white/10">
-                                    <th className="text-left py-2 text-teal">Feature</th>
-                                    <th className="text-left py-2 text-yellow-400">Gold</th>
-                                    <th className="text-left py-2 text-gray-400">Silver</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-white/5">
-                                {[
-                                    ["Volatility", "Medium", "High"],
-                                    ["Industrial Use", "Low", "Very High"],
-                                    ["Safe Haven", "Strong", "Moderate"],
-                                    ["Price Range", "$1,800–$2,500+", "$20–$35+"],
-                                    ["Gold/Silver Ratio", "—", "~75–90x cheaper"],
-                                ].map(([f, g, s]) => (
-                                    <tr key={f as string}>
-                                        <td className="py-2 text-white">{f as string}</td>
-                                        <td className="py-2 text-yellow-400">{g as string}</td>
-                                        <td className="py-2 text-gray-300">{s as string}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-                <div className="bg-teal/5 border border-teal/20 rounded-xl p-4">
-                    <p className="text-sm text-gray-300"><span className="text-teal font-semibold">Trading Tip:</span> Silver is more volatile than gold, meaning larger price swings — both up and down. This creates more opportunity for skilled traders but also more risk.</p>
-                </div>
-            </div>
-        ),
-    },
+
     "natural-gas": {
         title: "Natural Gas — Energy's Wild Card",
         body: (
@@ -480,7 +427,7 @@ const content: Record<string, { title: string; body: React.ReactNode }> = {
                         {
                             step: "3",
                             title: "Select a Commodity",
-                            desc: "Pick from our available commodities: Gold, Silver, Oil (WTI/Brent), Natural Gas, and more. Each has live price feeds from Capital.com.",
+                            desc: "Pick from our available commodities: Gold, Oil (WTI/Brent), Natural Gas, and more. Each has live price feeds from Capital.com.",
                         },
                         {
                             step: "4",

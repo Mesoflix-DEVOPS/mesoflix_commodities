@@ -13,13 +13,10 @@ import {
     ResponsiveContainer, ReferenceLine
 } from "recharts";
 
-// ─── Instruments ──────────────────────────────────────────────────────────────
 const INSTRUMENTS = [
     { epic: "GOLD", label: "Gold", symbol: "XAU/USD", category: "Metals", flag: "🥇" },
-    { epic: "SILVER", label: "Silver", symbol: "XAG/USD", category: "Metals", flag: "🥈" },
     { epic: "OIL_CRUDE", label: "Crude Oil", symbol: "WTI", category: "Energy", flag: "🛢️" },
     { epic: "NATGAS", label: "Natural Gas", symbol: "NG", category: "Energy", flag: "🔥" },
-    { epic: "EURUSD", label: "EUR/USD", symbol: "EURUSD", category: "Forex", flag: "💶" },
     { epic: "BTCUSD", label: "Bitcoin", symbol: "BTC/USD", category: "Crypto", flag: "₿" },
 ];
 

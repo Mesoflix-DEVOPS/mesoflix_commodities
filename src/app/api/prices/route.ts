@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
 
         const { searchParams } = new URL(req.url);
         const epicsParam = searchParams.get('epics');
-        const epics = epicsParam ? epicsParam.split(',') : ['GOLD', 'OIL_CRUDE', 'EURUSD', 'BTCUSD'];
+        const epics = epicsParam ? epicsParam.split(',') : ['GOLD', 'OIL_CRUDE', 'BTCUSD'];
 
         // Get unified session
         const session = await withRetry(() => getValidSession(tokenPayload.userId));

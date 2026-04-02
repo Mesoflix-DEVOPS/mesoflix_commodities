@@ -5,7 +5,7 @@ const Features = () => {
         {
             icon: <TrendingUp size={40} className="text-teal" />,
             title: "Advanced AI Signals",
-            description: "Quality execution signals across Gold, Silver, and major Forex pairs (EUR/USD, GBP/USD)."
+            description: "Quality execution signals across Gold, Oil, and Crypto."
         },
         {
             icon: <Zap size={40} className="text-teal" />,
@@ -20,7 +20,7 @@ const Features = () => {
         {
             icon: <Globe size={40} className="text-teal" />,
             title: "Multi-Asset Automation",
-            description: "Access Gold, Silver, Oil, and global currencies from a single automated dashboard."
+            description: "Access Gold, Oil, and Crypto from a single automated dashboard."
         },
         {
             icon: <Smartphone size={40} className="text-teal" />,

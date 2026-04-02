@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
     const mode = searchParams.get('mode') || 'demo';
     const isDemo = mode === 'demo';
     const epicsParam = searchParams.get('epics');
-    const epics = epicsParam ? epicsParam.split(',') : ['GOLD', 'OIL_CRUDE', 'EURUSD', 'BTCUSD'];
+    const epics = epicsParam ? epicsParam.split(',') : ['GOLD', 'OIL_CRUDE', 'BTCUSD'];
 
     const stream = new ReadableStream({
         async start(controller) {

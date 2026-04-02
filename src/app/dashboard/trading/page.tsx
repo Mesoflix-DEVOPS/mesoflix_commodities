@@ -16,9 +16,7 @@ import {
 
 const INSTRUMENTS = [
     { epic: "GOLD", label: "Gold", symbol: "XAU/USD", flag: "🥇", tvSymbol: "TVC:GOLD", sizes: ["1", "5", "10", "50"], defaultSize: "1" },
-    { epic: "SILVER", label: "Silver", symbol: "XAG/USD", flag: "🥈", tvSymbol: "TVC:SILVER", sizes: ["50", "100", "500", "1000"], defaultSize: "50" },
     { epic: "OIL_CRUDE", label: "Crude Oil", symbol: "WTI", flag: "🛢️", tvSymbol: "TVC:USOIL", sizes: ["10", "50", "100", "500"], defaultSize: "10" },
-    { epic: "EURUSD", label: "EUR/USD", symbol: "EURUSD", flag: "💶", tvSymbol: "FX:EURUSD", sizes: ["1000", "5000", "10000", "50000"], defaultSize: "1000" },
     { epic: "BTCUSD", label: "Bitcoin", symbol: "BTC/USD", flag: "₿", tvSymbol: "COINBASE:BTCUSD", sizes: ["0.01", "0.1", "0.5", "1.0"], defaultSize: "0.01" },
 ];
 

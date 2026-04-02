@@ -295,7 +295,7 @@ export default function RightPanel() {
     // Map ticker epics to sentiment items for click-through
     const tickerSentiment: Record<string, string> = {
         'GOLD': 'GOLD', 'OIL_CRUDE': 'OIL_CRUDE',
-        'EURUSD': 'EURUSD', 'BTCUSD': 'BTCUSD',
+        'BTCUSD': 'BTCUSD',
     };
 
     const handleTickerClick = (epic: string) => {
@@ -354,7 +354,6 @@ export default function RightPanel() {
                                 {[
                                     { epic: 'GOLD', symbol: 'GOLD' },
                                     { epic: 'OIL_CRUDE', symbol: 'OIL' },
-                                    { epic: 'EURUSD', symbol: 'EUR/USD' },
                                     { epic: 'BTCUSD', symbol: 'BTC/USD' },
                                 ].map(({ epic, symbol }) => (
                                     <TickerRow

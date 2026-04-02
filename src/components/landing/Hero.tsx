@@ -52,13 +52,13 @@ const Hero = () => {
                                 </div>
                             </div>
 
-                            {/* Forex Card */}
+                            {/* Crypto Card */}
                             <div className="absolute top-1/2 -left-8 md:-left-20 bg-white/5 backdrop-blur-xl p-5 rounded-2xl border border-white/10 shadow-2xl animate-float-medium z-20 transform -translate-y-1/2">
-                                <div className="text-gray-400 text-[10px] font-bold uppercase tracking-widest mb-1">EUR/USD</div>
-                                <div className="text-white text-2xl font-mono font-bold tracking-tighter">1.08422</div>
-                                <div className="flex items-center gap-1 text-red-400 text-xs font-bold">
-                                    <TrendingUp size={12} className="rotate-180" />
-                                    -0.15%
+                                <div className="text-gray-400 text-[10px] font-bold uppercase tracking-widest mb-1">BTC/USD</div>
+                                <div className="text-white text-2xl font-mono font-bold tracking-tighter">64,210.00</div>
+                                <div className="flex items-center gap-1 text-teal text-xs font-bold">
+                                    <TrendingUp size={12} />
+                                    +4.50%
                                 </div>
                             </div>
 

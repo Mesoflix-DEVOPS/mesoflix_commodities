@@ -7,15 +7,13 @@ export const dynamic = 'force-dynamic';
 
 const LIVE_API = 'https://api-capital.backend-capital.com/api/v1';
 
-const DEFAULT_EPICS = ['GOLD', 'OIL_CRUDE', 'EURUSD', 'BTCUSD', 'NATGAS', 'SILVER'];
+const DEFAULT_EPICS = ['GOLD', 'OIL_CRUDE', 'BTCUSD', 'NATGAS'];
 
 const LABELS: Record<string, string> = {
     GOLD: 'Gold',
     OIL_CRUDE: 'Crude Oil',
-    EURUSD: 'EUR/USD',
     BTCUSD: 'BTC/USD',
     NATGAS: 'Natural Gas',
-    SILVER: 'Silver',
 };
 
 export async function GET(req: NextRequest) {

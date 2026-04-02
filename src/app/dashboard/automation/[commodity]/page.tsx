@@ -31,17 +31,7 @@ const MARKET_DATA: Record<string, any> = {
             { id: "crude-dominion", name: "Crude Dominion", tag: "Structural Swings", type: "Position", risk: "Low", trades: 1, hold: "5d", recCap: 20000, minCap: 2000, winRate: 45.8, return30: 11.4, dd: 6.8, sharpe: 2.2 }
         ]
     },
-    "eur-usd": {
-        epic: "EURUSD",
-        name: "EUR/USD", symbol: "EUR/USD", defaultPrice: "1.0842", range: "1.0810 - 1.0890", status: "Open", vol: "Low",
-        desc: "The most liquid forex pair. EUR/USD systems focus on central bank divergence and tight-spread mean reversion.",
-        color: "text-blue-400", bg: "from-blue-400/20", borderColor: "border-blue-400/30",
-        engines: [
-            { id: "euro-flux", name: "Euro Flux", tag: "Mean Reversion", type: "Scalper", risk: "Medium", trades: 50, hold: "10m", recCap: 3000, minCap: 250, winRate: 72.5, return30: 9.8, dd: 5.4, sharpe: 2.6 },
-            { id: "euro-vector", name: "Euro Vector", type: "Intraday", tag: "London Session Moves", risk: "Medium", trades: 12, hold: "2h", recCap: 5000, minCap: 500, winRate: 60.2, return30: 14.5, dd: 7.2, sharpe: 2.0 },
-            { id: "euro-macro", name: "Euro Macro", type: "Position", tag: "Intervention Tracking", risk: "Low", trades: 3, hold: "2d", recCap: 15000, minCap: 1500, winRate: 48.9, return30: 7.2, dd: 3.5, sharpe: 2.8 }
-        ]
-    },
+
     "bitcoin": {
         epic: "BTCUSD",
         name: "Bitcoin", symbol: "BTC", defaultPrice: "$64,210", range: "$61,000 - $65,500", status: "Open 24/7", vol: "Extreme",
