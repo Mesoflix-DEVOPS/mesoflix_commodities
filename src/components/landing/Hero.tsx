@@ -25,7 +25,7 @@ const Hero = () => {
                     </p>
 
                     <div className="flex flex-col sm:flex-row gap-4 pt-4 justify-center lg:justify-start">
-                        <Link href="/login" className="inline-flex items-center justify-center gap-2 bg-dark-blue text-white dark:bg-golden-gradient dark:text-dark-blue px-8 py-4 rounded-xl font-bold text-lg hover:shadow-[0_0_20px_rgba(255,215,0,0.4)] transition-all duration-300 transform hover:-translate-y-1">
+                        <Link href="/capital-check" className="inline-flex items-center justify-center gap-2 bg-dark-blue text-white dark:bg-teal dark:text-dark-blue px-8 py-4 rounded-xl font-bold text-lg hover:shadow-[0_0_20px_rgba(0,191,166,0.4)] transition-all duration-300 transform hover:-translate-y-1 border border-transparent dark:border-teal/50">
                             Start Trading Now
                             <ArrowRight size={20} />
                         </Link>

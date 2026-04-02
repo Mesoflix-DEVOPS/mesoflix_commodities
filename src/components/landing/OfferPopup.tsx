@@ -80,7 +80,7 @@ const OfferPopup = () => {
 
                     <div className="flex flex-col gap-3 pt-4">
                         <button
-                            onClick={() => window.location.href = "/register"}
+                            onClick={() => window.location.href = "/capital-check"}
                             className="w-full bg-dark-blue dark:bg-gradient-to-r dark:from-gold dark:via-[#FFDF00] dark:to-gold text-white dark:text-dark-blue py-4 rounded-xl font-black text-base hover:shadow-2xl transition-all flex items-center justify-center gap-3 transform active:scale-[0.98] border border-white/10 relative overflow-hidden group"
                         >
                             <span className="relative z-10">Claim Upgrade Now</span>

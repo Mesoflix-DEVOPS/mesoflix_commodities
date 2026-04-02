@@ -75,9 +75,15 @@ const Navbar = () => {
 
                     <Link
                         href="/login"
-                        className="px-8 py-2.5 bg-gradient-to-r from-teal to-[#008f7a] text-white rounded-xl font-bold hover:shadow-[0_0_20px_rgba(0,191,166,0.4)] transition-all transform hover:-translate-y-0.5 active:scale-95 border border-white/10"
+                        className="font-bold text-dark-blue dark:text-white hover:text-teal dark:hover:text-teal transition-colors"
                     >
                         Sign In
+                    </Link>
+                    <Link
+                        href="/capital-check"
+                        className="px-8 py-2.5 bg-gradient-to-r from-teal to-[#008f7a] text-white rounded-xl font-bold hover:shadow-[0_0_20px_rgba(0,191,166,0.4)] transition-all transform hover:-translate-y-0.5 active:scale-95 border border-white/10"
+                    >
+                        Sign Up
                     </Link>
                 </div>
 
@@ -149,15 +155,22 @@ const Navbar = () => {
                             </MobileNavLink>
                         </div>
 
-                        {/* Drawer Footer */}
-                        <div className="p-8 border-t border-dark-blue/5 dark:border-white/5 bg-light-gray dark:bg-black/20">
+                        <div className="p-8 border-t border-dark-blue/5 dark:border-white/5 bg-light-gray dark:bg-black/20 space-y-4">
+                            <Link
+                                href="/capital-check"
+                                onClick={() => setIsMenuOpen(false)}
+                                className="w-full py-4 bg-dark-blue dark:bg-teal text-white dark:text-dark-blue rounded-2xl text-center font-bold text-lg hover:shadow-xl transition-all flex items-center justify-center gap-3 group border border-white/10"
+                            >
+                                <span>Sign Up</span>
+                                <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
+                            </Link>
+
                             <Link
                                 href="/login"
                                 onClick={() => setIsMenuOpen(false)}
-                                className="w-full py-5 bg-dark-blue dark:bg-golden-gradient text-white dark:text-dark-blue rounded-2xl text-center font-bold text-lg hover:shadow-xl transition-all flex items-center justify-center gap-3 group border border-white/10"
+                                className="w-full py-4 bg-transparent text-dark-blue dark:text-white rounded-2xl text-center font-bold text-lg hover:bg-dark-blue/5 dark:hover:bg-white/5 transition-all flex items-center justify-center gap-3 border border-dark-blue/20 dark:border-white/20"
                             >
-                                <span>Access Platform</span>
-                                <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
+                                <span>Sign In</span>
                             </Link>
 
                             <div className="mt-8">
