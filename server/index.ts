@@ -249,9 +249,12 @@ app.get('/api/user', authGuard, async (req: any, res) => {
             .select('id, email, full_name, role')
             .eq('id', userId)
             .single();
-        if (error || !user) throw new Error("User Not Found");
+
+        if (error || !user) return res.status(401).json({ error: "User Not Found" });
+
         res.json({ user: { id: user.id, email: user.email, fullName: user.full_name, role: user.role } });
     } catch (err: any) {
+        console.error("[Identity Bridge] Failed:", err.message);
         res.status(500).json({ error: "Identity Bridge Failed" });
     }
 });
@@ -263,19 +266,23 @@ app.get('/api/dashboard', authGuard, async (req: any, res) => {
         const modeInput = req.query.mode || 'demo';
         const isDemo = modeInput === 'demo';
 
-        // Fetch User Info
+        // 1. Fetch User Profile via Supabase SDK (Ported from Drizzle)
         const { data: user, error: userError } = await supabase
             .from('users')
-            .select('*')
+            .select('id, full_name, email, role')
             .eq('id', userId)
             .single();
 
-        if (userError || !user) return res.status(404).json({ error: 'User Not Found' });
+        if (userError || !user) {
+            console.error(`[Dashboard Bridge] User Lookup Error:`, userError?.message);
+            return res.status(404).json({ error: 'User Not Found' });
+        }
 
         const userData = { fullName: user.full_name || 'Trader' };
 
         try {
             const session = await getValidSession(userId, isDemo);
+            if (!session) throw new Error("Brokerage Link Unavailable");
 
             const [accountsData, positionsData, historyData] = await Promise.all([
                 getAccounts(session.cst, session.xSecurityToken, isDemo, session.serverUrl),
@@ -283,14 +290,18 @@ app.get('/api/dashboard', authGuard, async (req: any, res) => {
                 getHistory(session.cst, session.xSecurityToken, isDemo, { max: 50 }, session.serverUrl)
             ]) as [any, any, any];
 
-            const accounts = (accountsData.accounts || []).map((a: any) => ({
-                ...a,
-                balance: {
-                    ...(a.balance || {}),
-                    availableToWithdraw: a.balance?.available ?? a.balance?.availableToWithdraw ?? 0,
-                    equity: (a.balance?.balance ?? 0) + (a.balance?.profitLoss ?? 0),
-                }
-            }));
+            // Filter accounts strictly by the requested mode (Fixes "Demo in Real" bug)
+            const targetType = isDemo ? 'demo' : 'live';
+            const accounts = (accountsData.accounts || [])
+                .filter((a: any) => (a.accountType || '').toLowerCase() === targetType)
+                .map((a: any) => ({
+                    ...a,
+                    balance: {
+                        ...(a.balance || {}),
+                        availableToWithdraw: a.balance?.available ?? a.balance?.availableToWithdraw ?? 0,
+                        equity: (a.balance?.balance ?? 0) + (a.balance?.pnl ?? 0),
+                    }
+                }));
 
             res.json({
                 ...accountsData,
@@ -300,7 +311,7 @@ app.get('/api/dashboard', authGuard, async (req: any, res) => {
                 user: userData
             });
         } catch (capitalErr: any) {
-            console.error(`[Bridge Dashboard] Capital Error for ${userId}:`, capitalErr.message);
+            console.warn(`[Bridge Dashboard] Capital Connection Lag for ${userId}:`, capitalErr.message);
             res.json({
                 accounts: [], positions: [], history: [],
                 warning: `Institutional Connection Lag: ${capitalErr.message}`,
@@ -308,7 +319,7 @@ app.get('/api/dashboard', authGuard, async (req: any, res) => {
             });
         }
     } catch (err: any) {
-        console.error("Dashboard Bridge Failed:", err.message);
+        console.error("Dashboard Bridge Critical Failure:", err.message);
         res.status(500).json({ error: "Institutional Dashboard Offline" });
     }
 });
@@ -344,14 +355,9 @@ app.get('/api/auth/me', authGuard, async (req: any, res) => {
             .eq('id', userId)
             .single();
 
-        if (error) {
-            console.error(`[Identity Bridge] Supabase Error for ${userId}:`, error.message);
-            return res.status(500).json({ error: "Identity Database Unavailable" });
-        }
-
-        if (!user) {
-            console.warn(`[Identity Bridge] User ${userId} not found in database.`);
-            return res.status(401).json({ error: "Session Expired or User Removed" });
+        if (error || !user) {
+            console.warn(`[Identity Bridge] User ${userId} lookup failed.`);
+            return res.status(401).json({ error: "Session Expired" });
         }
 
         res.json({ user: { id: user.id, email: user.email, fullName: user.full_name, role: user.role } });
@@ -602,6 +608,12 @@ io.on('connection', (socket) => {
                 // Use the same logic as the SSE stream but emit via Socket.io
                 const currentSession = await getValidSession(userId, isDemo);
 
+                // CRITICAL CRASH GUARD: If session is null, don't attempt to use .cst
+                if (!currentSession) {
+                    console.warn(`[Socket Poll] Brokerage Session Unavailable for ${userId} (Mode: ${mode})`);
+                    return; 
+                }
+
                 const [accountsData, positionsData, marketData] = await Promise.all([
                     getAccounts(currentSession.cst, currentSession.xSecurityToken, isDemo, currentSession.serverUrl),
                     getPositions(currentSession.cst, currentSession.xSecurityToken, isDemo, currentSession.serverUrl),
@@ -624,7 +636,13 @@ io.on('connection', (socket) => {
 
                 // 2. Separate Balance & Positions (as expected by Frontend listeners)
                 if (accountsData?.accounts) {
-                    const activeAccount = accountsData.accounts.find((a: any) => a.accountId === currentSession.activeAccountId) || accountsData.accounts[0];
+                    // Strict filtering: Only use the account that matches our current stream mode
+                    const targetType = isDemo ? 'demo' : 'live';
+                    const activeAccount = accountsData.accounts.find((a: any) => 
+                        a.accountId === currentSession.activeAccountId && 
+                        (a.accountType || '').toLowerCase() === targetType
+                    ) || accountsData.accounts.find((a: any) => (a.accountType || '').toLowerCase() === targetType);
+
                     if (activeAccount) {
                         socket.emit('balance', {
                             ...activeAccount.balance,
