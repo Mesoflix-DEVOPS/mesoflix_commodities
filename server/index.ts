@@ -8,6 +8,7 @@ import { getValidSession } from './capital-service';
 import { getAccounts, getPositions, getMarketTickers, getHistory } from './capital';
 import { supabase } from './supabase';
 import { sql } from 'drizzle-orm';
+import { encrypt } from './crypto';
 import bcrypt from 'bcryptjs';
 
 // Load environment variables
@@ -158,13 +159,13 @@ app.post('/api/auth/register', async (req, res) => {
 
         if (userError) throw userError;
 
-        // 2. Link Capital Credentials
+        // 2. Link Capital Credentials (Secured with Institutional Encryption)
         const { error: capitalError } = await supabase
             .from('capital_accounts')
             .insert({
                 user_id: newUser.id,
-                encrypted_api_key: apiKey,
-                encrypted_api_password: apiPassword,
+                encrypted_api_key: encrypt(apiKey), //iv:tag:data
+                encrypted_api_password: encrypt(apiPassword),
                 account_type: accountType || 'demo',
                 is_active: true,
                 created_at: new Date()
