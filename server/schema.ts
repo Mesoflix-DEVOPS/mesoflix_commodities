@@ -126,8 +126,9 @@ export const supportAgents = pgTable('support_agents', {
 // Tickets Table
 export const tickets = pgTable('tickets', {
     id: uuid('id').defaultRandom().primaryKey(),
-    user_id: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+    user_id: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }),
     assigned_agent_id: uuid('assigned_agent_id').references(() => supportAgents.id, { onDelete: 'set null' }),
+    email: text('email'), // For guest onboarding requests
     category: text('category').notNull(),
     subject: text('subject').notNull(),
     description: text('description').notNull(),

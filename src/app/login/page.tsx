@@ -3,9 +3,11 @@
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Lock, Mail, ArrowRight, AlertCircle, Eye, EyeOff, ArrowLeft } from "lucide-react";
+import { Lock, Mail, ArrowRight, AlertCircle, Eye, EyeOff, ArrowLeft, Bot, Video, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import OnboardingBot from "@/components/onboarding/OnboardingBot";
+import ManualOnboardingForm from "@/components/auth/ManualOnboardingForm";
+import HumanOnboardingModal from "@/components/auth/HumanOnboardingModal";
 
 export default function AuthPage() {
     return (
@@ -23,6 +25,8 @@ function AuthPageForm() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const [isLogin, setIsLogin] = useState(true);
+    const [showAI, setShowAI] = useState(false);
+    const [showConcierge, setShowConcierge] = useState(false);
 
     // Sync isLogin with mode param
     useEffect(() => {
@@ -133,7 +137,7 @@ function AuthPageForm() {
                 {/* Main Card */}
                 <div className={cn(
                     "bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl shadow-2xl transition-all duration-500 hover:border-white/20 overflow-hidden",
-                    isLogin ? "p-8 md:p-10" : "p-0 h-[600px]"
+                    isLogin ? "p-8 md:p-10" : "p-8 md:p-10"
                 )}>
 
                     {/* Header (Only for Login) */}
@@ -212,6 +216,7 @@ function AuthPageForm() {
                         <>
                             {isLogin ? (
                                 <form onSubmit={handleLogin} className="space-y-6 animate-in fade-in duration-500">
+                                    {/* ... existing fields ... */}
                                     <div className="animate-in fade-in slide-in-from-left-4 duration-300">
                                         <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Email Address</label>
                                         <div className="relative group">
@@ -274,8 +279,61 @@ function AuthPageForm() {
                                     </button>
                                 </form>
                             ) : (
-                                <div className="h-full animate-in zoom-in-95 duration-500">
-                                    <OnboardingBot />
+                                <div className="space-y-8 animate-in zoom-in-95 duration-500">
+                                    <div className="mb-6">
+                                        <h1 className="text-2xl font-bold text-white mb-2">Institutional Signup</h1>
+                                        <p className="text-gray-400 text-sm">Initialize your direct brokerage linkage protocol.</p>
+                                    </div>
+                                    
+                                    <ManualOnboardingForm />
+
+                                    <div className="pt-6 border-t border-white/5 space-y-4">
+                                        <div className="flex flex-col gap-3">
+                                            <button 
+                                                onClick={() => setShowAI(!showAI)}
+                                                className="w-full py-3 px-4 bg-teal/10 border border-teal/20 rounded-xl flex items-center justify-between group hover:bg-teal/20 transition-all"
+                                            >
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-8 h-8 bg-teal/20 rounded-lg flex items-center justify-center">
+                                                        <Bot size={18} className="text-teal" />
+                                                    </div>
+                                                    <div className="text-left">
+                                                        <p className="text-[10px] font-black text-teal uppercase tracking-widest leading-none mb-1">Guided Experience</p>
+                                                        <p className="text-xs text-white font-medium">Use Institutional AI Assistant</p>
+                                                    </div>
+                                                </div>
+                                                <ArrowRight size={16} className={cn("text-gray-500 group-hover:text-teal transition-all", showAI && "rotate-90")} />
+                                            </button>
+
+                                            <button 
+                                                onClick={() => setShowConcierge(true)}
+                                                className="w-full py-3 px-4 bg-gold/5 border border-gold/10 rounded-xl flex items-center justify-between group hover:bg-gold/10 transition-all"
+                                            >
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-8 h-8 bg-gold/20 rounded-lg flex items-center justify-center">
+                                                        <Video size={18} className="text-gold" />
+                                                    </div>
+                                                    <div className="text-left">
+                                                        <p className="text-[10px] font-black text-gold uppercase tracking-widest leading-none mb-1">Human Onboarding</p>
+                                                        <p className="text-xs text-white font-medium">Request Google Meet Session</p>
+                                                    </div>
+                                                </div>
+                                                <Sparkles size={16} className="text-gold animate-pulse" />
+                                            </button>
+                                        </div>
+
+                                        {showAI && (
+                                            <div className="h-[450px] pt-4 animate-in slide-in-from-top-4 duration-500">
+                                                <OnboardingBot />
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {showConcierge && (
+                                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-300">
+                                    <HumanOnboardingModal onClose={() => setShowConcierge(false)} />
                                 </div>
                             )}
 

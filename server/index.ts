@@ -70,10 +70,10 @@ app.post('/api/onboarding/chat', async (req, res) => {
         let aiRes = await tryAI('v1beta', 'gemini-2.0-flash');
         let data: any = await aiRes.json();
 
-        // If Quota Exceeded (429) or Service Overloaded (503), switch to High-Quota 1.5
+        // If Quota Exceeded (429) or Service Overloaded (503), switch to High-Quota 2.0 Lite
         if (aiRes.status === 429 || aiRes.status === 503 || data.error?.code === 429) {
-            console.warn("[Bridge AI] Primary Tier Throttled. Falling back to High-Quota 1.5...");
-            aiRes = await tryAI('v1', 'gemini-1.5-flash');
+            console.warn("[Bridge AI] Primary Tier Throttled. Falling back to 2.0 Flash Lite...");
+            aiRes = await tryAI('v1beta', 'gemini-2.0-flash-lite');
             data = await aiRes.json();
         }
         
@@ -106,26 +106,24 @@ app.post('/api/auth/check-user', async (req, res) => {
     }
 });
 
-// 3. Support Ticket Bridge
-app.post('/api/support/tickets', async (req, res) => {
+// 3. Human Onboarding Concierge (Meet Requests)
+app.post('/api/onboarding/request-session', async (req, res) => {
     try {
-        const { email, category, subject, description } = req.body;
-        const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
+        const { email, preferredTime, phone } = req.body;
         
-        if (!user) return res.status(404).json({ error: "Client Not Found" });
-
         await db.insert(tickets).values({
-            user_id: user.id,
-            category: category || 'Onboarding',
-            subject: subject || 'Manual Assistance Requested',
-            description: description || 'User requested human intervention during AI onboarding.',
-            status: 'OPEN',
-            priority: 'HIGH'
+            email: email || "pending@onboarding.user",
+            subject: "Onboarding Session Requested (Google Meet)",
+            description: `User requested a live Google Meet walkthrough. \nPreferred Time: ${preferredTime || 'ASAP'} \nPhone: ${phone || 'Not provided'}`,
+            category: 'ONBOARDING',
+            onboarding_status: 'REQUESTED',
+            created_at: new Date()
         });
 
-        res.json({ success: true });
-    } catch (err) {
-        res.status(500).json({ error: "Ticket Bridge Failure" });
+        res.json({ success: true, message: "Handshake Successful. Our Brokerage Desk will reach out via Google Meet shortly." });
+    } catch (err: any) {
+        console.error("Concierge Error:", err.message);
+        res.status(500).json({ error: "Concierge Bridge Failure" });
     }
 });
 
