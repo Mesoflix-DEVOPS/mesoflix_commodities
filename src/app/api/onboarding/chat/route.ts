@@ -13,6 +13,18 @@ export async function POST(req: NextRequest) {
             });
         }
 
+        if (!message || typeof message !== 'string') {
+            return NextResponse.json({ error: "Invalid message payload" }, { status: 400 });
+        }
+
+        // Defensive Sanitization: Ensure all history items match the Gemini SDK schema
+        const sanitizedHistory = (history || []).map((item: any) => ({
+            role: item.role === 'user' ? 'user' : 'model',
+            parts: Array.isArray(item.parts) 
+                ? item.parts.map((p: any) => typeof p === 'string' ? { text: p } : p)
+                : [{ text: String(item.parts || '') }]
+        }));
+
         const model = genAI.getGenerativeModel({ model: "gemini-pro" });
 
         const chat = model.startChat({
@@ -40,7 +52,7 @@ Institutional, elite, and high-end. Use terms like "Liquidity", "Brokerage Integ
                     role: "model",
                     parts: [{ text: "Institutional Onboarding Engine Initialized. I am ready to guide the client through the Mesoflix terminal integration protocols. I will monitor for identity verification and credential collection triggers." }],
                 },
-                ...history
+                ...sanitizedHistory
             ],
         });
 
@@ -51,6 +63,10 @@ Institutional, elite, and high-end. Use terms like "Liquidity", "Brokerage Integ
         return NextResponse.json({ message: text });
     } catch (error: any) {
         console.error("Gemini Chat Error:", error);
-        return NextResponse.json({ error: "Failed to connect to AI engine" }, { status: 500 });
+        const errorMessage = error?.message || "Unknown Connection Failure";
+        return NextResponse.json({ 
+            error: `AI Link Failed: ${errorMessage.substring(0, 100)}`,
+            hint: "Verify your GEMINI_API_KEY on Vercel and check your Google AI Console quota."
+        }, { status: 500 });
     }
 }
