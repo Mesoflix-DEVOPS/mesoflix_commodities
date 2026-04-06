@@ -1,10 +1,12 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/db';
-import { users, refreshTokens, recoveryCodes } from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
+import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
 import { signAccessToken, setAuthCookies, generateRefreshToken } from '@/lib/auth';
 import { jwtVerify } from 'jose';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Helper to Base32 decode a TOTP secret natively without libraries
 function base32Decode(base32String: string): Buffer {
@@ -16,7 +18,7 @@ function base32Decode(base32String: string): Buffer {
 
     for (let i = 0; i < base32.length; i++) {
         const index = alphabet.indexOf(base32[i]);
-        if (index === -1) continue; // Skip padding or invalid chars
+        if (index === -1) continue; 
         value = (value << 5) | index;
         bits += 5;
         if (bits >= 8) {
@@ -27,7 +29,6 @@ function base32Decode(base32String: string): Buffer {
     return Buffer.from(array);
 }
 
-// Compute an exact TOTP code for a secret and a time window
 function getTOTPForTime(secret: string, timeSeconds: number): string {
     const key = base32Decode(secret);
     const timeBuffer = Buffer.alloc(8);
@@ -54,7 +55,6 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Missing token or verification code' }, { status: 400 });
         }
 
-        // 1. Verify the Short-Lived Temp Token
         let payload;
         try {
             const secret = new TextEncoder().encode(process.env.JWT_SECRET || 'mesoflix-commodity-terminal-internal-fallback-v1');
@@ -66,42 +66,39 @@ export async function POST(req: Request) {
 
         const userId = payload.userId as string;
 
-        // 2. Fetch User & Secret
-        const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+        const { data: user, error: userError } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', userId)
+            .single();
 
-        if (!user || (!user.two_factor_secret && !user.two_factor_enabled)) {
-            return NextResponse.json({ error: '2FA is not enabled for this user' }, { status: 400 });
+        if (userError || !user || (!user.two_factor_secret && !user.two_factor_enabled)) {
+            return NextResponse.json({ error: '2FA Enrollment Missing' }, { status: 400 });
         }
 
         let isVerified = false;
 
-        // 3a. Branch: Recovery Mode Logic
         if (isRecoveryMode) {
             const cleanCode = code.toUpperCase().trim();
             const inputHash = crypto.createHash('sha256').update(cleanCode).digest('hex');
 
-            // Check all active codes for this user
-            const codes = await db.select().from(recoveryCodes)
-                .where(eq(recoveryCodes.user_id, userId));
+            const { data: rc, error: rcError } = await supabase
+                .from('recovery_codes')
+                .select('*')
+                .eq('user_id', userId)
+                .eq('code_hash', inputHash)
+                .eq('used', false)
+                .single();
 
-            for (const rc of codes) {
-                if (!rc.used && rc.code_hash === inputHash) {
-                    isVerified = true;
-                    // Invalidate this singular backup code so it can't be replayed
-                    await db.update(recoveryCodes)
-                        .set({ used: true })
-                        .where(eq(recoveryCodes.id, rc.id));
-                    break;
-                }
+            if (rc && !rcError) {
+                isVerified = true;
+                await supabase.from('recovery_codes').update({ used: true }).eq('id', rc.id);
             }
 
             if (!isVerified) {
                 return NextResponse.json({ error: 'Invalid or already used recovery code' }, { status: 401 });
             }
-        }
-
-        // 3b. Branch: Standard Authenticator App TOTP Logic
-        else {
+        } else {
             const cleanCode = code.replace(/\s/g, '');
             const currentTime = Math.floor(Date.now() / 1000);
 
@@ -118,14 +115,12 @@ export async function POST(req: Request) {
             }
         }
 
-        // 4. Verification Passed -> Generate REAL session tokens
         const newRefreshToken = generateRefreshToken();
 
-        await db.insert(refreshTokens).values({
+        await supabase.from('refresh_tokens').insert({
             user_id: user.id,
-            token_hash: crypto.createHash('sha256').update(newRefreshToken).digest('hex'),
-            expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
-            device_info: req.headers.get('user-agent') || 'Unknown Device',
+            token_hash: newRefreshToken,
+            expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
         });
 
         const accessToken = await signAccessToken({
@@ -143,7 +138,7 @@ export async function POST(req: Request) {
         });
 
     } catch (error: any) {
-        console.error('2FA Verify Login Error:', error);
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+        console.error('2FA Verify Login Error:', error.message);
+        return NextResponse.json({ error: 'Security Bridge Offline' }, { status: 500 });
     }
 }

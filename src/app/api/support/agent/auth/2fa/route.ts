@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/db';
-import { supportAgents } from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
+import { createClient } from '@supabase/supabase-js';
 import * as jose from 'jose';
 import crypto from 'crypto';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 const JWT_SECRET = new TextEncoder().encode(
     process.env.JWT_SECRET || 'fallback_secret_must_change_in_prod'
@@ -14,76 +16,61 @@ function generateTOTP(secret: string): string {
     let bits = 0;
     let value = 0;
     const keyBytes = [];
-
     for (let i = 0; i < secret.length; i++) {
-        value = (value << 5) | alphabet.indexOf(secret[i].toUpperCase());
+        const idx = alphabet.indexOf(secret[i].toUpperCase());
+        if (idx === -1) continue;
+        value = (value << 5) | idx;
         bits += 5;
         if (bits >= 8) {
             keyBytes.push((value >>> (bits - 8)) & 255);
             bits -= 8;
         }
     }
-
     const counter = Math.floor(Date.now() / 30000);
     const counterBuffer = Buffer.alloc(8);
     counterBuffer.writeBigInt64BE(BigInt(counter), 0);
-
     const hmac = crypto.createHmac('sha1', Buffer.from(keyBytes));
     hmac.update(counterBuffer);
-    const hmacResult = hmac.digest();
-
-    const offset = hmacResult[hmacResult.length - 1] & 0xf;
-    const code = (
-        ((hmacResult[offset] & 0x7f) << 24) |
-        ((hmacResult[offset + 1] & 0xff) << 16) |
-        ((hmacResult[offset + 2] & 0xff) << 8) |
-        (hmacResult[offset + 3] & 0xff)
-    ) % 1000000;
-
+    const res = hmac.digest();
+    const offset = res[res.length - 1] & 0xf;
+    const code = (((res[offset] & 0x7f) << 24) | ((res[offset + 1] & 0xff) << 16) | ((res[offset + 2] & 0xff) << 8) | (res[offset + 3] & 0xff)) % 1000000;
     return code.toString().padStart(6, '0');
 }
 
 export async function POST(req: Request) {
     try {
-        const body = await req.json();
-        const { totp, tempToken } = body;
+        const { totp, tempToken } = await req.json();
+        if (!totp || !tempToken) return NextResponse.json({ error: "Missing fields" }, { status: 400 });
 
-        if (!totp || !tempToken) {
-            return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
-        }
-
-        // Verify Temp Token
         let payload;
         try {
             const result = await jose.jwtVerify(tempToken, JWT_SECRET);
             payload = result.payload;
         } catch (e) {
-            return NextResponse.json({ error: "Session expired, please login again" }, { status: 401 });
+            return NextResponse.json({ error: "Session expired" }, { status: 401 });
         }
 
         const agentId = payload.sub as string;
 
-        const agents = await db.select().from(supportAgents).where(eq(supportAgents.id, agentId)).limit(1);
-        const agent = agents[0];
+        // Institutional Bridge: Fetch Agent via stable SDK
+        const { data: agent, error: agentError } = await supabase
+            .from('support_agents')
+            .select('*')
+            .eq('id', agentId)
+            .single();
 
-        if (!agent || !agent.two_factor_secret) {
-            return NextResponse.json({ error: "Invalid agent or 2FA not initialized" }, { status: 403 });
+        if (agentError || !agent || !agent.two_factor_secret) {
+            return NextResponse.json({ error: "Identity Sync Failure" }, { status: 403 });
         }
 
-        const validTotp = generateTOTP(agent.two_factor_secret);
-
-        if (totp !== validTotp) {
+        if (totp !== generateTOTP(agent.two_factor_secret)) {
             return NextResponse.json({ error: "Invalid authenticator code" }, { status: 401 });
         }
 
-        // If it was setup phase, permanently enable it
         if (!agent.two_factor_enabled) {
-            await db.update(supportAgents)
-                .set({ two_factor_enabled: true })
-                .where(eq(supportAgents.id, agent.id));
+            await supabase.from('support_agents').update({ two_factor_enabled: true }).eq('id', agent.id);
         }
 
-        // Generate Final JWT
         const token = await new jose.SignJWT({
             sub: agent.id,
             email: agent.email,
@@ -104,14 +91,14 @@ export async function POST(req: Request) {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
             sameSite: 'lax',
-            maxAge: 12 * 60 * 60, // 12 hours
+            maxAge: 12 * 60 * 60,
             path: '/',
         });
 
         return response;
 
-    } catch (error) {
-        console.error("Agent 2FA verification error:", error);
-        return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    } catch (error: any) {
+        console.error("Agent 2FA verification error:", error.message);
+        return NextResponse.json({ error: "Security Bridge Offline" }, { status: 500 });
     }
 }

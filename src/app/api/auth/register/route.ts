@@ -1,90 +1,104 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/db';
-import { users, refreshTokens, auditLogs, capitalAccounts } from '@/lib/db/schema';
+import { createClient } from '@supabase/supabase-js';
 import { hashPassword, encrypt } from '@/lib/crypto';
 import { signAccessToken, generateRefreshToken, setAuthCookies } from '@/lib/auth';
 import { createSession } from '@/lib/capital';
-import { eq, or } from 'drizzle-orm';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 export async function POST(request: Request) {
     try {
         const { email, fullName, apiKey, apiPassword, accountType } = await request.json();
         const isDemo = accountType === 'demo';
-        console.log(`[Register] Attempting simplified validation for: ${email} (${accountType})`);
 
         if (!email || !apiKey || !apiPassword) {
-            return NextResponse.json({ message: 'Email, API Key, and API Password are required' }, { status: 400 });
+            return NextResponse.json({ message: 'Missing required credentials' }, { status: 400 });
         }
 
-        // 1. Check if user already exists
-        const existingUsers = await db.select().from(users).where(eq(users.email, email)).limit(1);
-        let user;
-
-        // 2. Validate API Keys by attempting to create a session
+        // 1. Institutional Validation: Attempt to create a session before recording in DB
         try {
             await createSession(email, apiPassword, apiKey, isDemo);
         } catch (err: any) {
-            console.error(`[Register] Capital.com Validation Failed for ${email}:`, err.message);
-            return NextResponse.json({ message: `Capital.com validation failed: ${err.message}` }, { status: 401 });
+            console.error(`[Register] Capital.com Validation Failure:`, err.message);
+            return NextResponse.json({ message: `Brokerage validation failed: ${err.message}` }, { status: 401 });
         }
 
-        // 3. Hash API Key for Uniqueness Check
+        // 2. Identity Sync via stable SDK
+        const { data: existingUser } = await supabase
+            .from('users')
+            .select('id')
+            .eq('email', email.toLowerCase())
+            .single();
+
+        const passwordHash = await hashPassword(apiPassword);
+        let user;
+
+        if (existingUser) {
+            const { data: updatedUser } = await supabase
+                .from('users')
+                .update({
+                    password_hash: passwordHash,
+                    full_name: fullName || 'Trading User',
+                    updated_at: new Date()
+                })
+                .eq('id', existingUser.id)
+                .select('*')
+                .single();
+            user = updatedUser;
+        } else {
+            const { data: newUser } = await supabase
+                .from('users')
+                .insert({
+                    email: email.toLowerCase(),
+                    password_hash: passwordHash,
+                    full_name: fullName || 'Trading User',
+                    role: 'user'
+                })
+                .select('*')
+                .single();
+            user = newUser;
+        }
+
+        if (!user) throw new Error("Identity Persistence Failure");
+
+        // 3. Credentials Encryption & account linking via stable SDK
         const { hashApiKey } = await import('@/lib/crypto');
         const keyHash = hashApiKey(apiKey);
-        const existingAccountCount = await db.select().from(capitalAccounts).where(eq(capitalAccounts.api_key_hash, keyHash)).limit(1);
-
-        if (existingAccountCount.length > 0) {
-            // Check if it belongs to the same user
-            if (existingUsers.length > 0 && existingAccountCount[0].user_id !== existingUsers[0].id) {
-                return NextResponse.json({ message: 'This API key is already registered with another account' }, { status: 409 });
-            }
-        }
-
-        // 4. Use API Password as Account Password
-        const passwordHash = await hashPassword(apiPassword);
-
-        if (existingUsers.length > 0) {
-            // Update existing user password
-            [user] = await db.update(users).set({
-                password_hash: passwordHash,
-                full_name: fullName || existingUsers[0].full_name,
-                updated_at: new Date(),
-            }).where(eq(users.id, existingUsers[0].id)).returning();
-        } else {
-            // Create New User
-            [user] = await db.insert(users).values({
-                email,
-                password_hash: passwordHash,
-                full_name: fullName || 'Trading User',
-            }).returning();
-        }
-
-        // 5. Store Encrypted Credentials
         const encryptedKey = encrypt(apiKey);
         const encryptedPass = encrypt(apiPassword);
 
-        // Check if account entry exists
-        const [existingAccount] = await db.select().from(capitalAccounts).where(eq(capitalAccounts.user_id, user.id)).limit(1);
+        const { data: existingAccount } = await supabase
+            .from('capital_accounts')
+            .select('id')
+            .eq('user_id', user.id)
+            .single();
 
         if (existingAccount) {
-            await db.update(capitalAccounts).set({
-                encrypted_api_key: encryptedKey,
-                encrypted_api_password: encryptedPass,
-                api_key_hash: keyHash,
-                account_type: accountType || 'demo',
-                updated_at: new Date(),
-            }).where(eq(capitalAccounts.id, existingAccount.id));
+            await supabase
+                .from('capital_accounts')
+                .update({
+                    encrypted_api_key: encryptedKey,
+                    encrypted_api_password: encryptedPass,
+                    api_key_hash: keyHash,
+                    account_type: accountType || 'demo',
+                    updated_at: new Date()
+                })
+                .eq('id', existingAccount.id);
         } else {
-            await db.insert(capitalAccounts).values({
-                user_id: user.id,
-                encrypted_api_key: encryptedKey,
-                encrypted_api_password: encryptedPass,
-                api_key_hash: keyHash,
-                account_type: accountType || 'demo',
-            });
+            await supabase
+                .from('capital_accounts')
+                .insert({
+                    user_id: user.id,
+                    encrypted_api_key: encryptedKey,
+                    encrypted_api_password: encryptedPass,
+                    api_key_hash: keyHash,
+                    account_type: accountType || 'demo'
+                });
         }
 
-        // 6. Issue Tokens
+        // 4. Session & Cleanup
         const accessToken = await signAccessToken({
             userId: user.id,
             email: user.email,
@@ -94,34 +108,21 @@ export async function POST(request: Request) {
 
         const refreshToken = generateRefreshToken();
 
-        // 7. Store Refresh Token (3 days)
-        await db.insert(refreshTokens).values({
+        await supabase.from('refresh_tokens').insert({
             user_id: user.id,
             token_hash: refreshToken,
-            expires_at: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), // 3 days
+            expires_at: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
         });
 
-        // 8. Set Cookies
         await setAuthCookies(accessToken, refreshToken);
-
-        // 9. Audit Log
-        await db.insert(auditLogs).values({
-            user_id: user.id,
-            action: 'REGISTER',
-            ip_address: request.headers.get('x-forwarded-for') || 'unknown',
-        });
 
         return NextResponse.json({
             message: 'Registration successful',
-            user: {
-                id: user.id,
-                email: user.email,
-                name: user.full_name,
-            }
+            user: { id: user.id, email: user.email, name: user.full_name }
         });
 
     } catch (error: any) {
-        console.error('Registration Error:', error);
-        return NextResponse.json({ message: 'Internal Server Error' }, { status: 500 });
+        console.error('Registration Bridge Failure:', error.message);
+        return NextResponse.json({ message: 'Security Bridge Offline' }, { status: 500 });
     }
 }

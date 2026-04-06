@@ -1,34 +1,35 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/db';
-import { users } from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
+import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
 import { verifyAccessToken } from '@/lib/auth';
 import { cookies } from 'next/headers';
 
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabase = createClient(supabaseUrl, supabaseKey);
+
 export async function POST(req: Request) {
     try {
-        // 1. Verify Authentication
         const cookieStore = await cookies();
         const accessToken = cookieStore.get('access_token')?.value;
         if (!accessToken) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
         const userCookie = await verifyAccessToken(accessToken);
-        if (!userCookie || !userCookie.userId) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-        }
+        if (!userCookie || !userCookie.userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-        // 2. Fetch User
-        const [user] = await db.select().from(users).where(eq(users.id, userCookie.userId)).limit(1);
-        if (!user) {
-            return NextResponse.json({ error: 'User not found' }, { status: 404 });
-        }
+        const userId = userCookie.userId;
 
-        if (user.two_factor_enabled) {
-            return NextResponse.json({ error: 'Two-factor authentication is already enabled' }, { status: 400 });
-        }
+        // 1. Fetch User via stable SDK
+        const { data: user, error: userError } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', userId)
+            .single();
 
-        // 3. Generate Secret via Base32 Math
+        if (userError || !user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
+        if (user.two_factor_enabled) return NextResponse.json({ error: 'MFA Already Active' }, { status: 400 });
+
+        // 2. Generate Secret via Base32 Math
         const buffer = crypto.randomBytes(20);
         const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
         let secret = '';
@@ -43,28 +44,20 @@ export async function POST(req: Request) {
                 bits -= 5;
             }
         }
-        if (bits > 0) {
-            secret += alphabet[(value << (5 - bits)) & 31];
-        }
+        if (bits > 0) secret += alphabet[(value << (5 - bits)) & 31];
 
-        // Generate otpauth URL using standard template strings
         const otpauthUrl = `otpauth://totp/Mesoflix%20Commodities:${encodeURIComponent(user.email)}?secret=${secret}&issuer=Mesoflix%20Commodities&algorithm=SHA1&digits=6&period=30`;
 
-        // 5. Save the temporary secret to the user's record (but keep 'enabled' false until verified)
-        await db.update(users)
-            .set({
-                two_factor_secret: secret,
-                updated_at: new Date()
-            })
-            .where(eq(users.id, user.id));
+        // 3. Save secret via stable SDK
+        await supabase
+            .from('users')
+            .update({ two_factor_secret: secret, updated_at: new Date() })
+            .eq('id', userId);
 
-        return NextResponse.json({
-            secret,
-            otpauthUrl
-        });
+        return NextResponse.json({ secret, otpauthUrl });
 
     } catch (error: any) {
-        console.error('2FA Generate Error:', error);
-        return NextResponse.json({ error: 'Failed to initialize 2FA setup' }, { status: 500 });
+        console.error('2FA Generate Error:', error.message);
+        return NextResponse.json({ error: 'Security Bridge Offline' }, { status: 500 });
     }
 }

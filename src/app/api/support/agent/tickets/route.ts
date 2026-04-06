@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/db';
-import { tickets, ticketMessages } from '@/lib/db/schema';
-import { desc, eq, sql } from 'drizzle-orm';
+import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import * as jose from 'jose';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 const JWT_SECRET = new TextEncoder().encode(
     process.env.JWT_SECRET || 'fallback_secret_must_change_in_prod'
@@ -11,13 +13,10 @@ const JWT_SECRET = new TextEncoder().encode(
 
 export async function GET(req: Request) {
     try {
-        // Enforce Agent Authentication Middleware Logic
         const cookieStore = await cookies();
         const token = cookieStore.get('agent_session')?.value;
 
-        if (!token) {
-            return NextResponse.json({ error: "Unauthorized access" }, { status: 401 });
-        }
+        if (!token) return NextResponse.json({ error: "Unauthorized access" }, { status: 401 });
 
         try {
             await jose.jwtVerify(token, JWT_SECRET);
@@ -25,30 +24,37 @@ export async function GET(req: Request) {
             return NextResponse.json({ error: "Invalid or expired agent session" }, { status: 401 });
         }
 
-        // Fetch all tickets with their latest message snippet
-        // In a real production app, we would paginate this and use a left join
+        // Institutional Bridge: Fetch all tickets via stable SDK
+        const { data: allTickets, error: ticketError } = await supabase
+            .from('tickets')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .limit(100);
 
-        const allTickets = await db.select().from(tickets).orderBy(desc(tickets.created_at)).limit(100);
+        if (ticketError) throw ticketError;
 
-        // Fetch latest message for each tickt as a quick snippet
-        const resolvedTickets = await Promise.all(allTickets.map(async (t) => {
-            const latestMsg = await db.select()
-                .from(ticketMessages)
-                .where(eq(ticketMessages.ticket_id, t.id))
-                .orderBy(desc(ticketMessages.created_at))
+        // Fetch latest message for snippets via stable SDK
+        const resolvedTickets = await Promise.all((allTickets || []).map(async (t) => {
+            const { data: latestMsgs } = await supabase
+                .from('ticket_messages')
+                .select('*')
+                .eq('ticket_id', t.id)
+                .order('created_at', { ascending: false })
                 .limit(1);
+
+            const latestMsg = latestMsgs?.[0];
 
             return {
                 ...t,
-                last_message: latestMsg[0]?.message || "No messages yet.",
-                unread: latestMsg[0]?.sender_type === "user" && !latestMsg[0]?.read_status
+                last_message: latestMsg?.message || "No messages.",
+                unread: latestMsg?.sender_type === "user" && !latestMsg?.read_status
             }
         }));
 
         return NextResponse.json({ tickets: resolvedTickets });
 
-    } catch (error) {
-        console.error("Agent tickets fetch error:", error);
-        return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    } catch (error: any) {
+        console.error("Agent tickets fetch error:", error.message);
+        return NextResponse.json({ error: "Support Database Error" }, { status: 500 });
     }
 }

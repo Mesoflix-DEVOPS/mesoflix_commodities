@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getValidSession, getApiUrl } from '@/lib/capital-service';
-import { db, withRetry } from '@/lib/db';
 import { verifyAccessToken } from '@/lib/auth';
 import { cookies } from 'next/headers';
 
@@ -20,8 +19,8 @@ export async function GET(req: NextRequest) {
         const epicsParam = searchParams.get('epics');
         const epics = epicsParam ? epicsParam.split(',') : ['GOLD', 'OIL_CRUDE', 'BTCUSD'];
 
-        // Get unified session
-        const session = await withRetry(() => getValidSession(tokenPayload.userId));
+        // Institutional Bridge: Fetch session via stable SDK
+        const session = await getValidSession(tokenPayload.userId);
         const API_BASE = getApiUrl(false);
 
         const response = await fetch(`${API_BASE}/markets?epics=${epics.join(',')}`, {
@@ -33,9 +32,6 @@ export async function GET(req: NextRequest) {
         });
 
         if (!response.ok) {
-            const text = await response.text();
-            console.error(`[Prices API] Capital.com error:`, response.status, text);
-
             if (response.status === 401) {
                 try {
                     const freshSession = await getValidSession(tokenPayload.userId, false, true);
@@ -50,18 +46,16 @@ export async function GET(req: NextRequest) {
                     console.error('[Prices API] Refresh retry failed:', refreshErr.message);
                 }
             }
-
-            return NextResponse.json({ prices: {}, warning: `Capital.com returned ${response.status}` });
+            return NextResponse.json({ prices: {}, warning: `Brokerage Data Delayed` });
         }
 
         return NextResponse.json({ prices: parseMarketDetails(await response.json()) });
 
     } catch (err: any) {
         console.error('[Prices API] Fatal Error:', err.message);
-        return NextResponse.json({ prices: {}, error: 'Internal Server Error', message: err.message }, { status: 500 });
+        return NextResponse.json({ prices: {}, error: 'Prices Bridge Offline' }, { status: 500 });
     }
 }
-
 
 function parseMarketDetails(data: any): Record<string, { bid: number; offer: number; change: number; changePct: number }> {
     const result: Record<string, any> = {};

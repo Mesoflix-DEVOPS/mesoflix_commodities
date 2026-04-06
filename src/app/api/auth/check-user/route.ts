@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/db';
-import { users } from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
@@ -12,14 +14,17 @@ export async function GET(request: Request) {
     }
 
     try {
-        const existingUsers = await db.select({ id: users.id }).from(users).where(eq(users.email, email.toLowerCase())).limit(1);
-        
-        return NextResponse.json({ 
-            exists: existingUsers.length > 0,
-            message: existingUsers.length > 0 ? 'User already exists' : 'User available'
+        const { data: user, error } = await supabase
+            .from('users')
+            .select('id')
+            .eq('email', email.toLowerCase())
+            .single();
+
+        return NextResponse.json({
+            exists: !!user,
+            message: !!user ? 'User already exists' : 'User available'
         });
     } catch (error: any) {
-        console.error('[Check User API] Error:', error);
-        return NextResponse.json({ message: 'Internal Server Error' }, { status: 500 });
+        return NextResponse.json({ exists: false, message: 'Identity check timeout' });
     }
 }

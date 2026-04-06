@@ -1,10 +1,12 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/db';
-import { supportAgents } from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
+import { createClient } from '@supabase/supabase-js';
 import bcrypt from 'bcryptjs';
 import * as jose from 'jose';
 import { randomBytes } from 'crypto';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 const JWT_SECRET = new TextEncoder().encode(
     process.env.JWT_SECRET || 'fallback_secret_must_change_in_prod'
@@ -12,17 +14,20 @@ const JWT_SECRET = new TextEncoder().encode(
 
 export async function POST(req: Request) {
     try {
-        const body = await req.json();
-        const { email, password } = body;
+        const { email, password } = await req.json();
 
         if (!email || !password) {
             return NextResponse.json({ error: "Email and password are required" }, { status: 400 });
         }
 
-        const agents = await db.select().from(supportAgents).where(eq(supportAgents.email, email)).limit(1);
-        const agent = agents[0];
+        // Institutional Bridge: Fetch Agent via stable SDK
+        const { data: agent, error: agentError } = await supabase
+            .from('support_agents')
+            .select('*')
+            .eq('email', email)
+            .single();
 
-        if (!agent) {
+        if (agentError || !agent) {
             return NextResponse.json({ error: "Invalid corporate credentials" }, { status: 401 });
         }
 
@@ -35,7 +40,6 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "Invalid corporate credentials" }, { status: 401 });
         }
 
-        // Generate short-lived Temp Token for 2FA validation
         const tempToken = await new jose.SignJWT({ sub: agent.id })
             .setProtectedHeader({ alg: 'HS256' })
             .setIssuedAt()
@@ -50,13 +54,8 @@ export async function POST(req: Request) {
             });
         }
 
-        // If 2FA is NOT enabled and the secret is already set, or we just want to allow direct login:
-        // The user specifically wants to remove 2FA for John. 
-        // We check if we should force setup or just log in.
-        // For John, we'll allow direct login if 2FA is disabled.
-
+        // John's special access: Allow direct login if 2FA disabled
         if (!agent.two_factor_enabled && agent.email === 'john@gmail.com') {
-            // Generate FINAL session JWT
             const sessionToken = await new jose.SignJWT({
                 sub: agent.id,
                 email: agent.email,
@@ -67,22 +66,17 @@ export async function POST(req: Request) {
                 .setExpirationTime('24h')
                 .sign(JWT_SECRET);
 
-            const response = NextResponse.json({
-                success: true,
-                message: 'Login successful'
-            });
-
+            const response = NextResponse.json({ success: true, message: 'Login successful' });
             response.cookies.set('agent_session', sessionToken, {
                 httpOnly: true,
                 secure: process.env.NODE_ENV === 'production',
                 sameSite: 'lax',
-                maxAge: 60 * 60 * 24 // 24 hours
+                maxAge: 60 * 60 * 24 
             });
-
             return response;
         }
 
-        // If not enabled and needs setup (not John), generate a new secret for setup
+        // Generate 2FA Secret via stable SDK logic
         const buffer = randomBytes(20);
         const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
         let secret = '';
@@ -97,15 +91,11 @@ export async function POST(req: Request) {
                 bits -= 5;
             }
         }
-        if (bits > 0) {
-            secret += alphabet[(value << (5 - bits)) & 31];
-        }
+        if (bits > 0) secret += alphabet[(value << (5 - bits)) & 31];
 
         const otpauthUrl = `otpauth://totp/Mesoflix%20Support:${encodeURIComponent(agent.email)}?secret=${secret}&issuer=Mesoflix%20Support&algorithm=SHA1&digits=6&period=30`;
 
-        await db.update(supportAgents)
-            .set({ two_factor_secret: secret })
-            .where(eq(supportAgents.id, agent.id));
+        await supabase.from('support_agents').update({ two_factor_secret: secret }).eq('id', agent.id);
 
         return NextResponse.json({
             message: '2FA Setup Required',
@@ -115,8 +105,8 @@ export async function POST(req: Request) {
             tempToken: tempToken
         });
 
-    } catch (error) {
-        console.error("Agent login error:", error);
+    } catch (error: any) {
+        console.error("Agent login error:", error.message);
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
 }

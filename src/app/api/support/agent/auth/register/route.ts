@@ -1,46 +1,48 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/db';
-import { supportAgents } from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
+import { createClient } from '@supabase/supabase-js';
 import bcrypt from 'bcryptjs';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 export async function POST(req: Request) {
     try {
-        const body = await req.json();
-        const { fullName, email, password } = body;
+        const { fullName, email, password } = await req.json();
 
         if (!fullName || !email || !password) {
-            return NextResponse.json({ error: "All fields are required" }, { status: 400 });
+            return NextResponse.json({ error: "All corporate credentials required" }, { status: 400 });
         }
 
-        if (password.length < 8) {
-            return NextResponse.json({ error: "Password must be at least 8 characters" }, { status: 400 });
-        }
+        if (password.length < 8) return NextResponse.json({ error: "Security Policy: Min 8 chars" }, { status: 400 });
 
-        // Check if email already exists
-        const existing = await db.select().from(supportAgents).where(eq(supportAgents.email, email)).limit(1);
-        if (existing.length > 0) {
-            return NextResponse.json({ error: "An agent with this email already exists" }, { status: 409 });
-        }
+        // Institutional Bridge: Check existing agent via stable SDK
+        const { data: existing } = await supabase
+            .from('support_agents')
+            .select('id')
+            .eq('email', email)
+            .single();
 
-        // Hash password
+        if (existing) return NextResponse.json({ error: "Agent Identity Collision" }, { status: 409 });
+
         const salt = await bcrypt.genSalt(10);
         const password_hash = await bcrypt.hash(password, salt);
 
-        // In a real corporate environment, 'role' might default to a pending state until a supervisor approves them.
-        // For this demo, we'll auto-approve them as 'agent'
-        await db.insert(supportAgents).values({
-            email,
-            password_hash,
-            full_name: fullName,
-            role: 'agent',
-            is_active: true
-        });
+        // Persistent Registry via stable SDK
+        await supabase
+            .from('support_agents')
+            .insert({
+                email,
+                password_hash,
+                full_name: fullName,
+                role: 'agent',
+                is_active: true
+            });
 
         return NextResponse.json({ success: true }, { status: 201 });
 
-    } catch (error) {
-        console.error("Agent registration error:", error);
-        return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    } catch (error: any) {
+        console.error("Agent registration error:", error.message);
+        return NextResponse.json({ error: "Security Bridge Offline" }, { status: 500 });
     }
 }

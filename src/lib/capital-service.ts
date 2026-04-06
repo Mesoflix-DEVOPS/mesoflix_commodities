@@ -26,13 +26,14 @@ const SESSION_TTL_MS = 8 * 60 * 1000;
 
 export async function getValidSession(
     userId: string,
-    forceDemo: boolean = false
+    forceDemo: boolean = false,
+    forceRefresh: boolean = false
 ): Promise<SessionTokens> {
     const isDemo = forceDemo;
     const cacheKey = `${userId}-${isDemo ? 'demo' : 'live'}`;
     const cached = memCache.get(cacheKey);
 
-    if (cached && cached.expiresAt > Date.now()) {
+    if (cached && cached.expiresAt > Date.now() && !forceRefresh) {
         return cached.tokens;
     }
 
@@ -81,4 +82,14 @@ export async function getValidSession(
         throw e;
     }
 }
+
+export async function clearCachedSession(userId: string): Promise<void> {
+    // Clear all entries for this user in the local memory cache
+    for (const key of memCache.keys()) {
+        if (key.startsWith(`${userId}-`)) {
+            memCache.delete(key);
+        }
+    }
+}
+
 

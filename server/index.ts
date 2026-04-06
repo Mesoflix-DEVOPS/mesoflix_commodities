@@ -7,7 +7,6 @@ import cors from 'cors';
 import { getValidSession } from './capital-service';
 import { getAccounts, getPositions, getMarketTickers, getHistory } from './capital';
 import { supabase } from './supabase';
-import { sql } from 'drizzle-orm';
 import { encrypt } from './crypto';
 import bcrypt from 'bcryptjs';
 

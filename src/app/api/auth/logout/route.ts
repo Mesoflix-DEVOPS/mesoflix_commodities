@@ -1,35 +1,30 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { db } from '@/lib/db';
-import { refreshTokens, auditLogs } from '@/lib/db/schema';
-import { clearAuthCookies, verifyAccessToken } from '@/lib/auth';
-import { eq } from 'drizzle-orm';
+import { createClient } from '@supabase/supabase-js';
+import { clearAuthCookies } from '@/lib/auth';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 export async function POST(request: Request) {
     try {
         const cookieStore = await cookies();
         const refreshToken = cookieStore.get('refresh_token')?.value;
-        const accessToken = cookieStore.get('access_token')?.value;
 
-        // Revoke token if present
+        // Revoke token via stable SDK
         if (refreshToken) {
-            await db.update(refreshTokens)
-                .set({ revoked: true })
-                .where(eq(refreshTokens.token_hash, refreshToken));
-        }
-
-        // Audit Log (try to get user ID from access token if Valid)
-        if (accessToken) {
-            // We decode but ignore expiration for logging logout
-            // verifyAccessToken might fail if expired, but that's okay.
+            await supabase
+                .from('refresh_tokens')
+                .update({ revoked: true })
+                .eq('token_hash', refreshToken);
         }
 
         await clearAuthCookies();
-
         return NextResponse.json({ message: 'Logged out successfully' });
 
     } catch (error: any) {
-        console.error('Logout Error:', error);
-        return NextResponse.json({ message: 'Internal Server Error' }, { status: 500 });
+        console.error('Logout Error:', error.message);
+        return NextResponse.json({ message: 'Logout Failure' }, { status: 500 });
     }
 }

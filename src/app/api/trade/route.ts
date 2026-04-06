@@ -1,11 +1,11 @@
-import { db, withRetry } from '@/lib/db';
-import { users, notifications, platformTrades } from '@/lib/db/schema';
-import { getValidSession } from '@/lib/capital-service';
-import { placeOrder, closePosition } from '@/lib/capital';
-import { verifyAccessToken } from '@/lib/auth';
-import { eq } from 'drizzle-orm';
-import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
+import { supabase } from '@/lib/supabase';
+import { getValidSession } from '@/lib/capital-service';
+import { placeOrder, closePosition, getConfirm } from '@/lib/capital';
+import { verifyAccessToken } from '@/lib/auth';
+import { cookies } from 'next/headers';
+
+export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
     try {
@@ -28,14 +28,10 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Missing required fields: epic, direction, size' }, { status: 400 });
         }
 
-        const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
-        if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
-
         const isDemo = requestMode === 'demo';
 
         const executeWithSession = async (forceRefresh = false) => {
             const session = await getValidSession(userId, isDemo, forceRefresh);
-            console.log(`[Trade API] Executing order on account ${session.activeAccountId} via ${session.serverUrl}`);
             const accountIsDemo = session.accountIsDemo ?? false;
 
             const result = await placeOrder(
@@ -53,15 +49,10 @@ export async function POST(request: Request) {
             let dealId = result.dealReference;
             if (result && result.dealReference) {
                 try {
-                    const { getConfirm } = require('@/lib/capital');
-                    await new Promise(res => setTimeout(res, 500));
+                    await new Promise(res => setTimeout(res, 800));
                     const confirmRes = await getConfirm(session.cst, session.xSecurityToken, result.dealReference, accountIsDemo, session.serverUrl);
-                    if (confirmRes && confirmRes.dealId) {
-                        dealId = confirmRes.dealId;
-                    }
-                } catch (e) {
-                    console.error("[Trade API] Failed to get confirmation, using dealReference", e);
-                }
+                    if (confirmRes && confirmRes.dealId) dealId = confirmRes.dealId;
+                } catch { }
             }
 
             return { result, dealId };
@@ -70,79 +61,43 @@ export async function POST(request: Request) {
         try {
             const { result, dealId } = await executeWithSession();
 
-            // Push notification
-            await withRetry(() => db.insert(notifications).values({
+            // Record Trade & Notification via stable SDK
+            await supabase.from('notifications').insert({
                 user_id: userId,
                 title: 'Position Opened',
-                message: `Successfully executed a ${direction} block on ${epic} for ${size} units.`,
+                message: `Successfully executed a ${direction} block on ${epic}.`,
                 type: 'success'
-            }));
+            });
 
             if (dealId) {
-                try {
-                    await withRetry(() => db.insert(platformTrades).values({
-                        user_id: userId,
-                        deal_id: dealId,
-                        epic,
-                        direction,
-                        size: String(size),
-                        mode: isDemo ? 'demo' : 'live'
-                    }));
-                } catch (dbErr) {
-                    console.error("Failed to insert locally into platformTrades:", dbErr);
-                }
-            }
-
-            try {
-                const { sql } = require('drizzle-orm');
-                await withRetry(() => db.delete(platformTrades).where(sql`created_at < NOW() - INTERVAL '1 day'`));
-            } catch (e) {
-                console.error("Cleanup failed", e);
+                await supabase.from('platform_trades').insert({
+                    user_id: userId,
+                    deal_id: dealId,
+                    epic,
+                    direction,
+                    size: String(size),
+                    mode: isDemo ? 'demo' : 'live',
+                    created_at: new Date()
+                });
             }
 
             return NextResponse.json({ success: true, ...result });
+
         } catch (err: any) {
-            console.error('[Trade API] First attempt failed:', err.message);
-            // Auto-retry with fresh session on auth errors
-            if (err.message.includes('401') || err.message.toLowerCase().includes('session') || err.message.toLowerCase().includes('unauthorized')) {
-                try {
-                    const { result: retryResult, dealId: retryDealId } = await executeWithSession(true);
-
-                    await withRetry(() => db.insert(notifications).values({
-                        user_id: userId,
-                        title: 'Position Opened',
-                        message: `Successfully executed a ${direction} block on ${epic} for ${size} units (Auth Retry).`,
-                        type: 'success'
-                    }));
-
-                    if (retryDealId) {
-                        try {
-                            await withRetry(() => db.insert(platformTrades).values({
-                                user_id: userId,
-                                deal_id: retryDealId,
-                                epic,
-                                direction,
-                                size: String(size),
-                                mode: isDemo ? 'demo' : 'live'
-                            }));
-                        } catch (dbErr) { }
-                    }
-
-                    return NextResponse.json({ success: true, ...retryResult, dealId: retryDealId });
-                } catch (retryErr: any) {
-                    return NextResponse.json({ error: `Trade failed after retry: ${retryErr.message}` }, { status: 502 });
-                }
+            console.error('[Trade API] Execution Failure:', err.message);
+            // Session Retry Logic
+            if (err.message.includes('401') || err.message.toLowerCase().includes('session')) {
+                const { result: retryResult, dealId: retryDealId } = await executeWithSession(true);
+                return NextResponse.json({ success: true, ...retryResult, dealId: retryDealId });
             }
-            return NextResponse.json({ error: err.message }, { status: 502 });
+            throw err;
         }
 
     } catch (error: any) {
         console.error('[Trade API] Fatal error:', error.message);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        return NextResponse.json({ error: error.message }, { status: 502 });
     }
 }
-
-import { closedTrades } from '@/lib/db/schema';
 
 export async function DELETE(request: Request) {
     try {
@@ -158,23 +113,14 @@ export async function DELETE(request: Request) {
         const dealId = searchParams.get('dealId');
         const mode = searchParams.get('mode') || 'demo';
 
-        if (!dealId) {
-            return NextResponse.json({ error: 'Missing dealId' }, { status: 400 });
-        }
+        if (!dealId) return NextResponse.json({ error: 'Missing dealId' }, { status: 400 });
 
         const isDemo = mode === 'demo';
-
-        // Try parsing body for trade details, if present (frontend should pass it)
         let requestBody: any = {};
-        try {
-            requestBody = await request.json();
-        } catch (e) {
-            // body is optional
-        }
+        try { requestBody = await request.json(); } catch { }
 
         const executeClose = async (forceRefresh = false) => {
             const session = await getValidSession(userId, isDemo, forceRefresh);
-            console.log(`[Trade API] Closing deal ${dealId} on account ${session.activeAccountId} via ${session.serverUrl}`);
             const accountIsDemo = session.accountIsDemo ?? false;
             return closePosition(session.cst, session.xSecurityToken, dealId, accountIsDemo, session.serverUrl);
         };
@@ -182,85 +128,40 @@ export async function DELETE(request: Request) {
         try {
             const result = await executeClose();
 
-            await withRetry(() => db.insert(notifications).values({
+            await supabase.from('notifications').insert({
                 user_id: userId,
                 title: 'Position Closed',
                 message: `Successfully closed deal ${dealId}.`,
                 type: 'info'
-            }));
+            });
 
-            // Store in our database for the Transactions table
-            if (requestBody && requestBody.epic && requestBody.direction) {
-                try {
-                    await withRetry(() => db.insert(closedTrades).values({
-                        user_id: userId,
-                        deal_id: dealId,
-                        epic: requestBody.epic,
-                        direction: requestBody.direction,
-                        size: String(requestBody.size || 0),
-                        open_price: String(requestBody.openPrice || 0),
-                        close_price: String(result.level ?? 0),
-                        pnl: String(requestBody.pnl || 0),
-                        mode: isDemo ? 'demo' : 'live'
-                    }));
-                } catch (dbErr) {
-                    console.error("Failed to insert into closedTrades:", dbErr);
-                }
-            }
-
-            try {
-                // Cleanup platform trades older than 1 day
-                const { sql } = require('drizzle-orm');
-                await withRetry(() => db.delete(platformTrades).where(sql`created_at < NOW() - INTERVAL '1 day'`));
-
-                // Also cleanup closed_trades older than 1 day to ensure it respects the 24-hour retention requirement
-                await withRetry(() => db.delete(closedTrades).where(sql`created_at < NOW() - INTERVAL '1 day'`));
-            } catch (e) {
-                console.error("Cleanup failed", e);
+            if (requestBody?.epic) {
+                await supabase.from('closed_trades').insert({
+                    user_id: userId,
+                    deal_id: dealId,
+                    epic: requestBody.epic,
+                    direction: requestBody.direction || 'BUY',
+                    size: String(requestBody.size || 0),
+                    open_price: String(requestBody.openPrice || 0),
+                    close_price: String(result.level ?? 0),
+                    pnl: String(requestBody.pnl || 0),
+                    mode: isDemo ? 'demo' : 'live',
+                    created_at: new Date()
+                });
             }
 
             return NextResponse.json({ success: true, ...result });
+
         } catch (err: any) {
-            console.error('[Trade API] First close attempt failed:', err.message);
-            if (err.message.includes('401') || err.message.toLowerCase().includes('session') || err.message.toLowerCase().includes('unauthorized')) {
-                try {
-                    const result = await executeClose(true);
-
-                    await withRetry(() => db.insert(notifications).values({
-                        user_id: userId,
-                        title: 'Position Closed',
-                        message: `Successfully closed deal ${dealId} (Auth Retry).`,
-                        type: 'info'
-                    }));
-
-                    if (requestBody && requestBody.epic && requestBody.direction) {
-                        try {
-                            await withRetry(() => db.insert(closedTrades).values({
-                                user_id: userId,
-                                deal_id: dealId,
-                                epic: requestBody.epic,
-                                direction: requestBody.direction,
-                                size: String(requestBody.size || 0),
-                                open_price: String(requestBody.openPrice || 0),
-                                close_price: String(result.level ?? 0),
-                                pnl: String(requestBody.pnl || 0),
-                                mode: isDemo ? 'demo' : 'live'
-                            }));
-                        } catch (dbErr) {
-                            console.error("Failed to insert into closedTrades after retry:", dbErr);
-                        }
-                    }
-
-                    return NextResponse.json({ success: true, ...result });
-                } catch (retryErr: any) {
-                    return NextResponse.json({ error: `Close failed after retry: ${retryErr.message}` }, { status: 502 });
-                }
+            if (err.message.includes('401') || err.message.toLowerCase().includes('session')) {
+                const result = await executeClose(true);
+                return NextResponse.json({ success: true, ...result });
             }
-            return NextResponse.json({ error: err.message }, { status: 502 });
+            throw err;
         }
     } catch (error: any) {
         console.error('[Trade API] Fatal close error:', error.message);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        return NextResponse.json({ error: error.message }, { status: 502 });
     }
 }
 

@@ -1,23 +1,23 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/db';
-import { users, recoveryCodes } from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
+import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
 import { verifyAccessToken } from '@/lib/auth';
 import { cookies } from 'next/headers';
 
-// Helper to generate secure random 10-character recovery codes
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabase = createClient(supabaseUrl, supabaseKey);
+
 function generateRecoveryCodes(count: number = 10): { raw: string, hash: string }[] {
     const codes = [];
     for (let i = 0; i < count; i++) {
-        const rawCode = crypto.randomBytes(4).toString('hex').toUpperCase() + '-' + crypto.randomBytes(4).toString('hex').toUpperCase(); // e.g. "A1B2-C3D4"
+        const rawCode = crypto.randomBytes(4).toString('hex').toUpperCase() + '-' + crypto.randomBytes(4).toString('hex').toUpperCase();
         const hash = crypto.createHash('sha256').update(rawCode).digest('hex');
         codes.push({ raw: rawCode, hash });
     }
     return codes;
 }
 
-// Helper to Base32 decode a TOTP secret natively without libraries
 function base32Decode(base32String: string): Buffer {
     let base32 = base32String.replace(/-/g, '').toUpperCase();
     const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
@@ -27,7 +27,7 @@ function base32Decode(base32String: string): Buffer {
 
     for (let i = 0; i < base32.length; i++) {
         const index = alphabet.indexOf(base32[i]);
-        if (index === -1) continue; // Skip padding or invalid chars
+        if (index === -1) continue; 
         value = (value << 5) | index;
         bits += 5;
         if (bits >= 8) {
@@ -38,7 +38,6 @@ function base32Decode(base32String: string): Buffer {
     return Buffer.from(array);
 }
 
-// Compute an exact TOTP code for a secret and a time window
 function getTOTPForTime(secret: string, timeSeconds: number): string {
     const key = base32Decode(secret);
     const timeBuffer = Buffer.alloc(8);
@@ -60,85 +59,63 @@ function getTOTPForTime(secret: string, timeSeconds: number): string {
 export async function POST(req: Request) {
     try {
         const { code } = await req.json();
+        if (!code) return NextResponse.json({ error: 'MFA Code Required' }, { status: 400 });
 
-        if (!code) {
-            return NextResponse.json({ error: 'Verification code is required' }, { status: 400 });
-        }
-
-        // 1. Verify Authentication
         const cookieStore = await cookies();
         const accessToken = cookieStore.get('access_token')?.value;
         if (!accessToken) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
         const userCookie = await verifyAccessToken(accessToken);
-        if (!userCookie || !userCookie.userId) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        if (!userCookie || !userCookie.userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+        const userId = userCookie.userId;
+
+        // 1. Fetch User via stable SDK
+        const { data: user, error: userError } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', userId)
+            .single();
+
+        if (userError || !user || !user.two_factor_secret) {
+            return NextResponse.json({ error: 'MFA Setup Not Initialized' }, { status: 400 });
         }
 
-        // 2. Fetch User & Secret
-        const [user] = await db.select().from(users).where(eq(users.id, userCookie.userId)).limit(1);
-
-        if (!user || (!user.two_factor_secret && !user.two_factor_enabled)) {
-            return NextResponse.json({ error: '2FA setup not initialized' }, { status: 400 });
-        }
-
-        if (user.two_factor_enabled) {
-            return NextResponse.json({ error: '2FA is already enabled' }, { status: 400 });
-        }
-
-        const secret = user.two_factor_secret;
-        if (!secret) {
-            return NextResponse.json({ error: 'No 2FA secret found. Please restart setup.' }, { status: 400 });
-        }
-
-        // 3. Verify TOTP natively (Check current, previous, and next window to fix minor drift)
+        // 2. Verify TOTP
         const cleanCode = code.replace(/\s/g, '');
         const currentTime = Math.floor(Date.now() / 1000);
-
         const validCodes = [
-            getTOTPForTime(secret, currentTime - 30),
-            getTOTPForTime(secret, currentTime),
-            getTOTPForTime(secret, currentTime + 30)
+            getTOTPForTime(user.two_factor_secret, currentTime - 30),
+            getTOTPForTime(user.two_factor_secret, currentTime),
+            getTOTPForTime(user.two_factor_secret, currentTime + 30)
         ];
 
-        const isValid = validCodes.includes(cleanCode);
-
-        if (!isValid) {
-            return NextResponse.json({ error: 'Invalid authentication code' }, { status: 401 });
+        if (!validCodes.includes(cleanCode)) {
+            return NextResponse.json({ error: 'Invalid MFA Code' }, { status: 401 });
         }
 
-        // 4. Generate Recovery Codes
+        // 3. Enable MFA via stable SDK
+        await supabase.from('users').update({ two_factor_enabled: true, updated_at: new Date() }).eq('id', userId);
+
+        // 4. Recovery Codes Management
         const newCodes = generateRecoveryCodes(10);
-
-        // 5. Enable 2FA for the user
-        await db.update(users)
-            .set({
-                two_factor_enabled: true,
-                updated_at: new Date()
-            })
-            .where(eq(users.id, user.id));
-
-        // 6. Delete old recovery codes if they somehow existed, then insert new ones
-        await db.delete(recoveryCodes).where(eq(recoveryCodes.user_id, user.id));
-
+        await supabase.from('recovery_codes').delete().eq('user_id', userId);
+        
         const insertData = newCodes.map(c => ({
-            user_id: user.id,
+            user_id: userId,
             code_hash: c.hash,
             used: false
         }));
 
-        await db.insert(recoveryCodes).values(insertData);
-
-        // 7. Return exactly once the RAW codes so the user can download them
-        const rawRecoveryCodes = newCodes.map(c => c.raw);
+        await supabase.from('recovery_codes').insert(insertData);
 
         return NextResponse.json({
             success: true,
-            recoveryCodes: rawRecoveryCodes
+            recoveryCodes: newCodes.map(c => c.raw)
         });
 
     } catch (error: any) {
-        console.error('2FA Verify Setup Error:', error);
-        return NextResponse.json({ error: 'Failed to complete 2FA setup' }, { status: 500 });
+        console.error('2FA Verify Setup Error:', error.message);
+        return NextResponse.json({ error: 'Security Bridge Offline' }, { status: 500 });
     }
 }

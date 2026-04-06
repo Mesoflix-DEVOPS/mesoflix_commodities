@@ -1,31 +1,29 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/db';
-import { tickets, ticketMessages } from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
+import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import * as jose from 'jose';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 const JWT_SECRET = new TextEncoder().encode(
     process.env.JWT_SECRET || 'fallback_secret_must_change_in_prod'
 );
 
-export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(req: Request, { params }: { params: any }) {
     try {
         const { id } = await params;
-        const body = await req.json();
-        const { message, attachmentUrl } = body;
+        const { message, attachmentUrl } = await req.json();
 
         if (!message && !attachmentUrl) {
             return NextResponse.json({ error: "Message content or attachment required" }, { status: 400 });
         }
 
-        // Authenticate Agent
+        // Auth Check
         const cookieStore = await cookies();
         const token = cookieStore.get('agent_session')?.value;
-
-        if (!token) {
-            return NextResponse.json({ error: "Unauthorized access" }, { status: 401 });
-        }
+        if (!token) return NextResponse.json({ error: "Unauthorized access" }, { status: 401 });
 
         let payload;
         try {
@@ -35,29 +33,40 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
             return NextResponse.json({ error: "Invalid or expired agent session" }, { status: 401 });
         }
 
-        // Validate ticket exists
-        const ticketData = await db.select().from(tickets).where(eq(tickets.id, id)).limit(1);
-        if (!ticketData.length) {
-            return NextResponse.json({ error: "Ticket not found" }, { status: 404 });
+        // Institutional Bridge: Validate ticket via stable SDK
+        const { data: ticket, error: ticketError } = await supabase
+            .from('tickets')
+            .select('*')
+            .eq('id', id)
+            .single();
+
+        if (ticketError || !ticket) return NextResponse.json({ error: "Ticket not found" }, { status: 404 });
+
+        // Insert message via stable SDK
+        const { data: newMessage, error: msgError } = await supabase
+            .from('ticket_messages')
+            .insert({
+                ticket_id: id,
+                sender_id: payload.sub as string,
+                sender_type: "agent",
+                message: message || '',
+                attachment_url: attachmentUrl,
+                read_status: false,
+            })
+            .select('*')
+            .single();
+
+        if (msgError || !newMessage) throw msgError;
+
+        // Auto-update ticket status via stable SDK
+        if (ticket.status === "OPEN") {
+            await supabase
+                .from('tickets')
+                .update({ status: "PENDING", assigned_agent_id: payload.sub as string })
+                .eq('id', id);
         }
 
-        // Insert message as agent
-        const [newMessage] = await db.insert(ticketMessages).values({
-            ticket_id: id,
-            sender_id: payload.sub as string,
-            sender_type: "agent",
-            message: message || '',
-            attachment_url: attachmentUrl,
-            read_status: false,
-        }).returning();
-
-        // Optional: change ticket status to PENDING if it was OPEN (agent responded)
-        if (ticketData[0].status === "OPEN") {
-            await db.update(tickets)
-                .set({ status: "PENDING", assigned_agent_id: payload.sub as string })
-                .where(eq(tickets.id, id));
-        }
-
+        // Broadcast via bridge
         import('@/lib/sse').then(({ broadcastSSE }) => {
             broadcastSSE('new_message', { ticketId: id, message: newMessage }, (client) => {
                 return client.params.ticketId === id || !!client.params.agentId;
@@ -66,8 +75,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
         return NextResponse.json({ success: true, messageId: newMessage.id });
 
-    } catch (error) {
-        console.error("Agent message POST error:", error);
-        return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    } catch (error: any) {
+        console.error("Agent message POST error:", error.message);
+        return NextResponse.json({ error: "Support Bridge Offline" }, { status: 500 });
     }
 }

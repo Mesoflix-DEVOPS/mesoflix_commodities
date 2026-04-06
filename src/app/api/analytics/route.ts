@@ -1,10 +1,7 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/db';
-import { users } from '@/lib/db/schema';
 import { getValidSession } from '@/lib/capital-service';
 import { getHistory } from '@/lib/capital';
 import { verifyAccessToken } from '@/lib/auth';
-import { eq } from 'drizzle-orm';
 import { cookies } from 'next/headers';
 
 export const dynamic = 'force-dynamic';

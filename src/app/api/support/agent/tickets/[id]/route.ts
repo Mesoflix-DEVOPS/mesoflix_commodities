@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/db';
-import { tickets } from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
+import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import * as jose from 'jose';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 const JWT_SECRET = new TextEncoder().encode(
     process.env.JWT_SECRET || 'fallback_secret_must_change_in_prod'
@@ -11,12 +13,11 @@ const JWT_SECRET = new TextEncoder().encode(
 
 export async function PATCH(
     req: Request,
-    { params }: { params: { id: string } }
+    { params }: { params: any }
 ) {
     try {
-        const id = params.id;
-        const body = await req.json();
-        const { meet_link, onboarding_status, status } = body;
+        const { id } = await params;
+        const { meet_link, onboarding_status, status } = await req.json();
 
         // Auth Check
         const cookieStore = await cookies();
@@ -34,28 +35,36 @@ export async function PATCH(
         if (onboarding_status !== undefined) updateData.onboarding_status = onboarding_status;
         if (status !== undefined) updateData.status = status;
 
-        await db.update(tickets)
-            .set(updateData)
-            .where(eq(tickets.id, id));
+        // Institutional Bridge: Update Ticket via stable SDK
+        await supabase
+            .from('tickets')
+            .update(updateData)
+            .eq('id', id);
 
         return NextResponse.json({ success: true });
-    } catch (error) {
-        console.error("Ticket update error:", error);
-        return NextResponse.json({ error: "Server Error" }, { status: 500 });
+    } catch (error: any) {
+        console.error("Ticket update error:", error.message);
+        return NextResponse.json({ error: "Support Bridge Offline" }, { status: 500 });
     }
 }
 
 export async function GET(
     req: Request,
-    { params }: { params: { id: string } }
+    { params }: { params: any }
 ) {
     try {
-        const id = params.id;
-        const [ticket] = await db.select().from(tickets).where(eq(tickets.id, id)).limit(1);
-        if (!ticket) return NextResponse.json({ error: "Not Found" }, { status: 404 });
+        const { id } = await params;
+        // Institutional Bridge: Fetch Ticket via stable SDK
+        const { data: ticket, error } = await supabase
+            .from('tickets')
+            .select('*')
+            .eq('id', id)
+            .single();
+
+        if (error || !ticket) return NextResponse.json({ error: "Not Found" }, { status: 404 });
 
         return NextResponse.json({ ticket });
-    } catch (error) {
-        return NextResponse.json({ error: "Server Error" }, { status: 500 });
+    } catch (error: any) {
+        return NextResponse.json({ error: "Support Database Error" }, { status: 500 });
     }
 }

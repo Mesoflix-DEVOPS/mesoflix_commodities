@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
-import { capitalAccounts } from '@/lib/db/schema';
-import { eq, and } from 'drizzle-orm';
+import { createClient } from '@supabase/supabase-js';
 import { verifyAccessToken } from '@/lib/auth';
 import { cookies } from 'next/headers';
 import { clearCachedSession } from '@/lib/capital-service';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 export async function POST(req: NextRequest) {
     try {
@@ -21,16 +23,18 @@ export async function POST(req: NextRequest) {
         const userId = tokenPayload.userId;
         const isDemo = accountType === 'SPREADBET' || (accountId && accountId.toLowerCase().includes('demo'));
 
-        // Update the active account row with the selected sub-account ID
-        // Note: we assume the user has at least one capital account row.
-        // We update the 'is_active' row for that user.
-        await db.update(capitalAccounts)
-            .set({
-                [isDemo ? 'selected_demo_account_id' : 'selected_real_account_id']: accountId,
+        // Institutional Bridge: Update selection via stable SDK
+        const updateField = isDemo ? 'selected_demo_account_id' : 'selected_real_account_id';
+        
+        await supabase
+            .from('capital_accounts')
+            .update({
+                [updateField]: accountId,
                 selected_capital_account_id: accountId, // Keep legacy in sync
                 updated_at: new Date()
             })
-            .where(and(eq(capitalAccounts.user_id, userId), eq(capitalAccounts.is_active, true)));
+            .eq('user_id', userId)
+            .eq('is_active', true);
 
         // Invalidate session cache to ensure the next request picks up the fresh account preference
         await clearCachedSession(userId);
@@ -39,6 +43,6 @@ export async function POST(req: NextRequest) {
 
     } catch (err: any) {
         console.error('[Select Account API] Error:', err.message);
-        return NextResponse.json({ error: err.message }, { status: 500 });
+        return NextResponse.json({ error: 'Failed to switch institutional account' }, { status: 500 });
     }
 }

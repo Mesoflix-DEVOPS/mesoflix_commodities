@@ -1,55 +1,62 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/db';
-import { tickets, ticketMessages } from '@/lib/db/schema';
-import { eq, asc } from 'drizzle-orm';
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(req: Request, { params }: { params: any }) {
     try {
         const { id } = await params;
 
-        const ticketData = await db.select().from(tickets).where(eq(tickets.id, id)).limit(1);
-        if (!ticketData.length) {
+        // Fetch ticket via stable SDK
+        const { data: ticket, error: ticketError } = await supabase
+            .from('tickets')
+            .select('*')
+            .eq('id', id)
+            .single();
+
+        if (ticketError || !ticket) {
             return NextResponse.json({ error: "Ticket not found" }, { status: 404 });
         }
 
-        const messages = await db
-            .select()
-            .from(ticketMessages)
-            .where(eq(ticketMessages.ticket_id, id))
-            .orderBy(asc(ticketMessages.created_at));
+        // Fetch messages via stable SDK
+        const { data: messages, error: messagesError } = await supabase
+            .from('ticket_messages')
+            .select('*')
+            .eq('ticket_id', id)
+            .order('created_at', { ascending: true });
 
         return NextResponse.json({
-            ticket: ticketData[0],
-            messages,
+            ticket,
+            messages: messages || [],
         });
 
-    } catch (error) {
-        console.error("Failed to fetch ticket info:", error);
-        return NextResponse.json(
-            { error: "Internal Server Error" },
-            { status: 500 }
-        );
+    } catch (error: any) {
+        console.error("Support Bridge Error:", error.message);
+        return NextResponse.json({ error: "Support Detail Offline" }, { status: 500 });
     }
 }
 
-export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function PATCH(req: Request, { params }: { params: any }) {
     try {
         const { id } = await params;
-        const body = await req.json();
+        const { status } = await req.json();
 
-        if (body.status === "CLOSED") {
-            await db.update(tickets)
-                .set({ status: "CLOSED" })
-                .where(eq(tickets.id, id));
+        if (status === "CLOSED") {
+            await supabase
+                .from('tickets')
+                .update({ status: "CLOSED" })
+                .eq('id', id);
 
             return NextResponse.json({ success: true });
         }
 
         return NextResponse.json({ error: "Invalid status update" }, { status: 400 });
-    } catch (error) {
-        console.error("Failed to close ticket:", error);
-        return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    } catch (error: any) {
+        console.error("Failed to close ticket:", error.message);
+        return NextResponse.json({ error: "Support Patch Offline" }, { status: 500 });
     }
 }
