@@ -2,9 +2,13 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import * as schema from './schema';
 import dotenv from 'dotenv';
+import { setDefaultResultOrder } from 'node:dns';
 
 // Use same config as index.ts for local relative path
 dotenv.config({ path: '../.env' });
+
+// CRITICAL: Force IPv4 as first preference to avoid Render's IPv6 'ENETUNREACH' failures
+setDefaultResultOrder('ipv4first');
 
 if (!process.env.DATABASE_URL) {
     throw new Error('DATABASE_URL is not defined in server/db.ts');
