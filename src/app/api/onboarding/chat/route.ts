@@ -18,18 +18,25 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "Invalid message payload" }, { status: 400 });
         }
 
-        // Standardize history into Gemini REST format
-        const contents = (history || []).map((item: any) => ({
+        // Standardize history into Gemini REST format (without system prompt)
+        const chatContents = (history || []).map((item: any) => ({
             role: item.role === 'user' ? 'user' : 'model',
             parts: Array.isArray(item.parts) 
                 ? item.parts.map((p: any) => typeof p === 'string' ? { text: p } : p)
                 : [{ text: String(item.parts || '') }]
         }));
 
-        // Add the system prompt and the current message to the payload
-        const systemPrompt = {
+        // Add the current user message to the conversation
+        chatContents.push({
             role: "user",
-            parts: [{ text: `You are the Mesoflix Institutional Onboarding Engine. Your goal is to onboard new users through a conversational interface instead of a form.
+            parts: [{ text: message }]
+        });
+
+        // The correct Gemini 1.5/2.0 REST API payload structure
+        const payload = {
+            contents: chatContents,
+            system_instruction: {
+                parts: [{ text: `You are the Mesoflix Institutional Onboarding Engine. Your goal is to onboard new users through a conversational interface instead of a form.
 
 **PROTOCOL OVERVIEW:**
 1. **Capital Check**: Ask if they have a Capital.com account. If NO, share the link: https://go.capital.com/visit/?bta=44529&brand=capital. Tell them to return when done.
@@ -45,21 +52,7 @@ export async function POST(req: NextRequest) {
 
 **TONE:** 
 Institutional, elite, and high-end. Use terms like "Liquidity", "Brokerage Integration", "Latency", and "Security Protocols".` }]
-        };
-
-        const acknowledgePrompt = {
-            role: "model",
-            parts: [{ text: "Institutional Onboarding Engine Initialized. I am ready to guide the client through the Mesoflix terminal integration protocols. I will monitor for identity verification and credential collection triggers." }]
-        };
-
-        const currentMessage = {
-            role: "user",
-            parts: [{ text: message }]
-        };
-
-        // Complete prompt chain for the stateless REST API
-        const payload = {
-            contents: [systemPrompt, acknowledgePrompt, ...contents, currentMessage],
+            },
             generationConfig: {
                 temperature: 0.7,
                 topK: 1,
@@ -68,7 +61,7 @@ Institutional, elite, and high-end. Use terms like "Liquidity", "Brokerage Integ
             }
         };
 
-        // Direct high-performance production REST call (v1 General Availability)
+        // Direct high-performance production REST call
         const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key=${API_KEY}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -83,7 +76,14 @@ Institutional, elite, and high-end. Use terms like "Liquidity", "Brokerage Integ
             throw new Error(`[${errorStatus}] Google API Reject: ${errorText}`);
         }
 
-        const aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || "Protocol Timeout. Re-connecting...";
+        // Defensive parsing for safety filters or empty responses
+        const aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        
+        if (!aiResponse) {
+             console.warn("Gemini Refusal/Safety Block:", JSON.stringify(data));
+             return NextResponse.json({ message: "Institutional Protocol Interrupted. Please re-state your request or provide your brokerage credentials directly." });
+        }
+
         return NextResponse.json({ message: aiResponse });
 
     } catch (error: any) {
