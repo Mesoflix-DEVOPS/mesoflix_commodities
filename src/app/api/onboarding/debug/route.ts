@@ -27,10 +27,10 @@ export async function GET(req: NextRequest) {
             }
         }
 
-        // Database Health Check
-        const redactedUrl = (process.env.DATABASE_URL || "")
-            .replace(/:([^@]+)@/, ":****@") // Hide password
-            .replace(/\/\/([^:]+):/, "//****:"); // Hide user
+        // Improved Diagnostic Redaction
+        const dbUrl = process.env.DATABASE_URL || "";
+        const redactedUrl = dbUrl.replace(/\/\/[^:]+:[^@]+@/, "//****:****@") // Hide user:pass
+                                .replace(/:[0-9]+\//, (match) => `:${match.substring(1, match.length-1)} (PORT)/`); // Highlight Port
 
         try {
             const dbCheck = await db.execute(sql`SELECT 1`);
@@ -38,9 +38,9 @@ export async function GET(req: NextRequest) {
         } catch (dbErr: any) {
             result.database_connection = `FAILED: ${dbErr.message}`;
             result.db_diagnostics = {
-                redacted_url: redactedUrl,
-                error_stack: dbErr.stack?.substring(0, 200),
-                hint: "Ensure port is 6543 and sslmode=require is appended."
+                endpoint_verification: redactedUrl,
+                error_summary: dbErr.message,
+                hint: "Your port MUST be 6543 for Vercel production."
             };
         }
 
