@@ -104,8 +104,9 @@ export function MarketDataProvider({ children }: { children: ReactNode }) {
 
         const socket = io(SOCKET_URL, {
             auth: { token },
-            reconnectionAttempts: 10,
-            reconnectionDelay: 5000,
+            reconnectionAttempts: 20,
+            reconnectionDelay: 2000,
+            transports: ['websocket'], // Force websocket for lower latency
         });
 
         socketRef.current = socket;
@@ -114,7 +115,8 @@ export function MarketDataProvider({ children }: { children: ReactNode }) {
         socket.on('connect', () => {
             console.log(`[MarketData] Socket Connected: ${SOCKET_URL}`);
             setConnectionStatus('connected');
-            socket.emit('start-stream', { mode });
+            // Request actual mode immediately on connect
+            socket.emit('start-stream', { mode: modeRef.current });
         });
 
         socket.on('market-data', (data: any[]) => {
@@ -162,6 +164,16 @@ export function MarketDataProvider({ children }: { children: ReactNode }) {
             socket.disconnect();
             socketRef.current = null;
         };
+    }, []); // Empty dependency array: Socket lives for the life of the App
+
+    // Handle Mode Changes without dropping the socket
+    const modeRef = useRef(mode);
+    useEffect(() => {
+        modeRef.current = mode;
+        if (socketRef.current?.connected) {
+            console.log(`[MarketData] Swapping stream mode to: ${mode}`);
+            socketRef.current.emit('start-stream', { mode });
+        }
     }, [mode]);
 
     return (

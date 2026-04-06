@@ -608,7 +608,7 @@ io.on('connection', (socket) => {
                     getMarketTickers(currentSession.cst, currentSession.xSecurityToken, epics, isDemo, currentSession.serverUrl)
                 ]) as [any, any, any];
 
-                // 1. Unified Market Data Emission
+                // 1. Unified Market Data Emission (matching UI field names)
                 if (marketData?.marketDetails) {
                     const formattedMarket = marketData.marketDetails.map((detail: any) => ({
                         epic: detail.instrument.epic,
@@ -616,28 +616,28 @@ io.on('connection', (socket) => {
                         offer: detail.snapshot.offer,
                         high: detail.snapshot.high,
                         low: detail.snapshot.low,
-                        changePct: detail.snapshot.percentageChange,
-                        status: detail.snapshot.marketStatus,
+                        netChange: detail.snapshot.netChange,
+                        percentageChange: detail.snapshot.percentageChange
                     }));
                     socket.emit('market-data', formattedMarket);
                 }
 
-                // 2. Unified Account Data Emission (Frontend expects 'account-data')
+                // 2. Separate Balance & Positions (as expected by Frontend listeners)
                 if (accountsData?.accounts) {
                     const activeAccount = accountsData.accounts.find((a: any) => a.accountId === currentSession.activeAccountId) || accountsData.accounts[0];
                     if (activeAccount) {
-                        const stats = {
-                            balance: activeAccount.balance.balance,
-                            equity: activeAccount.balance.equity,
-                            pnl: activeAccount.balance.pnl,
-                            margin: activeAccount.balance.deposit,
-                            available: activeAccount.balance.available,
-                        };
-                        socket.emit('account-data', { 
-                            stats, 
-                            positions: positionsData?.positions || [] 
+                        socket.emit('balance', {
+                            ...activeAccount.balance,
+                            profitLoss: activeAccount.balance.pnl, // Sync for UI 'parseBalance'
+                            isDemo,
+                            accountId: activeAccount.accountId,
+                            accountName: activeAccount.accountName,
                         });
                     }
+                }
+
+                if (positionsData?.positions) {
+                    socket.emit('positions', positionsData.positions);
                 }
 
             } catch (error: any) {
@@ -649,9 +649,9 @@ io.on('connection', (socket) => {
             }
         };
 
-        // Poll immediately, then every 2 seconds
+        // Complete Real-Time: 1s heartbeat
         await pollData();
-        const timer = setInterval(pollData, 2000);
+        const timer = setInterval(pollData, 1000);
         activePolls.set(socket.id, timer);
     });
 

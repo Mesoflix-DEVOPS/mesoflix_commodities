@@ -20,9 +20,13 @@ export async function authedFetch(
     try {
         const RENDER_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001';
         
-        // Institutional Bridge: Automatically re-target all /api calls to the stable Render Brain
+        // Institutional Bridge: Redirect core auth and data calls to Render
+        // BUT: Keep Charts and Sentiment on the frontend (Vercel) to avoid 404s
         let finalUrl = url;
-        if (url.startsWith('/api') && !url.includes('://')) {
+        const stayOnFrontend = ['/api/chart', '/api/sentiment'];
+        const isFrontendBoundary = stayOnFrontend.some(path => url.startsWith(path));
+
+        if (url.startsWith('/api') && !url.includes('://') && !isFrontendBoundary) {
             finalUrl = `${RENDER_URL}${url}`;
         }
 
