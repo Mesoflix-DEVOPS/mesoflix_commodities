@@ -153,7 +153,28 @@ app.post('/api/auth/register', async (req, res) => {
         res.json({ success: true, userId: newUser.id });
     } catch (err: any) {
         console.error("Registration Bridge Error:", err.message);
-        res.status(500).json({ error: "Registration Bridge Failure" });
+        res.status(500).json({ error: `Registration Bridge Failure: ${err.message}` });
+    }
+});
+
+// 5. Human Onboarding Concierge (Meet Requests)
+app.post('/api/onboarding/request-session', async (req, res) => {
+    try {
+        const { email, preferredTime, phone } = req.body;
+        
+        await db.insert(tickets).values({
+            email: email || "pending@onboarding.user",
+            subject: "Onboarding Session Requested (Google Meet)",
+            description: `User requested a live Google Meet walkthrough. \nPreferred Time: ${preferredTime || 'ASAP'} \nPhone: ${phone || 'Not provided'}`,
+            category: 'ONBOARDING',
+            onboarding_status: 'REQUESTED',
+            created_at: new Date()
+        });
+
+        res.json({ success: true, message: "Handshake Successful. Our Brokerage Desk will reach out via Google Meet shortly." });
+    } catch (err: any) {
+        console.error("Concierge Error:", err.message);
+        res.status(500).json({ error: `Concierge Bridge Failure: ${err.message}` });
     }
 });
 

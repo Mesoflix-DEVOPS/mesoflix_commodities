@@ -10,35 +10,36 @@ if (!process.env.DATABASE_URL) {
     throw new Error('DATABASE_URL is not defined in server/db.ts');
 }
 
-if (!process.env.DATABASE_URL) {
-    throw new Error('DATABASE_URL is not defined in server/db.ts');
-}
-
-// Institutional-grade Self-Healing Logic: 
-// Automatically patch the connection string for Render + Supabase production scaling.
+// Institutional-grade Supabase Connection Patching
 let connectionString = process.env.DATABASE_URL;
-if (connectionString.includes('supabase.co:5432')) {
-    console.info('[DB Patch] Backend upgrading to high-performance Port 6543');
+
+// Force Port 6543 (Transaction Pooler) if using Supabase
+if (connectionString.includes('supabase.co')) {
     connectionString = connectionString.replace(':5432', ':6543');
-    
-    // Ensure mandatory SSL and Pooling parameters are present
     if (!connectionString.includes('sslmode=')) {
         connectionString += (connectionString.includes('?') ? '&' : '?') + 'sslmode=require';
     }
-    if (!connectionString.includes('pgbouncer=')) {
-        connectionString += (connectionString.includes('?') ? '&' : '?') + 'pgbouncer=true';
-    }
 }
 
-// Independent Postgres pool for the standalone server
 const pool = new Pool({
     connectionString,
-    max: 15,
+    ssl: { rejectUnauthorized: false },
+    max: 10,
     idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 10000,
-    ssl: {
-        rejectUnauthorized: false
-    }
+    connectionTimeoutMillis: 5000,
 });
 
 export const db = drizzle(pool, { schema });
+
+// Startup Connection Heartbeat (The "HOPE" Log)
+(async () => {
+    try {
+        const client = await pool.connect();
+        await client.query('SELECT 1');
+        client.release();
+        console.info('\x1b[32m%s\x1b[0m', '🚀 INSTITUTIONAL DATABASE CONNECTED (Render -> Supabase Stable)');
+    } catch (err: any) {
+        console.error('\x1b[31m%s\x1b[0m', '❌ DATABASE CONNECTION FAILED:', err.message);
+        console.info('HINT: Check if DATABASE_URL in Render has exactly :6543 and sslmode=require');
+    }
+})();
