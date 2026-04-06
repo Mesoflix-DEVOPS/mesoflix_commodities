@@ -31,7 +31,7 @@ import { eq, sql } from 'drizzle-orm';
 
 // --- INSTITUTIONAL BRIDGE ROUTES ---
 
-// 1. AI Chat Bridge (Bypasses Vercel Networking)
+// 1. AI Chat Bridge (Bypasses Vercel Networking with Auto-Failover)
 app.post('/api/onboarding/chat', async (req, res) => {
     try {
         const { message, history } = req.body;
@@ -41,17 +41,7 @@ app.post('/api/onboarding/chat', async (req, res) => {
             return res.json({ message: "Institutional AI Offline (Missing Key)." });
         }
 
-        const systemPrompt = `You are the Mesoflix Institutional Onboarding Engine. Your goal is to onboard new users through a conversational interface instead of a form.
-
-    **PROTOCOL OVERVIEW:**
-    1. **Capital Check**: Ask if they have a Capital.com account. If NO, share the link: https://go.capital.com/visit/?bta=44529&brand=capital. Tell them to return when done.
-    2. **Identity**: Collect Full Name and Email. 
-       - **MANDATORY**: After getting the email, you MUST output a JSON action to check if the user exists: \`ACTION: CHECK_USER(email)\`.
-    3. **API Setup**: Provide instructions for creating an API Key and API Password in Capital.com Settings > API Integration.
-    4. **Credential Collection**: Collect the API Key and API Password.
-    5. **Finalization**: Once you have Email, Name, API Key, and API Password, output the final action: \`ACTION: COMPLETE_REGISTRATION(email, name, apiKey, apiPassword)\`.
-
-    **TONE:** Institutional, elite, and high-end.`;
+        const systemPrompt = `You are the Mesoflix Institutional Onboarding Engine. Onboard users by collecting Full Name, Email, API Key, and API Password for their Capital.com brokerage account. Be elite and professional.`;
 
         const chatContents = (history || []).map((item: any) => ({
             role: item.role === 'user' ? 'user' : 'model',
@@ -59,34 +49,43 @@ app.post('/api/onboarding/chat', async (req, res) => {
         }));
 
         const payload = {
-            system_instruction: {
-                parts: [{ text: systemPrompt }]
-            },
-            contents: [
-                ...chatContents,
-                { role: "user", parts: [{ text: message }] }
-            ],
+            system_instruction: { parts: [{ text: systemPrompt }] },
+            contents: [...chatContents, { role: "user", parts: [{ text: message }] }],
             generationConfig: { temperature: 0.7, maxOutputTokens: 1024 }
         };
 
-        const aiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${API_KEY}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
+        // Resilient Tiering: Try 2.0 First, Failover to 1.5
+        const tryAI = async (version: string, model: string) => {
+            const fetchBody = version === 'v1' ? { 
+                contents: [{ role: "user", parts: [{ text: `SYSTEM: ${systemPrompt}\n\nUSER: ${message}` }] }, ...chatContents] 
+            } : payload;
 
-        const data: any = await aiRes.json();
+            return await fetch(`https://generativelanguage.googleapis.com/${version}/models/${model}:generateContent?key=${API_KEY}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(fetchBody)
+            });
+        };
+
+        let aiRes = await tryAI('v1beta', 'gemini-2.0-flash');
+        let data: any = await aiRes.json();
+
+        // If Quota Exceeded (429) or Service Overloaded (503), switch to High-Quota 1.5
+        if (aiRes.status === 429 || aiRes.status === 503 || data.error?.code === 429) {
+            console.warn("[Bridge AI] Primary Tier Throttled. Falling back to High-Quota 1.5...");
+            aiRes = await tryAI('v1', 'gemini-1.5-flash');
+            data = await aiRes.json();
+        }
         
         if (data.error) {
             console.error("Gemini API Error:", data.error);
-            return res.json({ message: `AI Link Error: ${data.error.message || 'Unknown Protocol Failure'}` });
+            return res.json({ message: `Institutional AI is currently in high-demand. Please use our standard portal or retry in 60 seconds. [Error: ${data.error.message}]` });
         }
 
         const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
         
         if (!text) {
-            console.warn("Gemini Safety Block or Empty Response:", data);
-            return res.json({ message: "Institutional AI is currently calibrating its safety protocols. Please try rephrasing your request." });
+            return res.json({ message: "Institutional AI is currently calibrating. Please retry your message." });
         }
         
         res.json({ message: text });
