@@ -6,12 +6,27 @@ if (!process.env.DATABASE_URL) {
     throw new Error('DATABASE_URL is not defined');
 }
 
-// Institutional-grade Postgres connection pool for high-concurrency trading
+// Institutional-grade Self-Healing Logic: 
+// Automatically patch the connection string for Vercel + Supabase production scaling.
+let connectionString = process.env.DATABASE_URL;
+if (connectionString.includes('supabase.co:5432')) {
+    console.info('[DB Patch] Upgrading to high-performance Port 6543 for Supabase Pooling');
+    connectionString = connectionString.replace(':5432', ':6543');
+    
+    // Ensure mandatory SSL and Pooling parameters are present
+    if (!connectionString.includes('sslmode=')) {
+        connectionString += (connectionString.includes('?') ? '&' : '?') + 'sslmode=require';
+    }
+    if (!connectionString.includes('pgbouncer=')) {
+        connectionString += (connectionString.includes('?') ? '&' : '?') + 'pgbouncer=true';
+    }
+}
+
 const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
+    connectionString,
     max: 20,
     idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 5000,
+    connectionTimeoutMillis: 8000,
     ssl: {
         rejectUnauthorized: false
     }
