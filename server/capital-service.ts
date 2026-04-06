@@ -1,8 +1,6 @@
-import { db } from './db';
-import { capitalAccounts, users } from './schema';
+import { supabase } from './supabase';
 import { decrypt } from './crypto';
-import { createSession, switchActiveAccount, getAccounts } from './capital';
-import { eq } from 'drizzle-orm';
+import { createSession, switchActiveAccount } from './capital';
 
 const LIVE_API = 'https://api-capital.backend-capital.com/api/v1';
 const DEMO_API = 'https://demo-api-capital.backend-capital.com/api/v1';
@@ -21,10 +19,11 @@ export interface SessionTokens {
 
 export async function getValidSession(userId: string, forceDemo?: boolean): Promise<SessionTokens | null> {
     try {
-        const [account] = await db.select()
-            .from(capitalAccounts)
-            .where(eq(capitalAccounts.user_id, userId))
-            .limit(1);
+        const { data: account, error } = await supabase
+            .from('capital_accounts')
+            .select('*')
+            .eq('user_id', userId)
+            .single();
 
         if (!account) return null;
 

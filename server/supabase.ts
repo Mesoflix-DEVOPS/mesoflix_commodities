@@ -19,3 +19,14 @@ export const supabase = createClient(supabaseUrl || '', supabaseServiceKey || ''
         persistSession: false
     }
 });
+
+// Startup Handshake (Verification Log)
+(async () => {
+    try {
+        const { data, error } = await supabase.from('users').select('id').limit(1);
+        if (error) throw error;
+        console.info('\x1b[32m%s\x1b[0m', '🚀 SUPABASE SDK CONNECTED (Port 443 Stable)');
+    } catch (err: any) {
+        console.error('\x1b[31m%s\x1b[0m', '❌ SUPABASE SDK OFFLINE:', err.message);
+    }
+})();

@@ -27,14 +27,5 @@ const pool = new Pool({
 
 export const db = drizzle(pool, { schema });
 
-// Standard Startup Check
-(async () => {
-    try {
-        const client = await pool.connect();
-        await client.query('SELECT 1');
-        client.release();
-        console.info('\x1b[32m%s\x1b[0m', '🚀 DATABASE CONNECTED SUCCESSFULLY');
-    } catch (err: any) {
-        console.error('\x1b[31m%s\x1b[0m', '❌ DATABASE CONNECTION ERROR:', err.message);
-    }
-})();
+// Legacy TCP pooled connection is deprecated for the Render bridge
+// Standard startup check removed to eliminate 'ENETUNREACH' noise
