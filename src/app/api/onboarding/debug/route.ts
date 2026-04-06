@@ -1,22 +1,43 @@
 import { NextRequest, NextResponse } from "next/server";
+import { db } from "@/lib/db";
+import { users } from "@/lib/db/schema";
+import { sql } from "drizzle-orm";
 
 export async function GET(req: NextRequest) {
     try {
         const API_KEY = process.env.GEMINI_API_KEY;
+        const result: any = {
+            ai_handshake: "PENDING",
+            database_connection: "PENDING",
+            available_models: [],
+            environment: process.env.NODE_ENV
+        };
 
         if (!API_KEY) {
-            return NextResponse.json({ error: "No API Key found in Environment Variables." });
+            result.ai_handshake = "FAILED: Missing API Key";
+        } else {
+            // AI Handshake Check
+            const aiResponse = await fetch(`https://generativelanguage.googleapis.com/v1/models?key=${API_KEY}`);
+            const aiData = await aiResponse.json();
+            if (aiResponse.ok) {
+                result.ai_handshake = "SUCCESS";
+                result.available_models = aiData.models?.map((m: any) => m.name) || [];
+            } else {
+                result.ai_handshake = `FAILED: ${JSON.stringify(aiData.error || aiData)}`;
+            }
         }
 
-        // Discovery call to list all models available to this specific key
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1/models?key=${API_KEY}`);
-        const data = await response.json();
+        // Database Health Check
+        try {
+            await db.execute(sql`SELECT 1`);
+            result.database_connection = "SUCCESS (Supabase is Online)";
+        } catch (dbErr: any) {
+            result.database_connection = `FAILED: ${dbErr.message}`;
+        }
 
         return NextResponse.json({
-            status: response.status,
-            available_models: data.models?.map((m: any) => m.name) || [],
-            raw_error: data.error || null,
-            message: "Diagnostic tool active. Use this to verify your API Key handshake."
+            ...result,
+            message: "System Health Audit Complete. Share these results with Antigravity to finalize stabilization."
         });
 
     } catch (error: any) {
