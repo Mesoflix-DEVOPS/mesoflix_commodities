@@ -62,7 +62,7 @@ io.on('connection', (socket) => {
                 // Use the same logic as the SSE stream but emit via Socket.io
                 const currentSession = await getValidSession(userId, isDemo);
 
-                const [accountsData, positionsData, marketData] = await Promise.all([
+                const [accountsData, positionsData, marketData]: [any, any, any] = await Promise.all([
                     getAccounts(currentSession.cst, currentSession.xSecurityToken, isDemo, currentSession.serverUrl),
                     getPositions(currentSession.cst, currentSession.xSecurityToken, isDemo, currentSession.serverUrl),
                     getMarketTickers(currentSession.cst, currentSession.xSecurityToken, epics, isDemo, currentSession.serverUrl)
