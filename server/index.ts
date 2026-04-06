@@ -59,9 +59,12 @@ app.post('/api/onboarding/chat', async (req, res) => {
         }));
 
         const payload = {
+            system_instruction: {
+                parts: [{ text: systemPrompt }]
+            },
             contents: [
-                { role: "user", parts: [{ text: `SYSTEM: ${systemPrompt}\n\nUSER: ${message}` }] },
-                ...chatContents
+                ...chatContents,
+                { role: "user", parts: [{ text: message }] }
             ],
             generationConfig: { temperature: 0.7, maxOutputTokens: 1024 }
         };
@@ -73,7 +76,18 @@ app.post('/api/onboarding/chat', async (req, res) => {
         });
 
         const data: any = await aiRes.json();
-        const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "Protocol Timeout.";
+        
+        if (data.error) {
+            console.error("Gemini API Error:", data.error);
+            return res.json({ message: `AI Link Error: ${data.error.message || 'Unknown Protocol Failure'}` });
+        }
+
+        const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        
+        if (!text) {
+            console.warn("Gemini Safety Block or Empty Response:", data);
+            return res.json({ message: "Institutional AI is currently calibrating its safety protocols. Please try rephrasing your request." });
+        }
         
         res.json({ message: text });
     } catch (err: any) {
