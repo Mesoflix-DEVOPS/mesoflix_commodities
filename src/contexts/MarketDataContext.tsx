@@ -140,9 +140,9 @@ export function MarketDataProvider({ children }: { children: ReactNode }) {
         socket.on('balance', (data: any) => {
             const balanceObj = parseBalance(data);
             if (data.isDemo) {
-                setDemoBalance(prev => (isNonZero(balanceObj) || !isNonZero(prev)) ? balanceObj : prev);
+                setDemoBalance(balanceObj);
             } else {
-                setRealBalance(prev => (isNonZero(balanceObj) || !isNonZero(prev)) ? balanceObj : prev);
+                setRealBalance(balanceObj);
             }
         });
 

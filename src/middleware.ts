@@ -7,7 +7,7 @@ const PROTECTED_ROUTES = ['/dashboard'];
 const PUBLIC_ROUTES = ['/login', '/register', '/api/auth/login', '/api/auth/register', '/api/auth/refresh'];
 
 export async function middleware(request: NextRequest) {
-    const isMaintenanceMode = true; 
+    const isMaintenanceMode = false; 
     const BYPASS_KEY = 'mesoflix-dev';
 
     try {
