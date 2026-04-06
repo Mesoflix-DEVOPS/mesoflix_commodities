@@ -33,7 +33,9 @@ export default function ManualOnboardingForm() {
             if (!res.ok) throw new Error(data.error || "Registration Link Failed");
 
             setSuccess(true);
-            setTimeout(() => window.location.href = "/dashboard", 2000);
+            setTimeout(() => {
+                window.location.href = "/login?mode=login&registered=true";
+            }, 2000);
         } catch (err: any) {
             setError(err.message);
         } finally {

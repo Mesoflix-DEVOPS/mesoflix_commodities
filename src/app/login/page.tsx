@@ -27,10 +27,17 @@ function AuthPageForm() {
     const [isLogin, setIsLogin] = useState(true);
     const [showAI, setShowAI] = useState(false);
     const [showConcierge, setShowConcierge] = useState(false);
+    const [registrationSuccess, setRegistrationSuccess] = useState(false);
 
-    // Sync isLogin with mode param
+    // Sync isLogin with mode param and check for registration success
     useEffect(() => {
         const mode = searchParams.get("mode");
+        const registered = searchParams.get("registered");
+
+        if (registered === "true") {
+            setRegistrationSuccess(true);
+        }
+
         if (mode === "register") {
             setIsLogin(false);
         } else if (mode === "login") {
@@ -144,6 +151,13 @@ function AuthPageForm() {
                         <div className="mb-8 animate-in fade-in duration-500">
                             <h1 className="text-2xl font-bold text-white mb-2">Welcome Back</h1>
                             <p className="text-gray-400 text-sm">Enter your credentials to access your dashboard</p>
+                            
+                            {registrationSuccess && (
+                                <div className="mt-4 bg-teal/10 border border-teal/20 text-teal p-3 rounded-xl flex items-center gap-2 text-sm animate-in zoom-in-95 duration-500">
+                                    <Sparkles size={18} className="shrink-0" />
+                                    <span>Registration successful! Please sign in with your API password.</span>
+                                </div>
+                            )}
                         </div>
                     )}
 

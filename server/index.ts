@@ -342,12 +342,20 @@ app.get('/api/auth/me', authGuard, async (req: any, res) => {
             .eq('id', userId)
             .single();
 
-        if (error || !user) throw new Error("User not found");
+        if (error) {
+            console.error(`[Identity Bridge] Supabase Error for ${userId}:`, error.message);
+            return res.status(500).json({ error: "Identity Database Unavailable" });
+        }
+
+        if (!user) {
+            console.warn(`[Identity Bridge] User ${userId} not found in database.`);
+            return res.status(401).json({ error: "Session Expired or User Removed" });
+        }
 
         res.json({ user: { id: user.id, email: user.email, fullName: user.full_name, role: user.role } });
     } catch (err: any) {
-        console.error("Identity Bridge Failed:", err.message);
-        res.status(500).json({ error: "Identity Link Offline" });
+        console.error("[Identity Bridge] Critical Failure:", err.message);
+        res.status(500).json({ error: "Identity Bridge Link Offline" });
     }
 });
 
