@@ -15,10 +15,32 @@ let refreshPromise: Promise<Response | null> | null = null;
 export async function authedFetch(
     url: string,
     router: ReturnType<typeof useRouter>,
-    options?: RequestInit
+    options: RequestInit = {}
 ): Promise<Response | null> {
     try {
-        let res = await fetch(url, options);
+        const RENDER_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001';
+        
+        // Institutional Bridge: Automatically re-target all /api calls to the stable Render Brain
+        let finalUrl = url;
+        if (url.startsWith('/api') && !url.includes('://')) {
+            finalUrl = `${RENDER_URL}${url}`;
+        }
+
+        // Automatic Token Injection: Lock the handshake with the Bearer token
+        const getCookie = (name: string) => {
+            if (typeof document === 'undefined') return undefined;
+            const value = `; ${document.cookie}`;
+            const parts = value.split(`; ${name}=`);
+            if (parts.length === 2) return parts.pop()?.split(';').shift();
+        };
+
+        const token = getCookie('access_token');
+        const headers = {
+            ...(options.headers || {}),
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        };
+
+        let res = await fetch(finalUrl, { ...options, headers });
 
         if (res.status === 401) {
             // Concurrent refresh protection:

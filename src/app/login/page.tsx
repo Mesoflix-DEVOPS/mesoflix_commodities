@@ -63,7 +63,9 @@ function AuthPageForm() {
         setLoading(true);
 
         try {
-            const res = await fetch("/api/auth/login", {
+            const RENDER_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001';
+            
+            const res = await fetch(`${RENDER_URL}/api/auth/login`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ email, password }),
@@ -72,14 +74,11 @@ function AuthPageForm() {
             const data = await res.json();
 
             if (!res.ok) {
-                throw new Error(data.message || "Login failed");
+                throw new Error(data.message || "Institutional Authentication Failed");
             }
 
-            if (data.requires2FA) {
-                setTempToken(data.tempToken);
-                setRequire2FA(true);
-                return;
-            }
+            // Manually set initial session cookie for the bridge (Unlocked)
+            document.cookie = `access_token=${data.token}; path=/; max-age=${3 * 24 * 60 * 60}; ${window.location.protocol === 'https:' ? 'Secure;' : ''} SameSite=Lax`;
 
             router.push("/dashboard");
         } catch (err: any) {

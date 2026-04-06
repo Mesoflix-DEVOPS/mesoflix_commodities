@@ -35,6 +35,8 @@ import {
     Legend
 } from 'recharts';
 import { Suspense } from "react";
+import { useRouter } from "next/navigation";
+import { authedFetch } from "@/lib/fetch-utils";
 import { useMarketData } from "@/contexts/MarketDataContext";
 
 // ---------------------------------------------------------------------------
@@ -45,6 +47,7 @@ import { useMarketData } from "@/contexts/MarketDataContext";
 // ---------------------------------------------------------------------------
 
 function DashboardPageInner() {
+    const router = useRouter();
     const { mode, balanceData, positions: livePositions } = useMarketData();
     const [loading, setLoading] = useState(true);
     const [data, setData] = useState<any>(null);
@@ -58,33 +61,18 @@ function DashboardPageInner() {
     const fetchData = useCallback((isSilent = false) => {
         if (!isSilent) setLoading(true);
         
-        // Institutional Bridge: Fetch directly from the stable Render Backend (Port 443)
-        const RENDER_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001';
-        
-        const getCookie = (name: string) => {
-            const value = `; ${document.cookie}`;
-            const parts = value.split(`; ${name}=`);
-            if (parts.length === 2) return parts.pop()?.split(';').shift();
-        };
-
-        const token = getCookie('access_token');
-
-        fetch(`${RENDER_URL}/api/dashboard?mode=${mode}`, {
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
-        })
+        authedFetch(`/api/dashboard?mode=${mode}`, router)
             .then(async (res) => {
-                if (res.ok) {
+                if (res && res.ok) {
                     const jsonData = await res.json();
                     setData(jsonData);
                 }
             })
-            .catch((err) => console.error('[Dashboard Bridge] Fetch error:', err))
+            .catch((err: any) => console.error('[Dashboard Bridge] Fetch error:', err))
             .finally(() => {
                 if (!isSilent) setLoading(false);
             });
-    }, [mode]);
+    }, [mode, router]);
 
     useEffect(() => {
         fetchData();
@@ -128,7 +116,7 @@ function DashboardPageInner() {
         if (!selectedTrade?.dealId) return;
         setClosingTrade(true);
         try {
-            const res = await fetch(`/api/trade?dealId=${selectedTrade.dealId}&mode=${mode}`, {
+            const res = await authedFetch(`/api/trade?dealId=${selectedTrade.dealId}&mode=${mode}`, router, {
                 method: 'DELETE',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -139,11 +127,11 @@ function DashboardPageInner() {
                     pnl: selectedTrade.upl,
                 })
             });
-            if (res.ok) {
+            if (res && res.ok) {
                 // Refresh data immediately
                 fetchData(true);
                 setSelectedTrade(null);
-            } else {
+            } else if (res) {
                 const err = await res.json();
                 alert(`Failed to close trade: ${err.error || 'Unknown error'}`);
             }
@@ -175,7 +163,7 @@ function DashboardPageInner() {
 
         for (const trade of tradesToClose) {
             try {
-                const res = await fetch(`/api/trade?dealId=${trade.dealId}&mode=${mode}`, {
+                const res = await authedFetch(`/api/trade?dealId=${trade.dealId}&mode=${mode}`, router, {
                     method: 'DELETE',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -186,8 +174,8 @@ function DashboardPageInner() {
                         pnl: trade.upl,
                     })
                 });
-                if (res.ok) successCount++;
-                else failCount++;
+                if (res && res.ok) successCount++;
+                else if (res) failCount++;
             } catch (e) {
                 failCount++;
             }
@@ -404,8 +392,8 @@ function DashboardPageInner() {
                         </div>
                     </div>
 
-                    <div className="h-[280px] min-h-[280px] w-full relative z-10 min-w-0">
-                        <ResponsiveContainer width="100%" height="100%" debounce={100}>
+                    <div className="h-[280px] w-full relative z-10 min-w-0">
+                        <ResponsiveContainer width="100%" height={280}>
                             <LineChart data={liveHistory.length > 0 ? liveHistory : [{ name: 'Now', equity: 0 }]}>
                                 <CartesianGrid strokeDasharray="3 3" stroke="#ffffff05" vertical={false} />
                                 <XAxis
@@ -619,8 +607,8 @@ function DashboardPageInner() {
                         <Shield size={14} /> Risk Analysis
                     </h3>
 
-                    <div className="flex-1 flex flex-col items-center justify-center p-2 bg-white/5 rounded-[2rem] relative min-h-[150px] min-w-0 overflow-hidden">
-                        <ResponsiveContainer width="100%" height={150} minWidth={1}>
+                    <div className="flex-1 flex flex-col items-center justify-center p-2 bg-white/5 rounded-[2rem] relative h-[150px] min-w-0 overflow-hidden">
+                        <ResponsiveContainer width="100%" height={150}>
                             <RePieChart>
                                 <Pie
                                     data={riskByAsset}
