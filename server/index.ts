@@ -4,8 +4,8 @@ import { Server } from 'socket.io';
 import * as jose from 'jose';
 import dotenv from 'dotenv';
 import cors from 'cors';
-import { getValidSession } from '../src/lib/capital-service';
-import { getAccounts, getPositions, getMarketTickers } from '../src/lib/capital';
+import { getValidSession } from './capital-service';
+import { getAccounts, getPositions, getMarketTickers } from './capital';
 
 // Load environment variables
 dotenv.config({ path: '../.env' });

@@ -1,0 +1,111 @@
+const LIVE_API_URL = 'https://api-capital.backend-capital.com/api/v1';
+const DEMO_API_URL = 'https://demo-api-capital.backend-capital.com/api/v1';
+
+const getApiUrl = (isDemo: boolean) => isDemo ? DEMO_API_URL : LIVE_API_URL;
+
+export const createSession = async (
+    identifier: string,
+    password: string,
+    apiKey: string,
+    isDemo: boolean = false
+): Promise<any> => {
+    const API_URL = getApiUrl(isDemo);
+    const response = await fetch(`${API_URL}/session`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CAP-API-KEY': apiKey,
+        },
+        body: JSON.stringify({ identifier, password, encryptedPassword: false }),
+    });
+
+    if (!response.ok) {
+        throw new Error(`Capital.com Session Failed: ${response.status}`);
+    }
+
+    const data = await response.json() as { accounts: any[], currentAccountId: string, [key: string]: any };
+    const cst = response.headers.get('CST');
+    const xSecurityToken = response.headers.get('X-SECURITY-TOKEN');
+
+    if (!cst || !xSecurityToken) {
+        throw new Error('Failed to retrieve session tokens');
+    }
+
+    return {
+        ...data,
+        cst,
+        xSecurityToken,
+        accounts: data.accounts || [],
+        currentAccountId: data.currentAccountId || '',
+    };
+};
+
+export const switchActiveAccount = async (
+    cst: string,
+    xSecurityToken: string,
+    accountId: string,
+    isDemo: boolean = false
+): Promise<void> => {
+    const API_URL = getApiUrl(isDemo);
+    const response = await fetch(`${API_URL}/session`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+            'CST': cst,
+            'X-SECURITY-TOKEN': xSecurityToken,
+        },
+        body: JSON.stringify({ accountId }),
+    });
+
+    if (!response.ok) {
+        throw new Error(`Capital.com Account Switch Failed: ${response.status}`);
+    }
+};
+
+export const getAccounts = async (cst: string, xSecurityToken: string, isDemo: boolean = false, apiUrl?: string) => {
+    const API_URL = apiUrl || getApiUrl(isDemo);
+    const response = await fetch(`${API_URL}/accounts`, {
+        headers: {
+            'X-SECURITY-TOKEN': xSecurityToken,
+            'CST': cst,
+        },
+    });
+
+    if (!response.ok) {
+        throw new Error(`Failed to fetch accounts: ${response.status}`);
+    }
+
+    return response.json();
+};
+
+export const getPositions = async (cst: string, xSecurityToken: string, isDemo: boolean = false, apiUrl?: string) => {
+    const API_URL = apiUrl || getApiUrl(isDemo);
+    const response = await fetch(`${API_URL}/positions`, {
+        headers: {
+            'X-SECURITY-TOKEN': xSecurityToken,
+            'CST': cst,
+        },
+    });
+
+    if (!response.ok) {
+        throw new Error(`Failed to fetch positions: ${response.status}`);
+    }
+
+    return response.json();
+};
+
+export const getMarketTickers = async (cst: string, xSecurityToken: string, epics: string[], isDemo: boolean = false, apiUrl?: string) => {
+    const API_URL = apiUrl || getApiUrl(isDemo);
+    const marketResponse = await fetch(`${API_URL}/markets?epics=${epics.join(',')}`, {
+        headers: {
+            'X-SECURITY-TOKEN': xSecurityToken,
+            'CST': cst,
+        },
+    });
+
+    if (!marketResponse.ok) {
+        throw new Error(`Failed to fetch market details: ${marketResponse.status}`);
+    }
+
+    return marketResponse.json();
+};
