@@ -35,7 +35,17 @@ export function AutomationProvider({ children }: { children: ReactNode }) {
     // Fetch initial state from database
     const fetchDeployments = useCallback(async () => {
         try {
-            const res = await fetch('/api/automation/deploy');
+            const RENDER_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001';
+            const getCookie = (name: string) => {
+                const value = `; ${document.cookie}`;
+                const parts = value.split(`; ${name}=`);
+                if (parts.length === 2) return parts.pop()?.split(';').shift();
+            };
+            const token = getCookie('access_token');
+
+            const res = await fetch(`${RENDER_URL}/api/automation/deploy`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
             if (res.ok) {
                 const data = await res.json();
                 const loadedEngines: Record<string, EngineDetails> = {};
@@ -74,7 +84,18 @@ export function AutomationProvider({ children }: { children: ReactNode }) {
                 // If there are running engines, trigger the API runner
                 const hasRunning = Object.values(engines).some(e => e.state === 'Running');
                 if (hasRunning) {
-                    await fetch('/api/automation/runner', { method: 'POST' });
+                    const RENDER_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001';
+                    const getCookie = (name: string) => {
+                        const value = `; ${document.cookie}`;
+                        const parts = value.split(`; ${name}=`);
+                        if (parts.length === 2) return parts.pop()?.split(';').shift();
+                    };
+                    const token = getCookie('access_token');
+
+                    await fetch(`${RENDER_URL}/api/automation/runner`, { 
+                        method: 'POST',
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
                 }
             } catch (e) {
                 console.error("Engine heartbeat failed:", e);
@@ -92,9 +113,20 @@ export function AutomationProvider({ children }: { children: ReactNode }) {
         }));
 
         // Persist DB
-        await fetch('/api/automation/deploy', {
+        const RENDER_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001';
+        const getCookie = (name: string) => {
+            const value = `; ${document.cookie}`;
+            const parts = value.split(`; ${name}=`);
+            if (parts.length === 2) return parts.pop()?.split(';').shift();
+        };
+        const token = getCookie('access_token');
+
+        await fetch(`${RENDER_URL}/api/automation/deploy`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
             body: JSON.stringify({
                 engine_id: engine.id,
                 commodity: engine.commodity,
@@ -118,9 +150,20 @@ export function AutomationProvider({ children }: { children: ReactNode }) {
             };
         });
 
-        await fetch('/api/automation/deploy', {
+        const RENDER_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001';
+        const getCookie = (name: string) => {
+            const value = `; ${document.cookie}`;
+            const parts = value.split(`; ${name}=`);
+            if (parts.length === 2) return parts.pop()?.split(';').shift();
+        };
+        const token = getCookie('access_token');
+
+        await fetch(`${RENDER_URL}/api/automation/deploy`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
             body: JSON.stringify({
                 engine_id: id,
                 action: 'update_state',

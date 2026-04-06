@@ -279,6 +279,115 @@ app.get('/api/notifications', authGuard, async (req: any, res) => {
     }
 });
 
+// 7. Identity Engine (Stabilized on Render)
+app.get('/api/auth/me', authGuard, async (req: any, res) => {
+    try {
+        const userId = req.userId;
+        const { data: user, error } = await supabase
+            .from('users')
+            .select('id, email, full_name, role')
+            .eq('id', userId)
+            .single();
+
+        if (error || !user) throw new Error("User not found");
+
+        res.json({ user: { id: user.id, email: user.email, fullName: user.full_name, role: user.role } });
+    } catch (err: any) {
+        console.error("Identity Bridge Failed:", err.message);
+        res.status(500).json({ error: "Identity Link Offline" });
+    }
+});
+
+// 8. Automation Registry (Stabilized on Render)
+app.get('/api/automation/deploy', authGuard, async (req: any, res) => {
+    try {
+        const userId = req.userId;
+        const { data: deps, error } = await supabase
+            .from('automation_deployments')
+            .select('*')
+            .eq('user_id', userId);
+
+        if (error) throw error;
+        res.json({ deployments: deps || [] });
+    } catch (err: any) {
+        console.error("Automation Registry Failed:", err.message);
+        res.status(500).json({ error: "Automation Registry Offline" });
+    }
+});
+
+app.post('/api/automation/deploy', authGuard, async (req: any, res) => {
+    try {
+        const userId = req.userId;
+        const body = req.body;
+        const { engine_id, action, status } = body;
+
+        if (action === "update_state") {
+            const { error } = await supabase
+                .from('automation_deployments')
+                .update({ status, updated_at: new Date() })
+                .eq('user_id', userId)
+                .eq('engine_id', engine_id);
+            if (error) throw error;
+            return res.json({ success: true });
+        }
+
+        // New Deploy or Upsert
+        const { data: existing } = await supabase
+            .from('automation_deployments')
+            .select('id')
+            .eq('user_id', userId)
+            .eq('engine_id', engine_id)
+            .single();
+
+        if (existing) {
+            const { error } = await supabase
+                .from('automation_deployments')
+                .update({
+                    allocated_capital: body.allocated_capital?.toString(),
+                    risk_multiplier: body.risk_multiplier?.toString(),
+                    stop_loss_cap: body.stop_loss_cap?.toString(),
+                    target_profit: body.target_profit?.toString(),
+                    daily_stop_loss: body.daily_stop_loss?.toString(),
+                    risk_level: body.risk_level,
+                    status: 'Running',
+                    mode: body.mode || 'demo',
+                    updated_at: new Date()
+                })
+                .eq('id', existing.id);
+            if (error) throw error;
+        } else {
+            const { error } = await supabase
+                .from('automation_deployments')
+                .insert({
+                    user_id: userId,
+                    engine_id,
+                    commodity: body.commodity,
+                    allocated_capital: body.allocated_capital?.toString(),
+                    risk_multiplier: body.risk_multiplier?.toString() || "1.0",
+                    stop_loss_cap: body.stop_loss_cap?.toString(),
+                    target_profit: body.target_profit?.toString(),
+                    daily_stop_loss: body.daily_stop_loss?.toString(),
+                    risk_level: body.risk_level || "Balanced",
+                    status: 'Running',
+                    mode: body.mode || 'demo'
+                });
+            if (error) throw error;
+        }
+
+        res.json({ success: true });
+    } catch (err: any) {
+        console.error("Automation Deploy Failed:", err.message);
+        res.status(500).json({ error: "Automation Deploy Failure" });
+    }
+});
+
+// 9. Heartbeat Runner (Stabilized on Render)
+app.post('/api/automation/runner', authGuard, async (req: any, res) => {
+    // This is a placeholder for the strategy evaluation logic 
+    // In a production global system, this would trigger the actual trading bot loops.
+    res.json({ success: true, message: "Heartbeat Acknowledged by Render" });
+});
+
 // Map to track active per-socket polling loops
 const activePolls = new Map<string, NodeJS.Timeout>();
 

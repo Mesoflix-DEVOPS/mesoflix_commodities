@@ -30,7 +30,18 @@ export default function TopNav({
     // Fetch Notifications
     const fetchNotifications = async () => {
         try {
-            const res = await fetch('/api/notifications');
+            const RENDER_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001';
+            const getCookie = (name: string) => {
+                const value = `; ${document.cookie}`;
+                const parts = value.split(`; ${name}=`);
+                if (parts.length === 2) return parts.pop()?.split(';').shift();
+            };
+            const token = getCookie('access_token');
+
+            const res = await fetch(`${RENDER_URL}/api/notifications`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
             if (res.ok) {
                 const data = await res.json();
                 setNotifications(data.notifications || []);
@@ -59,13 +70,24 @@ export default function TopNav({
 
     const markAsRead = async (id: string | null = null, markAll = false) => {
         try {
+            const RENDER_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001';
+            const getCookie = (name: string) => {
+                const value = `; ${document.cookie}`;
+                const parts = value.split(`; ${name}=`);
+                if (parts.length === 2) return parts.pop()?.split(';').shift();
+            };
+            const token = getCookie('access_token');
+
             const body: any = {};
             if (markAll) body.markAll = true;
             else if (id) body.ids = [id];
 
-            await fetch('/api/notifications', {
+            await fetch(`${RENDER_URL}/api/notifications`, {
                 method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
                 body: JSON.stringify(body)
             });
             fetchNotifications();

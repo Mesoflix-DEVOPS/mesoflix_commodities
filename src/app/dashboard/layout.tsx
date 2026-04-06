@@ -19,14 +19,24 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
     const router = useRouter();
 
     const fetchUserData = useCallback(async () => {
-        // Use a lightweight user endpoint — don't depend on Capital.com being up
+        // Institutional Bridge: Fetch profile from stable Render backend
         try {
-            const res = await authedFetch('/api/user', router);
+            const RENDER_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001';
+            const getCookie = (name: string) => {
+                const value = `; ${document.cookie}`;
+                const parts = value.split(`; ${name}=`);
+                if (parts.length === 2) return parts.pop()?.split(';').shift();
+            };
+            const token = getCookie('access_token');
+
+            const res = await fetch(`${RENDER_URL}/api/auth/me`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
             if (res && res.ok) {
                 const data = await res.json();
                 setUserData(data?.user);
             } else if (res && res.status === 401) {
-                // Secondary defense: if API says unauthorized, we're definitely logged out
                 router.push('/login?reason=unauthorized');
             }
         } catch (e) {
