@@ -28,11 +28,20 @@ export async function GET(req: NextRequest) {
         }
 
         // Database Health Check
+        const redactedUrl = (process.env.DATABASE_URL || "")
+            .replace(/:([^@]+)@/, ":****@") // Hide password
+            .replace(/\/\/([^:]+):/, "//****:"); // Hide user
+
         try {
-            await db.execute(sql`SELECT 1`);
+            const dbCheck = await db.execute(sql`SELECT 1`);
             result.database_connection = "SUCCESS (Supabase is Online)";
         } catch (dbErr: any) {
             result.database_connection = `FAILED: ${dbErr.message}`;
+            result.db_diagnostics = {
+                redacted_url: redactedUrl,
+                error_stack: dbErr.stack?.substring(0, 200),
+                hint: "Ensure port is 6543 and sslmode=require is appended."
+            };
         }
 
         return NextResponse.json({
