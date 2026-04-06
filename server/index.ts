@@ -69,7 +69,7 @@ app.post('/api/onboarding/chat', async (req, res) => {
             generationConfig: { temperature: 0.7, maxOutputTokens: 1024 }
         };
 
-        const aiRes = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${API_KEY}`, {
+        const aiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
