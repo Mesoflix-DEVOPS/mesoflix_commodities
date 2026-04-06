@@ -6,10 +6,8 @@ import dotenv from 'dotenv';
 import cors from 'cors';
 import { getValidSession } from './capital-service';
 import { getAccounts, getPositions, getMarketTickers } from './capital';
-import { db } from './db';
+import { supabase } from './supabase';
 import { sql } from 'drizzle-orm';
-import { users, capitalAccounts, tickets } from './schema';
-import { eq } from 'drizzle-orm';
 
 // Load environment variables
 dotenv.config({ path: '../.env' });
@@ -99,10 +97,16 @@ app.post('/api/onboarding/chat', async (req, res) => {
 app.post('/api/auth/check-user', async (req, res) => {
     try {
         const { email } = req.body;
-        const [existing] = await db.select().from(users).where(eq(users.email, email)).limit(1);
+        const { data: existing, error } = await supabase
+            .from('users')
+            .select('id')
+            .eq('email', email)
+            .single();
+            
         res.json({ exists: !!existing });
-    } catch (err) {
-        res.status(500).json({ error: "DB Bridge Failure" });
+    } catch (err: any) {
+        console.error("Check User Error:", err.message);
+        res.status(500).json({ error: "SDK Bridge Failure" });
     }
 });
 
@@ -111,19 +115,23 @@ app.post('/api/onboarding/request-session', async (req, res) => {
     try {
         const { email, preferredTime, phone } = req.body;
         
-        await db.insert(tickets).values({
-            email: email || "pending@onboarding.user",
-            subject: "Onboarding Session Requested (Google Meet)",
-            description: `User requested a live Google Meet walkthrough. \nPreferred Time: ${preferredTime || 'ASAP'} \nPhone: ${phone || 'Not provided'}`,
-            category: 'ONBOARDING',
-            onboarding_status: 'REQUESTED',
-            created_at: new Date()
-        });
+        const { error: ticketError } = await supabase
+            .from('tickets')
+            .insert({
+                email: email || "pending@onboarding.user",
+                subject: "Onboarding Session Requested (Google Meet)",
+                description: `User requested a live Google Meet walkthrough. \nPreferred Time: ${preferredTime || 'ASAP'} \nPhone: ${phone || 'Not provided'}`,
+                category: 'ONBOARDING',
+                onboarding_status: 'REQUESTED',
+                created_at: new Date()
+            });
+
+        if (ticketError) throw ticketError;
 
         res.json({ success: true, message: "Handshake Successful. Our Brokerage Desk will reach out via Google Meet shortly." });
     } catch (err: any) {
         console.error("Concierge Error:", err.message);
-        res.status(500).json({ error: "Concierge Bridge Failure" });
+        res.status(500).json({ error: `Concierge Bridge Failure: ${err.message}` });
     }
 });
 
@@ -133,22 +141,32 @@ app.post('/api/auth/register', async (req, res) => {
         const { email, fullName, apiKey, apiPassword, accountType } = req.body;
         
         // 1. Create User
-        const [newUser] = await db.insert(users).values({
-            email,
-            full_name: fullName,
-            role: 'user',
-            created_at: new Date()
-        }).returning();
+        const { data: newUser, error: userError } = await supabase
+            .from('users')
+            .insert({
+                email,
+                full_name: fullName,
+                role: 'user',
+                created_at: new Date()
+            })
+            .select()
+            .single();
 
-        // 2. Link Capital Credentials (Placeholder for encryption)
-        // In a real scenario, use the same encryption logic as the frontend
-        await db.insert(capitalAccounts).values({
-            user_id: newUser.id,
-            encrypted_api_key: apiKey, // Should be encrypted in production
-            encrypted_api_password: apiPassword,
-            account_type: accountType || 'demo',
-            is_active: true
-        });
+        if (userError) throw userError;
+
+        // 2. Link Capital Credentials
+        const { error: capitalError } = await supabase
+            .from('capital_accounts')
+            .insert({
+                user_id: newUser.id,
+                encrypted_api_key: apiKey,
+                encrypted_api_password: apiPassword,
+                account_type: accountType || 'demo',
+                is_active: true,
+                created_at: new Date()
+            });
+
+        if (capitalError) throw capitalError;
 
         res.json({ success: true, userId: newUser.id });
     } catch (err: any) {
@@ -157,26 +175,6 @@ app.post('/api/auth/register', async (req, res) => {
     }
 });
 
-// 5. Human Onboarding Concierge (Meet Requests)
-app.post('/api/onboarding/request-session', async (req, res) => {
-    try {
-        const { email, preferredTime, phone } = req.body;
-        
-        await db.insert(tickets).values({
-            email: email || "pending@onboarding.user",
-            subject: "Onboarding Session Requested (Google Meet)",
-            description: `User requested a live Google Meet walkthrough. \nPreferred Time: ${preferredTime || 'ASAP'} \nPhone: ${phone || 'Not provided'}`,
-            category: 'ONBOARDING',
-            onboarding_status: 'REQUESTED',
-            created_at: new Date()
-        });
-
-        res.json({ success: true, message: "Handshake Successful. Our Brokerage Desk will reach out via Google Meet shortly." });
-    } catch (err: any) {
-        console.error("Concierge Error:", err.message);
-        res.status(500).json({ error: `Concierge Bridge Failure: ${err.message}` });
-    }
-});
 
 const JWT_SECRET = new TextEncoder().encode(
     process.env.JWT_SECRET || 'fallback_secret_must_change_in_prod'
@@ -286,9 +284,10 @@ app.get('/api/bridge/health', async (req, res) => {
     };
 
     try {
-        // 1. Test Database
-        await db.execute(sql`SELECT 1`);
-        health.database_handshake = "SUCCESS (Render -> Supabase Stable)";
+        // 1. Test Database (Supabase SDK)
+        const { data, error } = await supabase.from('users').select('id').limit(1);
+        if (error) throw error;
+        health.database_handshake = "SUCCESS (Render SDK -> Supabase HTTPS Stable)";
     } catch (err: any) {
         health.database_handshake = `FAILED: ${err.message}`;
         health.status = "DEGRADED";

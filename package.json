@@ -13,6 +13,7 @@
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
     "@neondatabase/serverless": "^1.0.2",
+    "@supabase/supabase-js": "^2.101.1",
     "@types/pg": "^8.20.0",
     "@types/ws": "^8.18.1",
     "bcryptjs": "^2.4.3",
