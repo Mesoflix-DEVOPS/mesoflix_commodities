@@ -1,38 +1,17 @@
-import { drizzle } from 'drizzle-orm/node-postgres';
-import { Pool } from 'pg';
+import { drizzle } from 'drizzle-orm/neon-http';
+import { neon } from '@neondatabase/serverless';
 import * as schema from './schema';
 
 if (!process.env.DATABASE_URL) {
     throw new Error('DATABASE_URL is not defined');
 }
 
-// Institutional-grade Self-Healing Logic: 
-// Automatically patch the connection string for Vercel + Supabase production scaling.
-let connectionString = process.env.DATABASE_URL;
-if (connectionString.includes('supabase.co:5432')) {
-    console.info('[DB Patch] Upgrading to high-performance Port 6543 for Supabase Pooling');
-    connectionString = connectionString.replace(':5432', ':6543');
-    
-    // Ensure mandatory SSL and Pooling parameters are present
-    if (!connectionString.includes('sslmode=')) {
-        connectionString += (connectionString.includes('?') ? '&' : '?') + 'sslmode=require';
-    }
-    if (!connectionString.includes('pgbouncer=')) {
-        connectionString += (connectionString.includes('?') ? '&' : '?') + 'pgbouncer=true';
-    }
-}
+// Institutional-grade HTTPS Overpass: 
+// We use the Neon HTTP driver to communicate over Port 443. 
+// This bypasses all FIREWALL blocks on Port 5432 and 6543.
+const sqlConnection = neon(process.env.DATABASE_URL);
 
-const pool = new Pool({
-    connectionString,
-    max: 20,
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 8000,
-    ssl: {
-        rejectUnauthorized: false
-    }
-});
-
-export const db = drizzle(pool, { schema });
+export const db = drizzle(sqlConnection, { schema });
 
 /**
  * Helper to retry database operations on transient connection failures
@@ -44,14 +23,8 @@ export async function withRetry<T>(fn: () => Promise<T>, retries = 3, delay = 50
             return await fn();
         } catch (err: any) {
             lastError = err;
-            const msg = err.message?.toLowerCase() || '';
-            const isTransient = msg.includes('timeout') ||
-                msg.includes('fetch failed') ||
-                msg.includes('connection') ||
-                msg.includes('undici');
-
-            if (isTransient && i < retries - 1) {
-                console.warn(`[DB Retry] attempt ${i + 1} failed, retrying in ${delay * Math.pow(2, i)}ms...`);
+            console.warn(`[DB Retry] attempt ${i + 1} failed, retrying...`);
+            if (i < retries - 1) {
                 await new Promise(res => setTimeout(res, delay * Math.pow(2, i)));
                 continue;
             }
