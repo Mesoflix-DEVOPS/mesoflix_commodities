@@ -30,7 +30,16 @@ export async function getValidSession(userId: string, forceDemo?: boolean): Prom
         const isDemo = forceDemo !== undefined ? forceDemo : (account.account_type === 'demo');
         const apiKey = decrypt(account.encrypted_api_key);
         const apiPassword = decrypt(account.encrypted_api_password || '');
-        const identifier = account.capital_account_id || '';
+        // Self-Heal: Use the explicit ID if present, otherwise fallback to the user's Mesoflix email
+        let identifier = account.capital_account_id;
+        if (!identifier || identifier === '') {
+            const { data: userData } = await supabase
+                .from('users')
+                .select('email')
+                .eq('id', userId)
+                .single();
+            identifier = userData?.email || '';
+        }
 
         // Standard institutional session creation
         const session = await createSession(identifier, apiPassword, apiKey, isDemo);

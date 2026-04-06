@@ -160,11 +160,13 @@ app.post('/api/auth/register', async (req, res) => {
         if (userError) throw userError;
 
         // 2. Link Capital Credentials (Secured with Institutional Encryption)
+        // Create Capital Account with correct identifier mapping
         const { error: capitalError } = await supabase
             .from('capital_accounts')
             .insert({
                 user_id: newUser.id,
-                encrypted_api_key: encrypt(apiKey), //iv:tag:data
+                capital_account_id: email, // Critical: Map login identifier for brokerage
+                encrypted_api_key: encrypt(apiKey),
                 encrypted_api_password: encrypt(apiPassword),
                 account_type: accountType || 'demo',
                 is_active: true,
@@ -606,7 +608,7 @@ io.on('connection', (socket) => {
                     getMarketTickers(currentSession.cst, currentSession.xSecurityToken, epics, isDemo, currentSession.serverUrl)
                 ]) as [any, any, any];
 
-                // Emit Market Data
+                // 1. Unified Market Data Emission
                 if (marketData?.marketDetails) {
                     const formattedMarket = marketData.marketDetails.map((detail: any) => ({
                         epic: detail.instrument.epic,
@@ -614,26 +616,28 @@ io.on('connection', (socket) => {
                         offer: detail.snapshot.offer,
                         high: detail.snapshot.high,
                         low: detail.snapshot.low,
-                        netChange: detail.snapshot.netChange,
-                        percentageChange: detail.snapshot.percentageChange
+                        changePct: detail.snapshot.percentageChange,
+                        status: detail.snapshot.marketStatus,
                     }));
                     socket.emit('market-data', formattedMarket);
                 }
 
-                // Emit Balances
+                // 2. Unified Account Data Emission (Frontend expects 'account-data')
                 if (accountsData?.accounts) {
-                    const activeAccountDetails = accountsData.accounts.find((a: any) => a.accountId === currentSession.activeAccountId);
-                    if (activeAccountDetails) {
-                        socket.emit('balance', {
-                            balance: activeAccountDetails.balance,
-                            isDemo
+                    const activeAccount = accountsData.accounts.find((a: any) => a.accountId === currentSession.activeAccountId) || accountsData.accounts[0];
+                    if (activeAccount) {
+                        const stats = {
+                            balance: activeAccount.balance.balance,
+                            equity: activeAccount.balance.equity,
+                            pnl: activeAccount.balance.pnl,
+                            margin: activeAccount.balance.deposit,
+                            available: activeAccount.balance.available,
+                        };
+                        socket.emit('account-data', { 
+                            stats, 
+                            positions: positionsData?.positions || [] 
                         });
                     }
-                }
-
-                // Emit Positions
-                if (positionsData?.positions) {
-                    socket.emit('positions', positionsData.positions);
                 }
 
             } catch (error: any) {
