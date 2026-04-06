@@ -31,68 +31,11 @@ const io = new Server(httpServer, {
 
 // --- INSTITUTIONAL BRIDGE ROUTES ---
 
-// 1. AI Chat Bridge (Bypasses Vercel Networking with Auto-Failover)
+// 1. AI Chat Bridge (Placed in Maintenance Mode)
 app.post('/api/onboarding/chat', async (req, res) => {
-    try {
-        const { message, history } = req.body;
-        const API_KEY = process.env.GEMINI_API_KEY;
-
-        if (!API_KEY) {
-            return res.json({ message: "Institutional AI Offline (Missing Key)." });
-        }
-
-        const systemPrompt = `You are the Mesoflix Institutional Onboarding Engine. Onboard users by collecting Full Name, Email, API Key, and API Password for their Capital.com brokerage account. Be elite and professional.`;
-
-        const chatContents = (history || []).map((item: any) => ({
-            role: item.role === 'user' ? 'user' : 'model',
-            parts: [{ text: String(item.parts?.[0]?.text || item.text || '') }]
-        }));
-
-        const payload = {
-            system_instruction: { parts: [{ text: systemPrompt }] },
-            contents: [...chatContents, { role: "user", parts: [{ text: message }] }],
-            generationConfig: { temperature: 0.7, maxOutputTokens: 1024 }
-        };
-
-        // Resilient Tiering: Try 2.0 First, Failover to 1.5
-        const tryAI = async (version: string, model: string) => {
-            const fetchBody = version === 'v1' ? { 
-                contents: [{ role: "user", parts: [{ text: `SYSTEM: ${systemPrompt}\n\nUSER: ${message}` }] }, ...chatContents] 
-            } : payload;
-
-            return await fetch(`https://generativelanguage.googleapis.com/${version}/models/${model}:generateContent?key=${API_KEY}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(fetchBody)
-            });
-        };
-
-        let aiRes = await tryAI('v1beta', 'gemini-2.0-flash');
-        let data: any = await aiRes.json();
-
-        // If Quota Exceeded (429) or Service Overloaded (503), switch to High-Quota 2.0 Lite
-        if (aiRes.status === 429 || aiRes.status === 503 || data.error?.code === 429) {
-            console.warn("[Bridge AI] Primary Tier Throttled. Falling back to 2.0 Flash Lite...");
-            aiRes = await tryAI('v1beta', 'gemini-2.0-flash-lite');
-            data = await aiRes.json();
-        }
-        
-        if (data.error) {
-            console.error("Gemini API Error:", data.error);
-            return res.json({ message: `Institutional AI is currently in high-demand. Please use our standard portal or retry in 60 seconds. [Error: ${data.error.message}]` });
-        }
-
-        const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        
-        if (!text) {
-            return res.json({ message: "Institutional AI is currently calibrating. Please retry your message." });
-        }
-        
-        res.json({ message: text });
-    } catch (err: any) {
-        console.error("Bridge AI Error:", err.message);
-        res.status(500).json({ error: "Bridge Link Failed" });
-    }
+    return res.json({ 
+        message: "Mesoflix Institutional AI is currently undergoing optimization. Please connect with a live agent via the 'Capital Connection' portal or our direct support desk." 
+    });
 });
 
 // 2. Identity Verification Bridge
@@ -117,12 +60,12 @@ app.post('/api/onboarding/request-session', async (req, res) => {
     try {
         const { email, preferredTime, phone } = req.body;
         
+        // FIX: Schema cache mismatch - removed 'email' column attempt
         const { error: ticketError } = await supabase
             .from('tickets')
             .insert({
-                email: email || "pending@onboarding.user",
                 subject: "Onboarding Session Requested (Google Meet)",
-                description: `User requested a live Google Meet walkthrough. \nPreferred Time: ${preferredTime || 'ASAP'} \nPhone: ${phone || 'Not provided'}`,
+                description: `Lead Email: ${email || 'Not provided'} \nUser requested a live Google Meet walkthrough. \nPreferred Time: ${preferredTime || 'ASAP'} \nPhone: ${phone || 'Not provided'}`,
                 category: 'ONBOARDING',
                 onboarding_status: 'REQUESTED',
                 created_at: new Date()
