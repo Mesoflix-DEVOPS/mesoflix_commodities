@@ -109,8 +109,8 @@ export default function OnboardingBot({ ticketId, onClose }: { ticketId?: string
         body: JSON.stringify({
           message: userMsg,
           history: messages.map(m => ({
-            role: m.role,
-            parts: m.text
+            role: m.role as "user" | "model",
+            parts: [{ text: m.text }]
           }))
         })
       });
