@@ -27,7 +27,7 @@ const io = new Server(httpServer, {
 
 import { db } from './db';
 import { users, tickets, capitalAccounts } from './schema';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 
 // --- INSTITUTIONAL BRIDGE ROUTES ---
 
@@ -256,6 +256,47 @@ io.on('connection', (socket) => {
             activePolls.delete(socket.id);
         }
     });
+});
+
+// 5. Bridge Health Diagnostic (Verification Tool)
+app.get('/api/bridge/health', async (req, res) => {
+    const health: any = {
+        status: "OPERATIONAL",
+        ai_handshake: "PENDING",
+        database_handshake: "PENDING",
+        timestamp: new Date().toISOString()
+    };
+
+    try {
+        // 1. Test Database
+        await db.execute(sql`SELECT 1`);
+        health.database_handshake = "SUCCESS (Render -> Supabase Stable)";
+    } catch (err: any) {
+        health.database_handshake = `FAILED: ${err.message}`;
+        health.status = "DEGRADED";
+    }
+
+    try {
+        // 2. Test AI (Simple check)
+        const API_KEY = process.env.GEMINI_API_KEY;
+        const aiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${API_KEY}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: 'ping' }] }] })
+        });
+        if (aiRes.ok) {
+            health.ai_handshake = "SUCCESS (Render -> Gemini 2.0 Stable)";
+        } else {
+            const errData: any = await aiRes.json();
+            health.ai_handshake = `FAILED: ${errData.error?.message || 'API rejected'}`;
+            health.status = "DEGRADED";
+        }
+    } catch (err: any) {
+        health.ai_handshake = `FAILED: ${err.message}`;
+        health.status = "DEGRADED";
+    }
+
+    res.json(health);
 });
 
 const PORT = process.env.PORT || 3001;
