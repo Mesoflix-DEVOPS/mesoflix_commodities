@@ -15,7 +15,7 @@
     "@neondatabase/serverless": "^1.0.2",
     "@types/pg": "^8.20.0",
     "@types/ws": "^8.18.1",
-    "bcryptjs": "^3.0.3",
+    "bcryptjs": "^2.4.3",
     "clsx": "^2.1.1",
     "cors": "^2.8.5",
     "dotenv": "^17.3.1",
