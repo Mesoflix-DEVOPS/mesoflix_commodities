@@ -7,15 +7,27 @@ const PROTECTED_ROUTES = ['/dashboard'];
 const PUBLIC_ROUTES = ['/login', '/register', '/api/auth/login', '/api/auth/register', '/api/auth/refresh'];
 
 export async function middleware(request: NextRequest) {
-    const isMaintenanceMode = true; // Set to true to enable maintenance mode
+    const isMaintenanceMode = true; 
+    const BYPASS_KEY = 'mesoflix-dev';
 
     try {
-        const { pathname } = request.nextUrl;
+        const { pathname, searchParams } = request.nextUrl;
+        const bypassCookie = request.cookies.get('maintenance_bypass')?.value;
+        const hasBypassParam = searchParams.get('bypass') === BYPASS_KEY;
 
         // 0. MAINTENANCE GUARD
-        if (isMaintenanceMode && !pathname.startsWith('/maintenance') && !pathname.startsWith('/_next') && !pathname.startsWith('/api/support') && !pathname.includes('.')) {
+        const isBypassed = bypassCookie === BYPASS_KEY || hasBypassParam;
+
+        if (isMaintenanceMode && !isBypassed && !pathname.startsWith('/maintenance') && !pathname.startsWith('/_next') && !pathname.startsWith('/api/support') && !pathname.includes('.')) {
             const maintenanceUrl = new URL('/maintenance', request.url);
             return NextResponse.redirect(maintenanceUrl);
+        }
+
+        // If newly bypassed via param, set a cookie to persist it
+        if (isMaintenanceMode && hasBypassParam && !bypassCookie) {
+            const response = NextResponse.redirect(new URL(pathname, request.url));
+            response.cookies.set('maintenance_bypass', BYPASS_KEY, { maxAge: 60 * 60 * 24 }); // 24h
+            return response;
         }
 
         // 0. EXPLICIT GUARD: Never intercept static assets, chunks, or internal Next.js data
