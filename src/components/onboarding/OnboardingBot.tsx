@@ -11,15 +11,83 @@ interface Message {
 
 export default function OnboardingBot({ ticketId, onClose }: { ticketId?: string | null; onClose?: () => void }) {
   const [messages, setMessages] = useState<Message[]>([
-    { role: "model", text: "Welcome to the Mesoflix Institutional Terminal. I am your Onboarding AI. While we wait for a senior agent to Join your session, I can assist with any questions regarding Capital.com API configuration or commodity market fundamentals. How can I assist you today?" }
+    { role: "model", text: "Welcome to the Mesoflix Institutional Terminal. I am your Onboarding AI. Do you currently have an account with Capital.com?" }
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [inputType, setInputType] = useState<"text" | "password">("text");
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [obData, setObData] = useState({ name: '', email: '', apiKey: '', apiPassword: '' });
 
   useEffect(() => {
     scrollRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  const parseAction = async (text: string) => {
+    // 1. CHECK_USER(email)
+    const checkMatch = text.match(/ACTION: CHECK_USER\(([^)]+)\)/);
+    if (checkMatch) {
+      const email = checkMatch[1].trim();
+      try {
+        const res = await fetch(`/api/auth/check-user?email=${email}`);
+        const data = await res.json();
+        if (data.exists) {
+          setMessages(prev => [...prev, { role: "model", text: "Wait, our institutional database shows an existing account for this email. Please log in or provide a different brokerage email." }]);
+          return true;
+        }
+        setObData(prev => ({ ...prev, email }));
+      } catch { }
+    }
+
+    // 2. CREATE_SUPPORT_TICKET()
+    if (text.includes("ACTION: CREATE_SUPPORT_TICKET()")) {
+      try {
+        const res = await fetch("/api/support/tickets", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            subject: "Onboarding Assistance Required",
+            description: "User is having difficulty with the automated API linkage protocol.",
+            category: "ONBOARDING",
+            email: obData.email || "pending@onboarding.user"
+          })
+        });
+        const data = await res.json();
+        if (data.ticketId) {
+            setMessages(prev => [...prev, { role: "model", text: "I've escalated your session to our Senior Brokerage Desk. A mentorship link will appear shortly." }]);
+        }
+      } catch { }
+      return true;
+    }
+
+    // 3. COMPLETE_REGISTRATION(...)
+    const completeMatch = text.match(/ACTION: COMPLETE_REGISTRATION\(([^,]+),\s*([^,]+),\s*([^,]+),\s*([^)]+)\)/);
+    if (completeMatch) {
+        const [email, name, apiKey, apiPassword] = completeMatch.slice(1).map(s => s.trim());
+        setLoading(true);
+        try {
+            const res = await fetch("/api/auth/register", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email, fullName: name, apiKey, apiPassword, accountType: 'demo' })
+            });
+            if (res.ok) {
+                setMessages(prev => [...prev, { role: "model", text: "Authentication Successful. Initializing Terminal... Redirecting to Institutional Dashboard." }]);
+                setTimeout(() => window.location.href = "/dashboard", 2000);
+            } else {
+                const err = await res.json();
+                setMessages(prev => [...prev, { role: "model", text: `Protocol Error: ${err.message || 'Validation failed'}. Let's re-verify your API credentials.` }]);
+            }
+        } catch {
+            setMessages(prev => [...prev, { role: "model", text: "System Handshake Failed. Please verify your internet connectivity." }]);
+        } finally {
+            setLoading(false);
+        }
+        return true;
+    }
+
+    return false;
+  };
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,14 +98,9 @@ export default function OnboardingBot({ ticketId, onClose }: { ticketId?: string
     setMessages(prev => [...prev, { role: "user", text: userMsg }]);
     setLoading(true);
 
-    // If we have a ticketId, persist the user message to the ticket
-    if (ticketId) {
-        fetch(`/api/support/tickets/${ticketId}/messages`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ message: userMsg, sender_type: 'user' })
-        }).catch(err => console.error("Failed to log user msg to ticket:", err));
-    }
+    // Dynamic input type masking
+    if (userMsg.toLowerCase().includes("api key")) setInputType("text");
+    if (userMsg.toLowerCase().includes("password")) setInputType("password");
 
     try {
       const res = await fetch("/api/onboarding/chat", {
@@ -54,21 +117,13 @@ export default function OnboardingBot({ ticketId, onClose }: { ticketId?: string
 
       const data = await res.json();
       if (data.message) {
-        setMessages(prev => [...prev, { role: "model", text: data.message }]);
-        
-        // Persist AI response to the ticket so agents see it
-        if (ticketId) {
-            fetch(`/api/support/tickets/${ticketId}/messages`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ message: `[AI Assistant]: ${data.message}`, sender_type: 'agent' })
-            }).catch(err => console.error("Failed to log AI msg to ticket:", err));
+        const wasAction = await parseAction(data.message);
+        if (!wasAction) {
+            setMessages(prev => [...prev, { role: "model", text: data.message }]);
         }
-      } else {
-        setMessages(prev => [...prev, { role: "model", text: "I'm currently recalibrating my institutional data feeds. Please try again in a moment." }]);
       }
     } catch (err) {
-      setMessages(prev => [...prev, { role: "model", text: "Connectivity to the AI core has been interrupted. An agent will be with you shortly." }]);
+      setMessages(prev => [...prev, { role: "model", text: "Connectivity interrupted. Re-establishing link..." }]);
     } finally {
       setLoading(false);
     }
@@ -102,7 +157,7 @@ export default function OnboardingBot({ ticketId, onClose }: { ticketId?: string
 
       {/* Info Status */}
       <div className="px-5 py-2 bg-teal/5 border-b border-teal/10 flex items-center justify-between text-[10px] font-black uppercase tracking-widest">
-        <span className="text-gray-500 flex items-center gap-1"><Globe size={10} /> Market Latency: 0ms</span>
+        <span className="text-gray-500 flex items-center gap-1"><Globe size={10} /> Identity: {obData.email || 'Anonymous'}</span>
         <span className="text-teal flex items-center gap-1"><ShieldCheck size={10} /> Secure End-to-End</span>
       </div>
 
@@ -140,11 +195,11 @@ export default function OnboardingBot({ ticketId, onClose }: { ticketId?: string
       <div className="p-4 bg-[#0D1B2A] border-t border-white/10 shrink-0">
         <form onSubmit={handleSend} className="flex gap-3">
           <input
-            type="text"
+            type={inputType}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             disabled={loading}
-            placeholder="Ask about API logic, markets, or help..."
+            placeholder={inputType === 'password' ? "Paste credentials securely..." : "Respond to Terminal AI..."}
             className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3.5 text-sm text-white placeholder:text-gray-500 focus:outline-none focus:border-teal/50 focus:ring-1 focus:ring-teal/50 transition-all font-medium"
           />
           <button

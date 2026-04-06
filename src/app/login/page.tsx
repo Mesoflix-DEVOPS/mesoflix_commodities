@@ -3,10 +3,9 @@
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Lock, Mail, ArrowRight, AlertCircle, Eye, EyeOff, Key, User, ArrowLeft } from "lucide-react";
+import { Lock, Mail, ArrowRight, AlertCircle, Eye, EyeOff, ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import OnboardingBot from "@/components/onboarding/OnboardingBot";
-import { Sparkles, MessageSquare, Zap } from "lucide-react";
 
 export default function AuthPage() {
     return (
@@ -34,12 +33,10 @@ function AuthPageForm() {
             setIsLogin(true);
         }
     }, [searchParams]);
+
     const [email, setEmail] = useState("");
-    const [password, setPassword] = useState(""); // This will now be the API password
-    const [apiKey, setApiKey] = useState("");
-    const [fullName, setFullName] = useState("");
-    const [accountType, setAccountType] = useState<"demo" | "live">("demo");
-    const [showPassword, setShowPassword] = useState(false); // This will control the single password field
+    const [password, setPassword] = useState("");
+    const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
 
@@ -50,83 +47,36 @@ function AuthPageForm() {
     const [isRecoveryMode, setIsRecoveryMode] = useState(false);
     const [twoFactorError, setTwoFactorError] = useState("");
     const [isTwoFactorLoading, setIsTwoFactorLoading] = useState(false);
-    const [showOnboarding, setShowOnboarding] = useState(false);
-    const [onboardingTicketId, setOnboardingTicketId] = useState<string | null>(null);
-    const [requestLoading, setRequestLoading] = useState(false);
 
     // Reset error when switching mode
     useEffect(() => {
         setError("");
     }, [isLogin]);
 
-    const handleRequestOnboarding = async () => {
-        if (requestLoading) return;
-        setRequestLoading(true);
-        setError("");
-
-        try {
-            const res = await fetch("/api/support/tickets", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    subject: `Onboarding Request: ${email || 'New User'}`,
-                    description: "User requested a guided onboarding session for API linkage.",
-                    category: "ONBOARDING",
-                    email: email || "pending@onboarding.user"
-                })
-            });
-
-            const data = await res.json();
-            if (data.ticketId) {
-                setOnboardingTicketId(data.ticketId);
-                setShowOnboarding(true);
-                
-                // Update onboarding status
-                await fetch(`/api/support/agent/tickets/${data.ticketId}`, {
-                    method: "PATCH",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ onboarding_status: 'REQUESTED' })
-                });
-            } else {
-                setError("Failed to initialize onboarding sequence. Please try again.");
-            }
-        } catch (err) {
-            setError("Network error in onboarding engine.");
-        } finally {
-            setRequestLoading(false);
-        }
-    };
-
-    const handleSubmit = async (e: React.FormEvent) => {
+    const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setError("");
         setLoading(true);
 
-        const endpoint = isLogin ? "/api/auth/login" : "/api/auth/register";
-        const payload = isLogin
-            ? { email, password }
-            : { email, fullName, apiKey, apiPassword: password, accountType }; // Use same password for both
-
         try {
-            const res = await fetch(endpoint, {
+            const res = await fetch("/api/auth/login", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload),
+                body: JSON.stringify({ email, password }),
             });
 
             const data = await res.json();
 
             if (!res.ok) {
-                throw new Error(data.message || (isLogin ? "Login failed" : "Registration failed"));
+                throw new Error(data.message || "Login failed");
             }
 
             if (data.requires2FA) {
                 setTempToken(data.tempToken);
                 setRequire2FA(true);
-                return; // Stop redirecting
+                return;
             }
 
-            // Success animation or message could go here
             router.push("/dashboard");
         } catch (err: any) {
             setError(err.message);
@@ -181,25 +131,22 @@ function AuthPageForm() {
                 </div>
 
                 {/* Main Card */}
-                <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl shadow-2xl p-8 md:p-10 transition-all duration-500 hover:border-white/20">
+                <div className={cn(
+                    "bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl shadow-2xl transition-all duration-500 hover:border-white/20 overflow-hidden",
+                    isLogin ? "p-8 md:p-10" : "p-0 h-[600px]"
+                )}>
 
-                    {/* Header */}
-                    {!require2FA && (
-                        <div className="mb-8">
-                            <h1 className="text-2xl font-bold text-white mb-2">
-                                {isLogin ? "Welcome Back" : "Create Account"}
-                            </h1>
-                            <p className="text-gray-400 text-sm">
-                                {isLogin
-                                    ? "Enter your credentials to access your dashboard"
-                                    : "Join the premium commodity trading platform"}
-                            </p>
+                    {/* Header (Only for Login) */}
+                    {isLogin && !require2FA && (
+                        <div className="mb-8 animate-in fade-in duration-500">
+                            <h1 className="text-2xl font-bold text-white mb-2">Welcome Back</h1>
+                            <p className="text-gray-400 text-sm">Enter your credentials to access your dashboard</p>
                         </div>
                     )}
 
-                    {/* Active Form */}
+                    {/* Active Content */}
                     {require2FA ? (
-                        <div className="animate-in fade-in duration-500">
+                        <div className="p-8 md:p-10 animate-in fade-in duration-500">
                             <div className="mb-8">
                                 <h1 className="text-2xl font-bold text-white mb-2">
                                     {isRecoveryMode ? "Account Recovery" : "Two-Factor Auth"}
@@ -263,125 +210,52 @@ function AuthPageForm() {
                         </div>
                     ) : (
                         <>
-                            {/* Form */}
-                            <form onSubmit={handleSubmit} className="space-y-5">
-                                {!isLogin && (
+                            {isLogin ? (
+                                <form onSubmit={handleLogin} className="space-y-6 animate-in fade-in duration-500">
                                     <div className="animate-in fade-in slide-in-from-left-4 duration-300">
-                                        <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Full Name</label>
+                                        <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Email Address</label>
                                         <div className="relative group">
-                                            <User className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-teal transition-colors" size={18} />
+                                            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-teal transition-colors" size={18} />
                                             <input
-                                                type="text"
-                                                required={!isLogin}
-                                                value={fullName}
-                                                onChange={(e) => setFullName(e.target.value)}
+                                                type="email"
+                                                required
+                                                value={email}
+                                                onChange={(e) => setEmail(e.target.value)}
                                                 className="w-full bg-white/5 border border-white/10 text-white pl-10 pr-4 py-3 rounded-xl focus:ring-2 focus:ring-teal focus:border-transparent outline-none transition-all placeholder:text-gray-600"
-                                                placeholder="John Doe"
+                                                placeholder="name@example.com"
                                             />
                                         </div>
                                     </div>
-                                )}
 
-                                <div className="animate-in fade-in duration-300">
-                                    <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Email Address</label>
-                                    <div className="relative group">
-                                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-teal transition-colors" size={18} />
-                                        <input
-                                            type="email"
-                                            required
-                                            value={email}
-                                            onChange={(e) => setEmail(e.target.value)}
-                                            className="w-full bg-white/5 border border-white/10 text-white pl-10 pr-4 py-3 rounded-xl focus:ring-2 focus:ring-teal focus:border-transparent outline-none transition-all placeholder:text-gray-600"
-                                            placeholder="name@example.com"
-                                        />
-                                    </div>
-                                </div>
-
-                                {!isLogin && (
-                                    <div className="animate-in fade-in slide-in-from-right-4 duration-300">
-                                        <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Capital.com API Key</label>
-                                        <div className="relative group mb-4">
-                                            <Key className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-teal transition-colors" size={18} />
+                                    <div className="animate-in fade-in duration-300">
+                                        <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">API Password</label>
+                                        <div className="relative group">
+                                            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-teal transition-colors" size={18} />
                                             <input
-                                                type="text"
-                                                required={!isLogin}
-                                                value={apiKey}
-                                                onChange={(e) => setApiKey(e.target.value)}
-                                                className="w-full bg-white/5 border border-white/10 text-white pl-10 pr-4 py-3 rounded-xl focus:ring-2 focus:ring-teal focus:border-transparent outline-none transition-all placeholder:text-gray-600"
-                                                placeholder="Capital.com API Key"
+                                                type={showPassword ? "text" : "password"}
+                                                required
+                                                value={password}
+                                                onChange={(e) => setPassword(e.target.value)}
+                                                className="w-full bg-white/5 border border-white/10 text-white pl-10 pr-12 py-3 rounded-xl focus:ring-2 focus:ring-teal focus:border-transparent outline-none transition-all placeholder:text-gray-600"
+                                                placeholder="Your Trading Password"
                                             />
-                                        </div>
-
-                                        <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Default Environment</label>
-                                        <div className="grid grid-cols-2 gap-3 mb-3">
                                             <button
                                                 type="button"
-                                                onClick={() => setAccountType("demo")}
-                                                className={cn(
-                                                    "py-2.5 rounded-xl border font-bold text-xs transition-all",
-                                                    accountType === "demo"
-                                                        ? "bg-teal/10 border-teal text-teal shadow-[0_0_15px_rgba(0,191,166,0.2)]"
-                                                        : "bg-white/5 border-white/10 text-gray-500 hover:text-white"
-                                                )}
+                                                onClick={() => setShowPassword(!showPassword)}
+                                                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors"
                                             >
-                                                DEMO ACCOUNT
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => setAccountType("live")}
-                                                className={cn(
-                                                    "py-2.5 rounded-xl border font-bold text-xs transition-all",
-                                                    accountType === "live"
-                                                        ? "bg-teal/10 border-teal text-teal shadow-[0_0_15px_rgba(0,191,166,0.2)]"
-                                                        : "bg-white/5 border-white/10 text-gray-500 hover:text-white"
-                                                )}
-                                            >
-                                                LIVE ACCOUNT
+                                                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                                             </button>
                                         </div>
-                                        <p className="text-[10px] text-gray-500 mb-6 px-1 italic">
-                                            Tip: You can dynamically switch between Demo and Real data anytime from your terminal without logging out.
-                                        </p>
                                     </div>
-                                )}
 
-                                <div className="animate-in fade-in duration-500">
-                                    <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
-                                        {isLogin ? "API Password" : "Capital.com API Password"}
-                                    </label>
-                                    <div className="relative group">
-                                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-teal transition-colors" size={18} />
-                                        <input
-                                            type={showPassword ? "text" : "password"}
-                                            required
-                                            value={password}
-                                            onChange={(e) => setPassword(e.target.value)}
-                                            className="w-full bg-white/5 border border-white/10 text-white pl-10 pr-12 py-3 rounded-xl focus:ring-2 focus:ring-teal focus:border-transparent outline-none transition-all placeholder:text-gray-600"
-                                            placeholder="Your Trading Password"
-                                        />
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowPassword(!showPassword)}
-                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors"
-                                        >
-                                            {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                                        </button>
-                                    </div>
-                                    {!isLogin && (
-                                        <p className="text-[10px] text-gray-500 mt-2 flex items-center gap-1">
-                                            <AlertCircle size={10} /> Found in Capital.com Settings &gt; API Integration
-                                        </p>
+                                    {error && (
+                                        <div className="bg-red-500/10 border border-red-500/20 text-red-500 p-3 rounded-xl flex items-center gap-2 text-sm animate-shake">
+                                            <AlertCircle size={18} className="shrink-0" />
+                                            <span>{error}</span>
+                                        </div>
                                     )}
-                                </div>
 
-                                {error && (
-                                    <div className="bg-red-500/10 border border-red-500/20 text-red-500 p-3 rounded-xl flex items-center gap-2 text-sm animate-shake">
-                                        <AlertCircle size={18} className="shrink-0" />
-                                        <span>{error}</span>
-                                    </div>
-                                )}
-
-                                {isLogin ? (
                                     <button
                                         type="submit"
                                         disabled={loading}
@@ -398,50 +272,15 @@ function AuthPageForm() {
                                             )}
                                         </span>
                                     </button>
-                                ) : (
-                                    <div className="space-y-4">
-                                        <button
-                                            type="submit"
-                                            disabled={loading}
-                                            className="w-full relative group overflow-hidden bg-gradient-to-r from-teal to-[#1B263B] text-gold font-bold py-3.5 rounded-xl transition-all duration-300 hover:shadow-[0_0_20px_rgba(0,191,166,0.3)] disabled:opacity-50 disabled:cursor-not-allowed"
-                                        >
-                                            <span className="relative z-10 flex items-center justify-center gap-2">
-                                                {loading ? (
-                                                    <div className="w-5 h-5 border-2 border-gold/30 border-t-gold rounded-full animate-spin" />
-                                                ) : (
-                                                    <>
-                                                        Register Account
-                                                        <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
-                                                    </>
-                                                )}
-                                            </span>
-                                        </button>
-                                        
-                                        <div className="relative flex items-center py-2">
-                                            <div className="flex-grow border-t border-white/5"></div>
-                                            <span className="flex-shrink mx-4 text-[10px] font-black text-gray-500 uppercase tracking-widest">Or Professional Assistance</span>
-                                            <div className="flex-grow border-t border-white/5"></div>
-                                        </div>
-
-                                        <button
-                                            type="button"
-                                            onClick={handleRequestOnboarding}
-                                            disabled={requestLoading}
-                                            className="w-full bg-white/5 border border-white/10 text-white font-bold py-3.5 rounded-xl hover:bg-white/10 transition-all flex items-center justify-center gap-3 transform active:scale-[0.98] group"
-                                        >
-                                            {requestLoading ? <div className="w-5 h-5 border-2 border-teal/30 border-t-teal rounded-full animate-spin" /> : (
-                                                <>
-                                                    <Sparkles size={18} className="text-gold group-hover:animate-pulse" />
-                                                    <span>Request Guided Onboarding</span>
-                                                </>
-                                            )}
-                                        </button>
-                                    </div>
-                                )}
-                            </form>
+                                </form>
+                            ) : (
+                                <div className="h-full animate-in zoom-in-95 duration-500">
+                                    <OnboardingBot />
+                                </div>
+                            )}
 
                             {/* Toggle */}
-                            <div className="mt-8 text-center">
+                            <div className={cn("text-center", isLogin ? "mt-8" : "mt-4 pb-4")}>
                                 <button
                                     onClick={() => setIsLogin(!isLogin)}
                                     className="text-sm text-gray-400 hover:text-white transition-colors"
@@ -457,12 +296,14 @@ function AuthPageForm() {
                         </>
                     )}
 
-                    {/* Hint */}
-                    <div className="mt-10 pt-6 border-t border-white/5 text-center">
-                        <p className="text-[10px] text-gray-600 uppercase tracking-widest font-medium">
-                            Sessions persist for 3 days • Secured by End-to-End Encryption
-                        </p>
-                    </div>
+                    {/* Hint (Only for Login) */}
+                    {isLogin && (
+                        <div className="mt-10 pt-6 border-t border-white/5 text-center">
+                            <p className="text-[10px] text-gray-600 uppercase tracking-widest font-medium">
+                                Sessions persist for 3 days • Secured by End-to-End Encryption
+                            </p>
+                        </div>
+                    )}
                 </div>
 
                 {/* Footer Links */}
@@ -472,15 +313,6 @@ function AuthPageForm() {
                     <Link href="/support" className="hover:text-gray-300 transition-colors">Help Center</Link>
                 </div>
             </div>
-
-            {/* Onboarding AI Modal */}
-            {showOnboarding && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-300">
-                    <div className="w-full max-w-lg h-[80vh] md:h-[600px] relative">
-                        <OnboardingBot ticketId={onboardingTicketId} onClose={() => setShowOnboarding(false)} />
-                    </div>
-                </div>
-            )}
         </div>
     );
 }
