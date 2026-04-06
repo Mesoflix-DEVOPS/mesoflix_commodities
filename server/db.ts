@@ -1,6 +1,6 @@
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
-import * as schema from '../src/lib/db/schema';
+import * as schema from './schema';
 import dotenv from 'dotenv';
 
 // Use same config as index.ts for local relative path

@@ -1,5 +1,5 @@
 import { db } from './db';
-import { capitalAccounts, users } from '../src/lib/db/schema';
+import { capitalAccounts, users } from './schema';
 import { decrypt } from './crypto';
 import { createSession, switchActiveAccount, getAccounts } from './capital';
 import { eq } from 'drizzle-orm';
