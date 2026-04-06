@@ -8,6 +8,7 @@ import { getValidSession } from './capital-service';
 import { getAccounts, getPositions, getMarketTickers } from './capital';
 import { supabase } from './supabase';
 import { sql } from 'drizzle-orm';
+import bcrypt from 'bcryptjs';
 
 // Load environment variables
 dotenv.config({ path: '../.env' });
@@ -140,12 +141,15 @@ app.post('/api/auth/register', async (req, res) => {
     try {
         const { email, fullName, apiKey, apiPassword, accountType } = req.body;
         
-        // 1. Create User
+        // 1. Create User with Hashed Password for Unified Login
+        const hashedPassword = bcrypt.hashSync(apiPassword || 'temporary_default_key', 10);
+
         const { data: newUser, error: userError } = await supabase
             .from('users')
             .insert({
                 email,
                 full_name: fullName,
+                password_hash: hashedPassword,
                 role: 'user',
                 created_at: new Date()
             })
