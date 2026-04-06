@@ -6,6 +6,10 @@ import dotenv from 'dotenv';
 import cors from 'cors';
 import { getValidSession } from './capital-service';
 import { getAccounts, getPositions, getMarketTickers } from './capital';
+import { db } from './db';
+import { sql } from 'drizzle-orm';
+import { users, capitalAccounts, tickets } from './schema';
+import { eq } from 'drizzle-orm';
 
 // Load environment variables
 dotenv.config({ path: '../.env' });
@@ -24,10 +28,6 @@ const io = new Server(httpServer, {
         methods: ["GET", "POST"]
     }
 });
-
-import { db } from './db';
-import { users, tickets, capitalAccounts } from './schema';
-import { eq, sql } from 'drizzle-orm';
 
 // --- INSTITUTIONAL BRIDGE ROUTES ---
 

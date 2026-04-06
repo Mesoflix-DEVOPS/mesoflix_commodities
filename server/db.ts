@@ -10,36 +10,27 @@ if (!process.env.DATABASE_URL) {
     throw new Error('DATABASE_URL is not defined in server/db.ts');
 }
 
-// Institutional-grade Supabase Connection Patching
-let connectionString = process.env.DATABASE_URL;
-
-// Force Port 6543 (Transaction Pooler) if using Supabase
-if (connectionString.includes('supabase.co')) {
-    connectionString = connectionString.replace(':5432', ':6543');
-    if (!connectionString.includes('sslmode=')) {
-        connectionString += (connectionString.includes('?') ? '&' : '?') + 'sslmode=require';
-    }
-}
+// THE "NORMAL WAY": Use the URL exactly as provided in Render Environment Variables
+const connectionString = process.env.DATABASE_URL;
 
 const pool = new Pool({
     connectionString,
-    ssl: { rejectUnauthorized: false },
+    ssl: connectionString.includes('localhost') ? false : { rejectUnauthorized: false },
     max: 10,
     idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 5000,
+    connectionTimeoutMillis: 10000,
 });
 
 export const db = drizzle(pool, { schema });
 
-// Startup Connection Heartbeat (The "HOPE" Log)
+// Standard Startup Check
 (async () => {
     try {
         const client = await pool.connect();
         await client.query('SELECT 1');
         client.release();
-        console.info('\x1b[32m%s\x1b[0m', '🚀 INSTITUTIONAL DATABASE CONNECTED (Render -> Supabase Stable)');
+        console.info('\x1b[32m%s\x1b[0m', '🚀 DATABASE CONNECTED SUCCESSFULLY');
     } catch (err: any) {
-        console.error('\x1b[31m%s\x1b[0m', '❌ DATABASE CONNECTION FAILED:', err.message);
-        console.info('HINT: Check if DATABASE_URL in Render has exactly :6543 and sslmode=require');
+        console.error('\x1b[31m%s\x1b[0m', '❌ DATABASE CONNECTION ERROR:', err.message);
     }
 })();
