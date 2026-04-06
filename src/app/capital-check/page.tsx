@@ -34,7 +34,7 @@ export default function CapitalCheckPage() {
                     </a>
                     
                     <button
-                        onClick={() => router.push("/register")}
+                        onClick={() => router.push("/login?mode=register")}
                         className="w-full flex items-center justify-center gap-3 bg-dark-blue text-white dark:bg-white/5 dark:text-white px-6 py-5 rounded-2xl font-black md:text-lg border border-dark-blue/10 dark:border-white/10 hover:bg-gray-800 dark:hover:bg-white/10 transition-all transform hover:-translate-y-1"
                     >
                         Proceed with registration

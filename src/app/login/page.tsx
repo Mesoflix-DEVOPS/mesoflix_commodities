@@ -477,7 +477,7 @@ function AuthPageForm() {
             {showOnboarding && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-300">
                     <div className="w-full max-w-lg h-[80vh] md:h-[600px] relative">
-                        <OnboardingBot onClose={() => setShowOnboarding(false)} />
+                        <OnboardingBot ticketId={onboardingTicketId} onClose={() => setShowOnboarding(false)} />
                     </div>
                 </div>
             )}

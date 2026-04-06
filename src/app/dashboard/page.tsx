@@ -45,7 +45,7 @@ import { useMarketData } from "@/contexts/MarketDataContext";
 // ---------------------------------------------------------------------------
 
 function DashboardPageInner() {
-    const { mode, balanceData } = useMarketData();
+    const { mode, balanceData, positions: livePositions } = useMarketData();
     const [loading, setLoading] = useState(true);
     const [data, setData] = useState<any>(null);
     const [liveHistory, setLiveHistory] = useState<any[]>([]);
@@ -72,34 +72,30 @@ function DashboardPageInner() {
 
     useEffect(() => {
         fetchData();
+    }, [fetchData, mode]);
 
-        // Listen to SSE stream for live position updates
-        const es = new EventSource(`/api/stream?mode=${mode}`);
-        es.addEventListener('positions', (ev) => {
-            try {
-                const livePositions = JSON.parse(ev.data);
-                setData((prev: any) => ({
-                    ...prev,
-                    positions: livePositions
-                }));
+    // Update liveHistory when positions change via Socket.io context
+    useEffect(() => {
+        if (!livePositions || livePositions.length === 0) return;
 
-                const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-                const tickData: any = { name: now };
-                livePositions.forEach((p: any) => {
-                    const epic = p.market?.instrumentName || p.position?.epic || 'Unknown';
-                    const upl = p.position?.upl ?? 0;
-                    tickData[epic] = parseFloat(Number(upl).toFixed(2));
-                });
+        setData((prev: any) => ({
+            ...prev,
+            positions: livePositions
+        }));
 
-                setLiveHistory(prev => {
-                    const newHistory = [...prev, tickData];
-                    return newHistory.slice(-50); // Keep last 50 data points
-                });
-            } catch (e) { }
+        const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        const tickData: any = { name: now };
+        livePositions.forEach((p: any) => {
+            const epic = p.market?.instrumentName || p.position?.epic || 'Unknown';
+            const upl = p.position?.upl ?? 0;
+            tickData[epic] = parseFloat(Number(upl).toFixed(2));
         });
 
-        return () => es.close();
-    }, [fetchData, mode]);
+        setLiveHistory(prev => {
+            const newHistory = [...prev, tickData];
+            return newHistory.slice(-50); // Keep last 50 data points
+        });
+    }, [livePositions]);
 
     // Handle outside click to close dropdowns
     useEffect(() => {

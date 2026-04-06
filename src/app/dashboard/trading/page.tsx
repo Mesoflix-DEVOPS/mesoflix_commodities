@@ -102,12 +102,11 @@ function ManualTab({ mode }: { mode: string }) {
     const [submitting, setSubmitting] = useState(false);
     const [execResult, setExecResult] = useState<{ ok: boolean; msg: string } | null>(null);
     const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-    // SSE live tick
     const [tick, setTick] = useState<Snapshot | null>(null);
+    const { marketData, connectionStatus: socketStatus } = useMarketData();
     const [priceDir, setPriceDir] = useState<"up" | "down" | null>(null);
     const [streamStatus, setStreamStatus] = useState<"connecting" | "live" | "offline">("connecting");
     const prevBid = useRef<number | null>(null);
-    const esRef = useRef<EventSource | null>(null);
 
     const fetchChart = useCallback(async () => {
         setChartLoading(true);
@@ -121,60 +120,36 @@ function ManualTab({ mode }: { mode: string }) {
         } finally { setChartLoading(false); }
     }, [instrument.epic, mode, resolution]);
 
-    // ── SSE stream for live price ticks ─────────────────────────────────────
+    // ── Sync with unified MarketData context ─────────────────────────────
     useEffect(() => {
-        let es: EventSource;
-        let reconnectTimer: ReturnType<typeof setTimeout>;
-        let flashTimer: ReturnType<typeof setTimeout>;
+        const data = marketData[instrument.epic];
+        if (!data) return;
 
-        const connect = () => {
-            setStreamStatus("connecting");
-            es = new EventSource(`/api/stream/${instrument.epic}?mode=${mode}`);
-            esRef.current = es;
-
-            es.onmessage = (ev) => {
-                try {
-                    const msg = JSON.parse(ev.data);
-                    if (msg.type === "tick") {
-                        setStreamStatus("live");
-                        const snap: Snapshot = {
-                            bid: msg.bid, offer: msg.ask,
-                            high: msg.high, low: msg.low,
-                            netChange: msg.net, percentageChange: msg.pct,
-                        };
-                        setTick(snap);
-                        setSnapshot(snap);          // keep chart snapshot in sync
-                        // Price direction flash
-                        if (prevBid.current !== null) {
-                            const dir = msg.bid > prevBid.current ? "up" : msg.bid < prevBid.current ? "down" : null;
-                            if (dir) {
-                                setPriceDir(dir);
-                                clearTimeout(flashTimer);
-                                flashTimer = setTimeout(() => setPriceDir(null), 600);
-                            }
-                        }
-                        prevBid.current = msg.bid;
-                    } else if (msg.type === "connected") {
-                        setStreamStatus("live");
-                    }
-                } catch { }
-            };
-
-            es.onerror = () => {
-                setStreamStatus("offline");
-                es.close();
-                // Reconnect after 2s
-                reconnectTimer = setTimeout(connect, 2000);
-            };
+        setStreamStatus(socketStatus === 'connected' ? "live" : "connecting");
+        
+        const snap: Snapshot = {
+            bid: data.bid,
+            offer: data.offer,
+            high: data.high,
+            low: data.low,
+            netChange: data.change,
+            percentageChange: data.changePct,
         };
 
-        connect();
-        return () => {
-            es?.close();
-            clearTimeout(reconnectTimer);
-            clearTimeout(flashTimer);
-        };
-    }, [instrument.epic, mode]);
+        setTick(snap);
+        setSnapshot(snap);
+
+        // Price direction flash
+        if (prevBid.current !== null) {
+            const dir = data.bid > prevBid.current ? "up" : data.bid < prevBid.current ? "down" : null;
+            if (dir) {
+                setPriceDir(dir);
+                const timer = setTimeout(() => setPriceDir(null), 600);
+                return () => clearTimeout(timer);
+            }
+        }
+        prevBid.current = data.bid;
+    }, [marketData, instrument.epic, socketStatus]);
 
     // ── Chart OHLC: refresh every 10s ────────────────────────────────────────
     useEffect(() => {
@@ -554,20 +529,18 @@ function ExecutionLogsTab({ mode }: { mode: string }) {
         }
     }, [mode]);
 
+    const { positions: livePositions } = useMarketData();
+
     useEffect(() => {
         fetchLogs();
+    }, [fetchLogs]);
 
-        // Listen to SSE stream for live position updates
-        const es = new EventSource(`/api/stream?mode=${mode}`);
-        es.addEventListener('positions', (ev) => {
-            try {
-                const livePositions = JSON.parse(ev.data);
-                setPositions(livePositions);
-            } catch (e) { }
-        });
-
-        return () => es.close();
-    }, [fetchLogs, mode]);
+    // Sync from context
+    useEffect(() => {
+        if (livePositions.length > 0) {
+            setPositions(livePositions);
+        }
+    }, [livePositions]);
 
     // Parse Capital.com activity item into useful display fields
     const parseLog = (log: any) => {

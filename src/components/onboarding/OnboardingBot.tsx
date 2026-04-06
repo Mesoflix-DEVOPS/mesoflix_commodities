@@ -9,7 +9,7 @@ interface Message {
   text: string;
 }
 
-export default function OnboardingBot({ onClose }: { onClose?: () => void }) {
+export default function OnboardingBot({ ticketId, onClose }: { ticketId?: string | null; onClose?: () => void }) {
   const [messages, setMessages] = useState<Message[]>([
     { role: "model", text: "Welcome to the Mesoflix Institutional Terminal. I am your Onboarding AI. While we wait for a senior agent to Join your session, I can assist with any questions regarding Capital.com API configuration or commodity market fundamentals. How can I assist you today?" }
   ]);
@@ -30,6 +30,15 @@ export default function OnboardingBot({ onClose }: { onClose?: () => void }) {
     setMessages(prev => [...prev, { role: "user", text: userMsg }]);
     setLoading(true);
 
+    // If we have a ticketId, persist the user message to the ticket
+    if (ticketId) {
+        fetch(`/api/support/tickets/${ticketId}/messages`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ message: userMsg, sender_type: 'user' })
+        }).catch(err => console.error("Failed to log user msg to ticket:", err));
+    }
+
     try {
       const res = await fetch("/api/onboarding/chat", {
         method: "POST",
@@ -46,6 +55,15 @@ export default function OnboardingBot({ onClose }: { onClose?: () => void }) {
       const data = await res.json();
       if (data.message) {
         setMessages(prev => [...prev, { role: "model", text: data.message }]);
+        
+        // Persist AI response to the ticket so agents see it
+        if (ticketId) {
+            fetch(`/api/support/tickets/${ticketId}/messages`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ message: `[AI Assistant]: ${data.message}`, sender_type: 'agent' })
+            }).catch(err => console.error("Failed to log AI msg to ticket:", err));
+        }
       } else {
         setMessages(prev => [...prev, { role: "model", text: "I'm currently recalibrating my institutional data feeds. Please try again in a moment." }]);
       }

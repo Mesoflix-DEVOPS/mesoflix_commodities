@@ -2,11 +2,13 @@
 
 import { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { authedFetch } from '@/lib/fetch-utils';
+import { io, Socket } from 'socket.io-client';
 
 type PriceData = {
     bid: number;
     offer: number;
+    high: number;
+    low: number;
     change: number;
     changePct: number;
 };
@@ -27,10 +29,10 @@ export type BalanceData = {
 
 interface MarketDataContextType {
     marketData: MarketData;
-    /** Balance for the currently active mode */
     balanceData: BalanceData | null;
     demoBalance: BalanceData | null;
     realBalance: BalanceData | null;
+    positions: any[];
     connectionStatus: 'connecting' | 'connected' | 'disconnected' | 'error';
     setMode: (mode: 'demo' | 'real') => void;
     mode: 'demo' | 'real';
@@ -41,16 +43,13 @@ const MarketDataContext = createContext<MarketDataContextType>({
     balanceData: null,
     demoBalance: null,
     realBalance: null,
+    positions: [],
     connectionStatus: 'disconnected',
     setMode: () => { },
     mode: 'real',
 });
 
 export const useMarketData = () => useContext(MarketDataContext);
-
-// Prices every 10s; balance every 2 minutes (single call returns both demo+real)
-const PRICE_POLL_MS = 10_000;
-const BALANCE_POLL_MS = 120_000;
 
 function parseBalance(data: any): BalanceData | null {
     if (!data) return null;
@@ -76,14 +75,10 @@ export function MarketDataProvider({ children }: { children: ReactNode }) {
     const [marketData, setMarketData] = useState<MarketData>({});
     const [demoBalance, setDemoBalance] = useState<BalanceData | null>(null);
     const [realBalance, setRealBalance] = useState<BalanceData | null>(null);
+    const [positions, setPositions] = useState<any[]>([]);
     const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected' | 'error'>('connecting');
 
-    const modeRef = useRef(mode);
-    const router = useRouter();
-    const balanceFetchingRef = useRef(false);
-    const priceFetchingRef = useRef(false);
-
-    // Unused polling functions removed in favor of SSE
+    const socketRef = useRef<Socket | null>(null);
 
     // Active balance is strictly the current mode's data — no cross-mode fallback
     const balanceData = mode === 'demo' ? demoBalance : realBalance;
@@ -92,67 +87,80 @@ export function MarketDataProvider({ children }: { children: ReactNode }) {
         setModeState(newMode);
     }, []);
 
-    // ── Unified SSE Stream ──────────────────────────────────────────────────
     useEffect(() => {
+        const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001';
+        
+        const getCookie = (name: string) => {
+            const value = `; ${document.cookie}`;
+            const parts = value.split(`; ${name}=`);
+            if (parts.length === 2) return parts.pop()?.split(';').shift();
+        };
+
+        const token = getCookie('access_token');
+        if (!token) {
+            setConnectionStatus('disconnected');
+            return;
+        }
+
+        const socket = io(SOCKET_URL, {
+            auth: { token },
+            reconnectionAttempts: 10,
+            reconnectionDelay: 5000,
+        });
+
+        socketRef.current = socket;
         setConnectionStatus('connecting');
 
-        const es = new EventSource(`/api/stream?mode=${mode}`);
+        socket.on('connect', () => {
+            console.log(`[MarketData] Socket Connected: ${SOCKET_URL}`);
+            setConnectionStatus('connected');
+            socket.emit('start-stream', { mode });
+        });
 
-        es.onopen = () => {
-            console.log(`[MarketData] Unified Stream Connected (${mode})`);
-        };
-
-        es.addEventListener('market-data', (ev) => {
-            try {
-                const data = JSON.parse(ev.data);
-                // Capital.com 'quote' destination messages
-                if (data.destination === 'quote' && data.payload) {
-                    const snap = data.payload;
+        socket.on('market-data', (data: any[]) => {
+            setMarketData(prev => {
+                const newState = { ...prev };
+                data.forEach((snap: any) => {
                     const epic = snap.epic;
-                    if (epic) {
-                        setMarketData(prev => ({
-                            ...prev,
-                            [epic]: {
-                                bid: snap.bid ?? prev[epic]?.bid ?? 0,
-                                offer: snap.offer ?? prev[epic]?.offer ?? 0,
-                                change: snap.netChange ?? prev[epic]?.change ?? 0,
-                                changePct: snap.percentageChange ?? prev[epic]?.changePct ?? 0,
-                            }
-                        }));
-                    }
-                }
-                setConnectionStatus('connected');
-            } catch (e) {
-                console.error("[MarketData] Pricing Parse Error", e);
+                    newState[epic] = {
+                        bid: snap.bid ?? prev[epic]?.bid ?? 0,
+                        offer: snap.offer ?? prev[epic]?.offer ?? 0,
+                        high: snap.high ?? prev[epic]?.high ?? 0,
+                        low: snap.low ?? prev[epic]?.low ?? 0,
+                        change: snap.netChange ?? prev[epic]?.change ?? 0,
+                        changePct: snap.percentageChange ?? prev[epic]?.changePct ?? 0,
+                    };
+                });
+                return newState;
+            });
+        });
+
+        socket.on('balance', (data: any) => {
+            const balanceObj = parseBalance(data);
+            if (data.isDemo) {
+                setDemoBalance(prev => (isNonZero(balanceObj) || !isNonZero(prev)) ? balanceObj : prev);
+            } else {
+                setRealBalance(prev => (isNonZero(balanceObj) || !isNonZero(prev)) ? balanceObj : prev);
             }
         });
 
-        es.addEventListener('balance', (ev) => {
-            try {
-                const data = JSON.parse(ev.data);
-                const newReal = parseBalance(data.realBalance);
-                const newDemo = parseBalance(data.demoBalance);
-
-                if (newReal) setRealBalance(prev => (isNonZero(newReal) || !isNonZero(prev)) ? newReal : prev);
-                if (newDemo) setDemoBalance(prev => (isNonZero(newDemo) || !isNonZero(prev)) ? newDemo : prev);
-            } catch (e) {
-                console.error("[MarketData] Balance Parse Error", e);
-            }
+        socket.on('positions', (data: any[]) => {
+            setPositions(data);
         });
 
-        // Positions could also be listened to here if we exposed them in Context, 
-        // but currently dashboard components fetch their own or rely on `/api/dashboard`.
-        // If we want to broadcast them, we can add a positions state to MarketDataContext.
-        // For now, we leave the listener out of context to keep it simple, or we can just ignore it.
-
-        es.onerror = () => {
-            console.warn(`[MarketData] Stream Error. Reconnecting in 3s...`);
+        socket.on('connect_error', (error) => {
+            console.error('[MarketData] Socket Connection Error:', error);
             setConnectionStatus('error');
-            es.close();
-        };
+        });
+
+        socket.on('disconnect', (reason) => {
+            console.warn('[MarketData] Socket Disconnected:', reason);
+            setConnectionStatus('disconnected');
+        });
 
         return () => {
-            es.close();
+            socket.disconnect();
+            socketRef.current = null;
         };
     }, [mode]);
 
@@ -162,6 +170,7 @@ export function MarketDataProvider({ children }: { children: ReactNode }) {
             balanceData,
             demoBalance,
             realBalance,
+            positions,
             connectionStatus,
             setMode,
             mode,
