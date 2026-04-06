@@ -182,7 +182,7 @@ app.post('/api/auth/register', async (req, res) => {
 // --- IDENTITY GUARD & SECURE ENGINES ---
 
 const JWT_SECRET = new TextEncoder().encode(
-    process.env.JWT_SECRET || 'fallback_secret_must_change_in_prod'
+    process.env.JWT_SECRET || 'mesoflix-commodity-terminal-internal-fallback-v1'
 );
 
 // Express Middleware for JWT Verification
@@ -226,7 +226,7 @@ app.get('/api/dashboard', authGuard, async (req: any, res) => {
                 getAccounts(session.cst, session.xSecurityToken, isDemo, session.serverUrl),
                 getPositions(session.cst, session.xSecurityToken, isDemo, session.serverUrl),
                 getHistory(session.cst, session.xSecurityToken, isDemo, { max: 50 }, session.serverUrl)
-            ]);
+            ]) as [any, any, any];
 
             const accounts = (accountsData.accounts || []).map((a: any) => ({
                 ...a,
@@ -422,11 +422,11 @@ io.on('connection', (socket) => {
                 // Use the same logic as the SSE stream but emit via Socket.io
                 const currentSession = await getValidSession(userId, isDemo);
 
-                const [accountsData, positionsData, marketData]: [any, any, any] = await Promise.all([
+                const [accountsData, positionsData, marketData] = await Promise.all([
                     getAccounts(currentSession.cst, currentSession.xSecurityToken, isDemo, currentSession.serverUrl),
                     getPositions(currentSession.cst, currentSession.xSecurityToken, isDemo, currentSession.serverUrl),
                     getMarketTickers(currentSession.cst, currentSession.xSecurityToken, epics, isDemo, currentSession.serverUrl)
-                ]);
+                ]) as [any, any, any];
 
                 // Emit Market Data
                 if (marketData?.marketDetails) {

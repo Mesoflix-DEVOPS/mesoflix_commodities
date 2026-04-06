@@ -21,9 +21,9 @@ export {
 export async function setAuthCookies(accessToken: string, refreshToken: string) {
     const cookieStore = await cookies();
 
-    // Access Token Cookie
+    // Access Token Cookie: Unlocked for the Institutional Bridge
     cookieStore.set('access_token', accessToken, {
-        httpOnly: true,
+        httpOnly: false, // Allow client-side extraction to facilitate Render bridge 
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
         maxAge: 3 * 24 * 60 * 60, // 3 days
