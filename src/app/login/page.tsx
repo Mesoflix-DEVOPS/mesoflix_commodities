@@ -1,14 +1,39 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Lock, Mail, ArrowRight, AlertCircle, Eye, EyeOff, Key, User, ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
+import OnboardingBot from "@/components/onboarding/OnboardingBot";
+import { Sparkles, MessageSquare, Zap } from "lucide-react";
 
 export default function AuthPage() {
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen flex items-center justify-center bg-[#0D1B2A]">
+                <div className="w-10 h-10 border-2 border-teal border-t-transparent rounded-full animate-spin" />
+            </div>
+        }>
+            <AuthPageForm />
+        </Suspense>
+    );
+}
+
+function AuthPageForm() {
     const router = useRouter();
+    const searchParams = useSearchParams();
     const [isLogin, setIsLogin] = useState(true);
+
+    // Sync isLogin with mode param
+    useEffect(() => {
+        const mode = searchParams.get("mode");
+        if (mode === "register") {
+            setIsLogin(false);
+        } else if (mode === "login") {
+            setIsLogin(true);
+        }
+    }, [searchParams]);
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState(""); // This will now be the API password
     const [apiKey, setApiKey] = useState("");
@@ -25,11 +50,52 @@ export default function AuthPage() {
     const [isRecoveryMode, setIsRecoveryMode] = useState(false);
     const [twoFactorError, setTwoFactorError] = useState("");
     const [isTwoFactorLoading, setIsTwoFactorLoading] = useState(false);
+    const [showOnboarding, setShowOnboarding] = useState(false);
+    const [onboardingTicketId, setOnboardingTicketId] = useState<string | null>(null);
+    const [requestLoading, setRequestLoading] = useState(false);
 
     // Reset error when switching mode
     useEffect(() => {
         setError("");
     }, [isLogin]);
+
+    const handleRequestOnboarding = async () => {
+        if (requestLoading) return;
+        setRequestLoading(true);
+        setError("");
+
+        try {
+            const res = await fetch("/api/support/tickets", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    subject: `Onboarding Request: ${email || 'New User'}`,
+                    description: "User requested a guided onboarding session for API linkage.",
+                    category: "ONBOARDING",
+                    email: email || "pending@onboarding.user"
+                })
+            });
+
+            const data = await res.json();
+            if (data.ticketId) {
+                setOnboardingTicketId(data.ticketId);
+                setShowOnboarding(true);
+                
+                // Update onboarding status
+                await fetch(`/api/support/agent/tickets/${data.ticketId}`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ onboarding_status: 'REQUESTED' })
+                });
+            } else {
+                setError("Failed to initialize onboarding sequence. Please try again.");
+            }
+        } catch (err) {
+            setError("Network error in onboarding engine.");
+        } finally {
+            setRequestLoading(false);
+        }
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -315,22 +381,63 @@ export default function AuthPage() {
                                     </div>
                                 )}
 
-                                <button
-                                    type="submit"
-                                    disabled={loading}
-                                    className="w-full relative group overflow-hidden bg-gradient-to-r from-teal to-[#1B263B] text-gold font-bold py-3.5 rounded-xl transition-all duration-300 hover:shadow-[0_0_20px_rgba(0,191,166,0.3)] disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                    <span className="relative z-10 flex items-center justify-center gap-2">
-                                        {loading ? (
-                                            <div className="w-5 h-5 border-2 border-gold/30 border-t-gold rounded-full animate-spin" />
-                                        ) : (
-                                            <>
-                                                {isLogin ? "Sign In" : "Register Account"}
-                                                <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
-                                            </>
-                                        )}
-                                    </span>
-                                </button>
+                                {isLogin ? (
+                                    <button
+                                        type="submit"
+                                        disabled={loading}
+                                        className="w-full relative group overflow-hidden bg-gradient-to-r from-teal to-[#1B263B] text-gold font-bold py-3.5 rounded-xl transition-all duration-300 hover:shadow-[0_0_20px_rgba(0,191,166,0.3)] disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        <span className="relative z-10 flex items-center justify-center gap-2">
+                                            {loading ? (
+                                                <div className="w-5 h-5 border-2 border-gold/30 border-t-gold rounded-full animate-spin" />
+                                            ) : (
+                                                <>
+                                                    Sign In
+                                                    <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
+                                                </>
+                                            )}
+                                        </span>
+                                    </button>
+                                ) : (
+                                    <div className="space-y-4">
+                                        <button
+                                            type="submit"
+                                            disabled={loading}
+                                            className="w-full relative group overflow-hidden bg-gradient-to-r from-teal to-[#1B263B] text-gold font-bold py-3.5 rounded-xl transition-all duration-300 hover:shadow-[0_0_20px_rgba(0,191,166,0.3)] disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            <span className="relative z-10 flex items-center justify-center gap-2">
+                                                {loading ? (
+                                                    <div className="w-5 h-5 border-2 border-gold/30 border-t-gold rounded-full animate-spin" />
+                                                ) : (
+                                                    <>
+                                                        Register Account
+                                                        <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
+                                                    </>
+                                                )}
+                                            </span>
+                                        </button>
+                                        
+                                        <div className="relative flex items-center py-2">
+                                            <div className="flex-grow border-t border-white/5"></div>
+                                            <span className="flex-shrink mx-4 text-[10px] font-black text-gray-500 uppercase tracking-widest">Or Professional Assistance</span>
+                                            <div className="flex-grow border-t border-white/5"></div>
+                                        </div>
+
+                                        <button
+                                            type="button"
+                                            onClick={handleRequestOnboarding}
+                                            disabled={requestLoading}
+                                            className="w-full bg-white/5 border border-white/10 text-white font-bold py-3.5 rounded-xl hover:bg-white/10 transition-all flex items-center justify-center gap-3 transform active:scale-[0.98] group"
+                                        >
+                                            {requestLoading ? <div className="w-5 h-5 border-2 border-teal/30 border-t-teal rounded-full animate-spin" /> : (
+                                                <>
+                                                    <Sparkles size={18} className="text-gold group-hover:animate-pulse" />
+                                                    <span>Request Guided Onboarding</span>
+                                                </>
+                                            )}
+                                        </button>
+                                    </div>
+                                )}
                             </form>
 
                             {/* Toggle */}
@@ -364,7 +471,16 @@ export default function AuthPage() {
                     <Link href="/privacy" className="hover:text-gray-300 transition-colors">Privacy Policy</Link>
                     <Link href="/support" className="hover:text-gray-300 transition-colors">Help Center</Link>
                 </div>
-            </div >
-        </div >
+            </div>
+
+            {/* Onboarding AI Modal */}
+            {showOnboarding && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-300">
+                    <div className="w-full max-w-lg h-[80vh] md:h-[600px] relative">
+                        <OnboardingBot onClose={() => setShowOnboarding(false)} />
+                    </div>
+                </div>
+            )}
+        </div>
     );
 }

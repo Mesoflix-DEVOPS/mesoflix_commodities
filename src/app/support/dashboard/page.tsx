@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import {
     LayoutDashboard, MessageSquare, Users, ShieldAlert, LogOut,
     Search, Clock, CheckCircle2, AlertCircle, MonitorPlay,
-    Send, Paperclip, MoreVertical, ShieldCheck, FileText, Activity, Loader2, X, GraduationCap
+    Send, Paperclip, MoreVertical, ShieldCheck, FileText, Activity, Loader2, X, GraduationCap, Zap, Sparkles
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import AcademyManagement from "@/components/support/AcademyManagement";
@@ -22,6 +22,8 @@ interface TicketNode {
     created_at: string;
     last_message?: string;
     unread?: boolean;
+    onboarding_status?: string | null;
+    meet_link?: string | null;
 }
 
 export default function AgentDashboard() {
@@ -35,7 +37,7 @@ export default function AgentDashboard() {
     const [sending, setSending] = useState(false);
     const [attachment, setAttachment] = useState<string | null>(null);
     const [attachmentName, setAttachmentName] = useState<string | null>(null);
-    const [activeTab, setActiveTab] = useState<"dashboard" | "chat" | "users" | "academy">("chat");
+    const [activeTab, setActiveTab] = useState<"dashboard" | "chat" | "users" | "academy" | "onboarding">("chat");
     const [showFreezeModal, setShowFreezeModal] = useState(false);
     const [showAuditModal, setShowAuditModal] = useState(false);
     const [isFreezing, setIsFreezing] = useState(false);
@@ -161,10 +163,8 @@ export default function AgentDashboard() {
         };
 
         setChatMessages(prev => [...prev, payload]);
-
         const outgoingInput = input.trim();
         const outgoingAttachment = attachment;
-
         setInput("");
         setAttachment(null);
         setAttachmentName(null);
@@ -178,6 +178,49 @@ export default function AgentDashboard() {
         })
             .catch(err => console.error("Message persist failed", err))
             .finally(() => setSending(false));
+    };
+
+    const handleGenerateMeet = async () => {
+        if (!selectedTicket || sending) return;
+        setSending(true);
+
+        const uniqueRoom = `mesoflix-ob-${selectedTicket.id.substring(0, 8)}`;
+        const meetUrl = `https://meet.google.com/${uniqueRoom}`;
+
+        const payload = {
+            id: `msg_meet_${Date.now()}`,
+            ticketId: selectedTicket.id,
+            sender_type: "agent",
+            message: `INSTITUTIONAL SESSION STARTING: Please join the professional onboarding session via this secure link: ${meetUrl}`,
+            attachment_url: null,
+            created_at: new Date().toISOString()
+        };
+
+        setChatMessages(prev => [...prev, payload]);
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+
+        try {
+            // Persist the message AND update ticket level meet_link
+            await Promise.all([
+                fetch(`/api/support/agent/tickets/${selectedTicket.id}/messages`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ message: payload.message })
+                }),
+                fetch(`/api/support/agent/tickets/${selectedTicket.id}`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ meet_link: meetUrl, onboarding_status: 'IN_PROGRESS' })
+                })
+            ]);
+            
+            // Refresh local state
+            setTickets(prev => prev.map(t => t.id === selectedTicket.id ? { ...t, meet_link: meetUrl, onboarding_status: 'IN_PROGRESS' } : t));
+        } catch (err) {
+            console.error("Meet link persist failed", err);
+        } finally {
+            setSending(false);
+        }
     };
 
     const handleLogout = () => {
@@ -212,6 +255,13 @@ export default function AgentDashboard() {
                         className={cn("w-10 h-10 md:w-full md:aspect-square flex items-center justify-center rounded-xl transition-colors relative", activeTab === "users" ? "text-teal bg-teal/10 border border-teal/20" : "text-gray-400 hover:text-white hover:bg-white/5")}
                     >
                         <Users size={20} />
+                    </button>
+                    <button
+                        onClick={() => setActiveTab("onboarding")}
+                        className={cn("w-10 h-10 md:w-full md:aspect-square flex items-center justify-center rounded-xl transition-colors relative", activeTab === "onboarding" ? "text-teal bg-teal/10 border border-teal/20" : "text-gray-400 hover:text-white hover:bg-white/5")}
+                    >
+                        <Zap size={20} />
+                        {tickets.some(t => t.onboarding_status === 'REQUESTED') && <div className="absolute top-2 right-2 w-2 h-2 bg-teal rounded-full animate-pulse" />}
                     </button>
                     <button
                         onClick={() => setActiveTab("academy")}
@@ -583,18 +633,53 @@ export default function AgentDashboard() {
                 </div>
             )}
 
-            {activeTab === "academy" && (
-                <div className="flex-1 h-full overflow-y-auto p-4 md:p-12 bg-[#060D14]">
-                    <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in zoom-in-95 duration-500 pb-20">
+            {activeTab === "onboarding" && (
+                <div className="flex-1 overflow-y-auto p-4 md:p-12 bg-[#060D14]">
+                    <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in zoom-in-95 duration-500 pb-20">
                         <div>
                             <h1 className="text-2xl md:text-3xl font-bold text-white tracking-tight flex items-center gap-3">
-                                <GraduationCap className="text-teal" size={32} />
-                                Academy Management
+                                <Zap className="text-teal" size={32} />
+                                Active Onboarding Session Queue
                             </h1>
-                            <p className="text-gray-400 mt-2">Upload and manage video lessons for the Learn Hub Academy.</p>
+                            <p className="text-gray-400 mt-2">Manage incoming institutional linkage requests and professional mentorship sessions.</p>
                         </div>
-                        <div className="bg-[#0A1622] backdrop-blur-xl border border-white/10 rounded-[2.5rem] p-8 md:p-12 transition-all hover:border-white/20 shadow-2xl">
-                            <AcademyManagement />
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {tickets.filter(t => t.category === 'ONBOARDING' || t.onboarding_status).map((t) => (
+                                <div key={t.id} className="bg-[#0A1622] rounded-2xl border border-white/5 p-6 space-y-4 hover:border-teal/30 transition-all group relative overflow-hidden">
+                                     <div className="absolute top-0 right-0 w-24 h-24 bg-teal/5 rounded-full blur-2xl -mr-12 -mt-12 group-hover:bg-teal/10 transition-colors" />
+                                     
+                                     <div className="flex justify-between items-start">
+                                         <div className="px-3 py-1 bg-black/40 border border-white/5 rounded-full text-[10px] font-mono text-gray-500">#{t.id.substring(0,8)}</div>
+                                         <div className={cn("px-2 py-0.5 rounded text-[9px] font-black tracking-widest uppercase", 
+                                             t.onboarding_status === 'REQUESTED' ? "bg-teal/10 text-teal animate-pulse" : 
+                                             t.onboarding_status === 'IN_PROGRESS' ? "bg-blue-500/10 text-blue-400" : "bg-white/5 text-gray-500" )}>
+                                             {t.onboarding_status || 'PENDING'}
+                                         </div>
+                                     </div>
+
+                                     <h3 className="text-lg font-bold text-white group-hover:text-teal transition-colors">Onboarding Request</h3>
+                                     <p className="text-xs text-gray-400 line-clamp-2 leading-relaxed">User {t.user_id} is awaiting an institutional walkthrough and API linkage confirmation.</p>
+                                     
+                                     <div className="pt-4 border-t border-white/5 flex gap-3">
+                                         <button 
+                                            onClick={() => { setActiveTab("chat"); handleSelectTicket(t); }}
+                                            className="flex-1 py-3 bg-white/5 hover:bg-white/10 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all">Open Chat</button>
+                                         <button 
+                                            onClick={() => { handleSelectTicket(t); handleGenerateMeet(); }}
+                                            disabled={loading || t.onboarding_status === 'COMPLETED'}
+                                            className="flex-1 py-3 bg-gradient-to-r from-teal to-dark-blue text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-teal/5 group-hover:shadow-teal/20">
+                                             {t.onboarding_status === 'IN_PROGRESS' ? 'Join Meet' : 'Start Meet'}
+                                         </button>
+                                     </div>
+                                </div>
+                            ))}
+                            {tickets.filter(t => t.category === 'ONBOARDING' || t.onboarding_status).length === 0 && (
+                                <div className="col-span-full py-20 text-center space-y-4 bg-white/[0.02] rounded-3xl border border-dashed border-white/10">
+                                    <Sparkles className="w-12 h-12 text-teal opacity-20 mx-auto" />
+                                    <p className="text-gray-500 font-bold uppercase tracking-widest text-xs">No active onboarding requests</p>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>

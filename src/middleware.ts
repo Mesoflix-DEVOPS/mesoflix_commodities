@@ -7,8 +7,16 @@ const PROTECTED_ROUTES = ['/dashboard'];
 const PUBLIC_ROUTES = ['/login', '/register', '/api/auth/login', '/api/auth/register', '/api/auth/refresh'];
 
 export async function middleware(request: NextRequest) {
+    const isMaintenanceMode = true; // Set to true to enable maintenance mode
+
     try {
         const { pathname } = request.nextUrl;
+
+        // 0. MAINTENANCE GUARD
+        if (isMaintenanceMode && !pathname.startsWith('/maintenance') && !pathname.startsWith('/_next') && !pathname.startsWith('/api/support') && !pathname.includes('.')) {
+            const maintenanceUrl = new URL('/maintenance', request.url);
+            return NextResponse.redirect(maintenanceUrl);
+        }
 
         // 0. EXPLICIT GUARD: Never intercept static assets, chunks, or internal Next.js data
         // This is critical to prevent "MIME type mismatch" errors in production.

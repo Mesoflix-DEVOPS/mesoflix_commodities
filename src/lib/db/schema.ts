@@ -133,6 +133,8 @@ export const tickets = pgTable('tickets', {
     description: text('description').notNull(),
     status: text('status').default('OPEN'), // 'OPEN', 'PENDING', 'CLOSED', 'ESCALATED'
     priority: text('priority').default('NORMAL'), // 'LOW', 'NORMAL', 'HIGH', 'URGENT'
+    onboarding_status: text('onboarding_status'), // 'REQUESTED', 'ASSIGNED', 'IN_PROGRESS', 'COMPLETED'
+    meet_link: text('meet_link'),
     created_at: timestamp('created_at').defaultNow(),
     closed_at: timestamp('closed_at'),
 }, (table) => ({

@@ -105,10 +105,10 @@ export async function GET(req: NextRequest) {
                 }
             };
 
-            // Poll immediately, then every 10 seconds (reduced from 3s to stabilize DB)
+            // Poll immediately, then every 2 seconds for high-fidelity real-time feel
             await pollData();
             if (!isClosed) {
-                pollingTimer = setInterval(pollData, 10000);
+                pollingTimer = setInterval(pollData, 2000);
             }
 
             req.signal.addEventListener('abort', cleanup);

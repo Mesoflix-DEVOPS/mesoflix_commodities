@@ -27,7 +27,12 @@ export async function POST(req: Request) {
         }
 
         // Fetch actual user via session layer
-        const userId = await getUserIdFromSession();
+        let userId = await getUserIdFromSession();
+
+        // ALLOW GUEST ONBOARDING: If no session, but category is ONBOARDING, use email or guest identifier
+        if (!userId && category === 'ONBOARDING') {
+            userId = body.email || 'GUEST_ONBOARDING';
+        }
 
         if (!userId) {
             return NextResponse.json({ error: "Unauthorized access" }, { status: 401 });
@@ -40,6 +45,7 @@ export async function POST(req: Request) {
             description,
             status: "OPEN",
             priority: "NORMAL",
+            onboarding_status: category === 'ONBOARDING' ? 'REQUESTED' : null
         }).returning();
 
         // Automatically insert the initial description as the very first message in the chat
