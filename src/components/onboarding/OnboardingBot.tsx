@@ -79,7 +79,15 @@ export default function OnboardingBot({ ticketId, onClose }: { ticketId?: string
                 setMessages(prev => [...prev, { role: "model", text: `Protocol Error: ${err.message || 'Validation failed'}. Let's re-verify your API credentials.` }]);
             }
         } catch {
-            setMessages(prev => [...prev, { role: "model", text: "System Handshake Failed. Please verify your internet connectivity." }]);
+            setMessages(prev => [...prev, { 
+                role: "model", 
+                text: "System Quota Exhausted. To ensure immediate service, please use our Standard Registration Portal below while I re-establish the neural link." 
+            }]);
+            // Add a manual link suggestion
+            setMessages(prev => [...prev, { 
+                role: "model", 
+                text: "--- [ CLICK HERE TO REGISTER MANUALLY ] ---" 
+            }]);
         } finally {
             setLoading(false);
         }
