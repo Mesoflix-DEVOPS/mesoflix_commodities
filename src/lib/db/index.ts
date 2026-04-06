@@ -1,17 +1,22 @@
-import { drizzle } from 'drizzle-orm/neon-http';
-import { neon } from '@neondatabase/serverless';
+import { drizzle } from 'drizzle-orm/node-postgres';
+import { Pool } from 'pg';
 import * as schema from './schema';
 
 if (!process.env.DATABASE_URL) {
     throw new Error('DATABASE_URL is not defined');
 }
 
-// Institutional-grade HTTPS Overpass: 
-// We use the Neon HTTP driver to communicate over Port 443. 
-// This bypasses all FIREWALL blocks on Port 5432 and 6543.
-const sqlConnection = neon(process.env.DATABASE_URL);
+// Institutional-grade Connection Pool:
+// We use the Node-Postgres pool to handle concurrent dashboard queries.
+// For Supabase, ensure the DATABASE_URL uses Port 6543 (Transaction Pooler).
+const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    max: 20,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 2000,
+});
 
-export const db = drizzle(sqlConnection, { schema });
+export const db = drizzle(pool, { schema });
 
 /**
  * Helper to retry database operations on transient connection failures

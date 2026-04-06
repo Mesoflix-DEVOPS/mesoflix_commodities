@@ -603,8 +603,8 @@ function DashboardPageInner() {
                         <Shield size={14} /> Risk Analysis
                     </h3>
 
-                    <div className="flex-1 flex flex-col items-center justify-center p-2 bg-white/5 rounded-[2rem] relative min-h-0 min-w-0">
-                        <ResponsiveContainer width="100%" height={120} minWidth={1}>
+                    <div className="flex-1 flex flex-col items-center justify-center p-2 bg-white/5 rounded-[2rem] relative min-h-[150px] min-w-0 overflow-hidden">
+                        <ResponsiveContainer width="100%" height={150} minWidth={1}>
                             <RePieChart>
                                 <Pie
                                     data={riskByAsset}
