@@ -69,7 +69,7 @@ Institutional, elite, and high-end. Use terms like "Liquidity", "Brokerage Integ
         };
 
         // Direct high-performance production REST call (v1 General Availability)
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${API_KEY}`, {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key=${API_KEY}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
