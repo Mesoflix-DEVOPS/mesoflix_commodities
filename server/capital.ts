@@ -109,3 +109,20 @@ export const getMarketTickers = async (cst: string, xSecurityToken: string, epic
 
     return marketResponse.json();
 };
+
+export const getHistory = async (cst: string, xSecurityToken: string, isDemo: boolean = false, options: any = {}, apiUrl?: string) => {
+    const API_URL = apiUrl || getApiUrl(isDemo);
+    const { max = 50 } = options;
+    const response = await fetch(`${API_URL}/history/activity?pageSize=${max}`, {
+        headers: {
+            'X-SECURITY-TOKEN': xSecurityToken,
+            'CST': cst,
+        },
+    });
+
+    if (!response.ok) {
+        throw new Error(`Failed to fetch history: ${response.status}`);
+    }
+
+    return response.json();
+};

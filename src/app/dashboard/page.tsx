@@ -57,14 +57,30 @@ function DashboardPageInner() {
 
     const fetchData = useCallback((isSilent = false) => {
         if (!isSilent) setLoading(true);
-        fetch(`/api/dashboard?mode=${mode}`)
+        
+        // Institutional Bridge: Fetch directly from the stable Render Backend (Port 443)
+        const RENDER_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001';
+        
+        const getCookie = (name: string) => {
+            const value = `; ${document.cookie}`;
+            const parts = value.split(`; ${name}=`);
+            if (parts.length === 2) return parts.pop()?.split(';').shift();
+        };
+
+        const token = getCookie('access_token');
+
+        fetch(`${RENDER_URL}/api/dashboard?mode=${mode}`, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        })
             .then(async (res) => {
                 if (res.ok) {
                     const jsonData = await res.json();
                     setData(jsonData);
                 }
             })
-            .catch((err) => console.error('[Dashboard] Fetch error:', err))
+            .catch((err) => console.error('[Dashboard Bridge] Fetch error:', err))
             .finally(() => {
                 if (!isSilent) setLoading(false);
             });

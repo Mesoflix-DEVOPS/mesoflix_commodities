@@ -5,7 +5,7 @@ import * as jose from 'jose';
 import dotenv from 'dotenv';
 import cors from 'cors';
 import { getValidSession } from './capital-service';
-import { getAccounts, getPositions, getMarketTickers } from './capital';
+import { getAccounts, getPositions, getMarketTickers, getHistory } from './capital';
 import { supabase } from './supabase';
 import { sql } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
@@ -179,10 +179,105 @@ app.post('/api/auth/register', async (req, res) => {
     }
 });
 
+// --- IDENTITY GUARD & SECURE ENGINES ---
 
 const JWT_SECRET = new TextEncoder().encode(
     process.env.JWT_SECRET || 'fallback_secret_must_change_in_prod'
 );
+
+// Express Middleware for JWT Verification
+const authGuard = async (req: any, res: any, next: any) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ error: 'Unauthorized: Missing Token' });
+    }
+    const token = authHeader.split(' ')[1];
+    try {
+        const { payload } = await jose.jwtVerify(token, JWT_SECRET);
+        req.userId = payload.userId;
+        next();
+    } catch (err) {
+        res.status(401).json({ error: 'Unauthorized: Invalid Token' });
+    }
+};
+
+// 5. Moved Dashboard Engine (Stabilized on Render)
+app.get('/api/dashboard', authGuard, async (req: any, res) => {
+    try {
+        const userId = req.userId;
+        const modeInput = req.query.mode || 'demo';
+        const isDemo = modeInput === 'demo';
+
+        // Fetch User Info
+        const { data: user, error: userError } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', userId)
+            .single();
+
+        if (userError || !user) return res.status(404).json({ error: 'User Not Found' });
+
+        const userData = { fullName: user.full_name || 'Trader' };
+
+        try {
+            const session = await getValidSession(userId, isDemo);
+
+            const [accountsData, positionsData, historyData] = await Promise.all([
+                getAccounts(session.cst, session.xSecurityToken, isDemo, session.serverUrl),
+                getPositions(session.cst, session.xSecurityToken, isDemo, session.serverUrl),
+                getHistory(session.cst, session.xSecurityToken, isDemo, { max: 50 }, session.serverUrl)
+            ]);
+
+            const accounts = (accountsData.accounts || []).map((a: any) => ({
+                ...a,
+                balance: {
+                    ...(a.balance || {}),
+                    availableToWithdraw: a.balance?.available ?? a.balance?.availableToWithdraw ?? 0,
+                    equity: (a.balance?.balance ?? 0) + (a.balance?.profitLoss ?? 0),
+                }
+            }));
+
+            res.json({
+                ...accountsData,
+                accounts,
+                positions: positionsData?.positions || [],
+                history: historyData?.activityHistory || [],
+                user: userData
+            });
+        } catch (capitalErr: any) {
+            console.error(`[Bridge Dashboard] Capital Error for ${userId}:`, capitalErr.message);
+            res.json({
+                accounts: [], positions: [], history: [],
+                warning: `Institutional Connection Lag: ${capitalErr.message}`,
+                user: userData
+            });
+        }
+    } catch (err: any) {
+        console.error("Dashboard Bridge Failed:", err.message);
+        res.status(500).json({ error: "Institutional Dashboard Offline" });
+    }
+});
+
+// 6. Moved Notification Engine (Stabilized on Render)
+app.get('/api/notifications', authGuard, async (req: any, res) => {
+    try {
+        const userId = req.userId;
+        const { data: items, error } = await supabase
+            .from('notifications')
+            .select('*')
+            .eq('user_id', userId)
+            .order('created_at', { ascending: false })
+            .limit(50);
+
+        if (error) throw error;
+
+        const unreadCount = items?.filter((i: any) => !i.read).length || 0;
+        res.json({ notifications: items || [], unreadCount });
+    } catch (err: any) {
+        console.error("Notification Bridge Failed:", err.message);
+        res.status(500).json({ error: "Institutional Alerts Offline" });
+    }
+});
 
 // Map to track active per-socket polling loops
 const activePolls = new Map<string, NodeJS.Timeout>();
