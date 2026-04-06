@@ -7,6 +7,8 @@ export async function GET(req: NextRequest) {
     try {
         const API_KEY = process.env.GEMINI_API_KEY;
         const result: any = {
+            build_version: "2.1.0-STABILIZED",
+            build_timestamp: new Date().toISOString(),
             ai_handshake: "PENDING",
             database_connection: "PENDING",
             available_models: [],
@@ -27,10 +29,17 @@ export async function GET(req: NextRequest) {
             }
         }
 
-        // Improved Diagnostic Redaction
-        const dbUrl = process.env.DATABASE_URL || "";
-        const redactedUrl = dbUrl.replace(/\/\/[^:]+:[^@]+@/, "//****:****@") // Hide user:pass
-                                .replace(/:[0-9]+\//, (match) => `:${match.substring(1, match.length-1)} (PORT)/`); // Highlight Port
+        // Institutional Self-Healing Verification
+        const rawUrl = process.env.DATABASE_URL || "";
+        let patchedUrl = rawUrl;
+        
+        // Match the same logic as our DB driver
+        if (patchedUrl.includes('supabase.co:5432')) {
+            patchedUrl = patchedUrl.replace(':5432', ':6543');
+        }
+
+        const redact = (url: string) => url.replace(/\/\/[^:]+:[^@]+@/, "//****:****@")
+                                          .replace(/:[0-9]+\//, (match) => `:${match.substring(1, match.length-1)} (PORT)/`);
 
         try {
             const dbCheck = await db.execute(sql`SELECT 1`);
@@ -38,7 +47,8 @@ export async function GET(req: NextRequest) {
         } catch (dbErr: any) {
             result.database_connection = `FAILED: ${dbErr.message}`;
             result.db_diagnostics = {
-                endpoint_verification: redactedUrl,
+                raw_endpoint: redact(rawUrl),
+                patched_endpoint: redact(patchedUrl),
                 error_summary: dbErr.message,
                 hint: "Your port MUST be 6543 for Vercel production."
             };
