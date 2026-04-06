@@ -10,6 +10,8 @@ interface Message {
 }
 
 export default function OnboardingBot({ ticketId, onClose }: { ticketId?: string | null; onClose?: () => void }) {
+  const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001';
+  
   const [messages, setMessages] = useState<Message[]>([
     { role: "model", text: "Welcome to the Mesoflix Institutional Terminal. I am your Onboarding AI. Do you currently have an account with Capital.com?" }
   ]);
@@ -29,7 +31,11 @@ export default function OnboardingBot({ ticketId, onClose }: { ticketId?: string
     if (checkMatch) {
       const email = checkMatch[1].trim();
       try {
-        const res = await fetch(`/api/auth/check-user?email=${email}`);
+        const res = await fetch(`${SOCKET_URL}/api/auth/check-user`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email })
+        });
         const data = await res.json();
         if (data.exists) {
           setMessages(prev => [...prev, { role: "model", text: "Wait, our institutional database shows an existing account for this email. Please log in or provide a different brokerage email." }]);
@@ -42,7 +48,7 @@ export default function OnboardingBot({ ticketId, onClose }: { ticketId?: string
     // 2. CREATE_SUPPORT_TICKET()
     if (text.includes("ACTION: CREATE_SUPPORT_TICKET()")) {
       try {
-        const res = await fetch("/api/support/tickets", {
+        const res = await fetch(`${SOCKET_URL}/api/support/tickets`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -66,7 +72,7 @@ export default function OnboardingBot({ ticketId, onClose }: { ticketId?: string
         const [email, name, apiKey, apiPassword] = completeMatch.slice(1).map(s => s.trim());
         setLoading(true);
         try {
-            const res = await fetch("/api/auth/register", {
+            const res = await fetch(`${SOCKET_URL}/api/auth/register`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ email, fullName: name, apiKey, apiPassword, accountType: 'demo' })
@@ -111,7 +117,7 @@ export default function OnboardingBot({ ticketId, onClose }: { ticketId?: string
     if (userMsg.toLowerCase().includes("password")) setInputType("password");
 
     try {
-      const res = await fetch("/api/onboarding/chat", {
+      const res = await fetch(`${SOCKET_URL}/api/onboarding/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
