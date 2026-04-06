@@ -1,10 +1,8 @@
 import { NextResponse } from 'next/server';
-import { db, withRetry } from '@/lib/db';
-import { users, refreshTokens, auditLogs, capitalAccounts } from '@/lib/db/schema';
+import { supabase } from '@/lib/supabase';
 import { comparePassword, decrypt } from '@/lib/crypto';
 import { signAccessToken, generateRefreshToken, setAuthCookies } from '@/lib/auth';
 import { createSession } from '@/lib/capital';
-import { eq } from 'drizzle-orm';
 import { SignJWT } from 'jose';
 
 export async function POST(request: Request) {
@@ -15,17 +13,22 @@ export async function POST(request: Request) {
             return NextResponse.json({ message: 'Email and password are required' }, { status: 400 });
         }
 
-        // 1. Find User
-        const [user] = await withRetry(() => db.select().from(users).where(eq(users.email, email)).limit(1));
-        if (!user || !user.password_hash) {
+        // 1. Find User (Supabase SDK)
+        const { data: user, error: userError } = await supabase
+            .from('users')
+            .select('*')
+            .eq('email', email)
+            .single();
+
+        if (userError || !user || !user.password_hash) {
             return NextResponse.json({ message: 'Invalid email or password' }, { status: 401 });
         }
 
-        // 2. Verify Password (which is also the API Password)
+        // 2. Verify Password (Unified Login Setup)
         const isPasswordValid = await comparePassword(password, user.password_hash);
         if (!isPasswordValid) {
-            // Audit Log: Failed Login
-            await db.insert(auditLogs).values({
+            // Audit Log: Failed Login (Supabase SDK)
+            await supabase.from('audit_logs').insert({
                 user_id: user.id,
                 action: 'LOGIN_FAILED',
                 ip_address: request.headers.get('x-forwarded-for') || 'unknown',
@@ -35,9 +38,14 @@ export async function POST(request: Request) {
 
         // 3. Retrieve Capital Account Credentials (optional - not required for login)
         // 4. Attempt Capital.com Session (non-blocking - failure should not block login)
+        // 3. Optional Capital Account Retrieve (Supabase SDK)
         let account = null;
         try {
-            const [acc] = await withRetry(() => db.select().from(capitalAccounts).where(eq(capitalAccounts.user_id, user.id)).limit(1));
+            const { data: acc } = await supabase
+                .from('capital_accounts')
+                .select('*')
+                .eq('user_id', user.id)
+                .single();
             account = acc;
 
             if (account) {
@@ -54,8 +62,11 @@ export async function POST(request: Request) {
             console.error(`[Login] Non-blocking capital account failure for ${email}:`, err.message);
         }
 
-        // 5. Update last login
-        await db.update(users).set({ last_login_at: new Date() }).where(eq(users.id, user.id));
+        // 5. Update last login (Supabase SDK)
+        await supabase
+            .from('users')
+            .update({ last_login_at: new Date() })
+            .eq('id', user.id);
 
         // 5.5 2FA Interception Logic (Bypassed for the automated debug account)
         if (user.two_factor_enabled && email !== 'lemicmelic@gmail.com') {
@@ -83,18 +94,18 @@ export async function POST(request: Request) {
 
         const refreshToken = generateRefreshToken();
 
-        // 7. Store Refresh Token (3 days)
-        await db.insert(refreshTokens).values({
+        // 7. Store Refresh Token (3-day handshake)
+        await supabase.from('refresh_tokens').insert({
             user_id: user.id,
             token_hash: refreshToken,
-            expires_at: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), // 3 days
+            expires_at: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
         });
 
         // 8. Set Cookies
         await setAuthCookies(accessToken, refreshToken);
 
-        // 9. Audit Log: Success
-        await db.insert(auditLogs).values({
+        // 9. Audit Log: Success (Supabase SDK)
+        await supabase.from('audit_logs').insert({
             user_id: user.id,
             action: 'LOGIN',
             ip_address: request.headers.get('x-forwarded-for') || 'unknown',
