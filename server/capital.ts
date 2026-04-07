@@ -139,6 +139,127 @@ export const getMarketTickers = async (cst: string, xSecurityToken: string, epic
     return marketResponse.json();
 };
 
+export const placeOrder = async (
+    cst: string,
+    xSecurityToken: string,
+    epic: string,
+    direction: 'BUY' | 'SELL',
+    size: number,
+    accountIsDemo: boolean = false,
+    options?: {
+        takeProfit?: number | null;
+        stopLoss?: number | null;
+        trailingStop?: boolean;
+    },
+    apiUrl?: string
+) => {
+    const API_URL = apiUrl || getApiUrl(accountIsDemo);
+    const body: any = {
+        epic, direction, size,
+        orderType: 'MARKET', guaranteedStop: false, forceOpen: true,
+    };
+
+    if (options?.takeProfit != null) body.profitLevel = options.takeProfit;
+    if (options?.stopLoss != null) body.stopLevel = options.stopLoss;
+    if (options?.trailingStop) body.trailingStop = true;
+
+    const response = await capitalFetch(`${API_URL}/positions`, {
+        method: 'POST',
+        headers: {
+            'X-SECURITY-TOKEN': xSecurityToken,
+            'CST': cst,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+        throw new Error(`Failed to place order: ${response.status}`);
+    }
+
+    return response.json();
+};
+
+export const closePosition = async (
+    cst: string,
+    xSecurityToken: string,
+    dealId: string,
+    accountIsDemo: boolean = false,
+    apiUrl?: string
+) => {
+    const API_URL = apiUrl || getApiUrl(accountIsDemo);
+    const response = await capitalFetch(`${API_URL}/positions/${dealId}`, {
+        method: 'DELETE',
+        headers: { 'X-SECURITY-TOKEN': xSecurityToken, 'CST': cst },
+    });
+
+    if (!response.ok) {
+        throw new Error(`Failed to close position: ${response.status}`);
+    }
+
+    return response.json();
+};
+
+export const updatePosition = async (
+    cst: string,
+    xSecurityToken: string,
+    dealId: string,
+    options: { stopLevel?: number; profitLevel?: number },
+    isDemo: boolean = false,
+    apiUrl?: string
+) => {
+    const API_URL = apiUrl || getApiUrl(isDemo);
+    const response = await capitalFetch(`${API_URL}/positions/${dealId}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+            'CST': cst,
+            'X-SECURITY-TOKEN': xSecurityToken,
+        },
+        body: JSON.stringify(options),
+    });
+
+    if (!response.ok) {
+        throw new Error(`Failed to update position: ${response.status}`);
+    }
+
+    return response.json();
+};
+
+export const getConfirm = async (
+    cst: string,
+    xSecurityToken: string,
+    dealReference: string,
+    accountIsDemo: boolean = false,
+    apiUrl?: string
+) => {
+    const API_URL = apiUrl || getApiUrl(accountIsDemo);
+    const response = await capitalFetch(`${API_URL}/confirms/${dealReference}`, {
+        headers: { 'X-SECURITY-TOKEN': xSecurityToken, 'CST': cst },
+    });
+
+    if (!response.ok) throw new Error(`Failed to fetch confirmation for ${dealReference}: ${response.status}`);
+    return response.json();
+};
+
+export const getMarketPrices = async (
+    cst: string,
+    xSecurityToken: string,
+    epic: string,
+    resolution: any = 'MINUTE_5',
+    max: number = 200,
+    isDemo: boolean = false,
+    apiUrl?: string
+) => {
+    const API_URL = apiUrl || getApiUrl(isDemo);
+    const response = await capitalFetch(`${API_URL}/prices/${epic}?resolution=${resolution}&max=${max}`, {
+        headers: { 'X-SECURITY-TOKEN': xSecurityToken, 'CST': cst },
+    });
+
+    if (!response.ok) throw new Error(`Failed to fetch prices for ${epic}: ${response.status}`);
+    return response.json();
+};
+
 export const getHistory = async (cst: string, xSecurityToken: string, isDemo: boolean = false, options: any = {}, apiUrl?: string) => {
     const API_URL = apiUrl || getApiUrl(isDemo);
     const { max = 50 } = options;

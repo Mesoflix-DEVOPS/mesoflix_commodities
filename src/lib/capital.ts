@@ -208,6 +208,33 @@ export const closePosition = async (
     return response.json();
 };
 
+export const updatePosition = async (
+    cst: string,
+    xSecurityToken: string,
+    dealId: string,
+    options: { stopLevel?: number; profitLevel?: number },
+    isDemo: boolean = false,
+    apiUrl?: string
+) => {
+    const API_URL = apiUrl || getApiUrl(isDemo);
+    const response = await capitalFetch(`${API_URL}/positions/${dealId}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+            'CST': cst,
+            'X-SECURITY-TOKEN': xSecurityToken,
+        },
+        body: JSON.stringify(options),
+    });
+
+    if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`Failed to update position: ${response.status} - ${text}`);
+    }
+
+    return response.json();
+};
+
 export const getConfirm = async (
     cst: string,
     xSecurityToken: string,
@@ -239,5 +266,16 @@ export const getMarketPrices = async (
     });
 
     if (!response.ok) throw new Error(`Failed to fetch prices for ${epic}: ${response.status}`);
+    return response.json();
+};
+
+export const getHistory = async (cst: string, xSecurityToken: string, isDemo: boolean = false, options: any = {}, apiUrl?: string) => {
+    const API_URL = apiUrl || getApiUrl(isDemo);
+    const { max = 50 } = options;
+    const response = await capitalFetch(`${API_URL}/history/activity?pageSize=${max}`, {
+        headers: { 'X-SECURITY-TOKEN': xSecurityToken, 'CST': cst },
+    });
+
+    if (!response.ok) throw new Error(`Failed to fetch history: ${response.status}`);
     return response.json();
 };
