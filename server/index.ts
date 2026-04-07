@@ -306,6 +306,7 @@ app.get('/api/dashboard', authGuard, async (req: any, res) => {
                 const accountPnl = filteredPositions.reduce((sum: number, p: any) => sum + (p.pnl || 0), 0);
                 return {
                     ...a,
+                    isDemo, // Item 6 alignment: Explicitly flag mode from server
                     balance: {
                         ...(a.balance || {}),
                         pnl: accountPnl,
@@ -631,14 +632,16 @@ app.get('/api/capital/connect', authGuard, async (req: any, res) => {
 app.post('/api/capital/connect', authGuard, async (req: any, res) => {
     try {
         const userId = req.userId;
-        const { label, apiKey, password, accountType } = req.body;
+        const { label, apiKey, password, accountType, login } = req.body;
         
         const { error } = await supabase
             .from('capital_accounts')
             .insert({
                 user_id: userId,
+                label,
+                capital_account_id: login || '', // Populate identifier (Item 3)
                 encrypted_api_key: encrypt(apiKey),
-                encrypted_api_password: encrypt(password),
+                encrypted_api_password: encrypt(password), // Separate encryption (Item 2)
                 account_type: accountType || 'demo',
                 is_active: false,
                 created_at: new Date()
@@ -690,27 +693,92 @@ app.post('/api/capital/select', authGuard, async (req: any, res) => {
     }
 });
 
-// Map to track active per-socket polling loops
-const activePolls = new Map<string, NodeJS.Timeout>();
+// --- INSTITUTIONAL SCALING: SHARED POLLING ENGINE (Items 9 & 13) ---
+const activeUserPollers = new Map<string, { interval: NodeJS.Timeout, socketCount: number, lastData: any }>();
 
-io.use(async (socket, next) => {
-    const token = socket.handshake.auth.token;
-    if (!token) {
-        console.warn(`[Socket Auth] Missing Token for ${socket.id}`);
-        return next(new Error('Unauthorized: Missing Token'));
+function stopUserPoller(userId: string) {
+    const poller = activeUserPollers.get(userId);
+    if (poller) {
+        poller.socketCount--;
+        if (poller.socketCount <= 0) {
+            clearInterval(poller.interval);
+            activeUserPollers.delete(userId);
+            console.log(`[Scaling] Stopped Shared Poller for User: ${userId}`);
+        }
+    }
+}
+
+function startUserPoller(userId: string, io: Server) {
+    if (activeUserPollers.has(userId)) {
+        activeUserPollers.get(userId)!.socketCount++;
+        return;
     }
 
-    try {
-        const secret = new TextEncoder().encode(process.env.JWT_SECRET || 'mesoflix-bridge-secret-2024');
-        const { payload } = await jose.jwtVerify(token, secret);
-        socket.data.userId = (payload as any).userId;
-        console.log(`[Socket Auth] Handshake Successful for User ${socket.data.userId}`);
-        next();
-    } catch (err: any) {
-        console.error(`[Socket Auth] Verification Failed for ${socket.id}:`, err.message);
-        next(new Error('Unauthorized: Invalid Token'));
-    }
-});
+    console.log(`[Scaling] Initializing Shared Poller for User: ${userId}`);
+    
+    const pollFunc = async () => {
+        try {
+            // Heartbeat: Fetch both environments in parallel (Items 4, 14 alignment)
+            const [real, demo] = await Promise.all([
+                getValidSession(userId, false, true),
+                getValidSession(userId, true, true)
+            ]).catch(() => [null, null]);
+
+            if (real) {
+                try {
+                    const [accs, positionsData] = await Promise.all([
+                        getAccounts(real.cst, real.xSecurityToken, false, real.serverUrl),
+                        getPositions(real.cst, real.xSecurityToken, false, real.serverUrl)
+                    ]) as [any, any];
+                    
+                    const bal = accs.accounts?.find((a: any) => a.accountId === real.activeAccountId);
+                    if (bal) {
+                        const filteredPoss = (positionsData?.positions || []).filter((p: any) => p.accountId === real.activeAccountId);
+                        const totalPnl = filteredPoss.reduce((s: number, p: any) => s + (p.pnl || 0), 0);
+                        io.to(`user:${userId}`).emit('balance', {
+                            ...bal.balance, pnl: totalPnl, profitLoss: totalPnl,
+                            equity: (bal.balance?.balance || 0) + totalPnl,
+                            isDemo: false, accountId: real.activeAccountId, accountName: bal.accountName
+                        });
+                        io.to(`user:${userId}`).emit('positions', filteredPoss);
+                    }
+                } catch (e) {}
+            }
+
+            if (demo) {
+                try {
+                    const [accs, positionsData] = await Promise.all([
+                        getAccounts(demo.cst, demo.xSecurityToken, true, demo.serverUrl),
+                        getPositions(demo.cst, demo.xSecurityToken, true, demo.serverUrl)
+                    ]) as [any, any];
+                    
+                    const bal = accs.accounts?.find((a: any) => a.accountId === demo.activeAccountId);
+                    if (bal) {
+                        const filteredPoss = (positionsData?.positions || []).filter((p: any) => p.accountId === demo.activeAccountId);
+                        const totalPnl = filteredPoss.reduce((s: number, p: any) => s + (p.pnl || 0), 0);
+                        io.to(`user:${userId}`).emit('balance', {
+                            ...bal.balance, pnl: totalPnl, profitLoss: totalPnl,
+                            equity: (bal.balance?.balance || 0) + totalPnl,
+                            isDemo: true, accountId: demo.activeAccountId, accountName: demo.accountName
+                        });
+                        io.to(`user:${userId}`).emit('positions', filteredPoss);
+                    }
+                } catch (e) {}
+            }
+
+            // Always broadcast global prices to this user group
+            const cachedPrices = Array.from(marketPriceCache.values());
+            io.to(`user:${userId}`).emit('market-data', cachedPrices);
+
+        } catch (err: any) {
+            console.error(`[Shared Poller Failure] ${userId}:`, err.message);
+        }
+    };
+
+    const interval = setInterval(pollFunc, 3500); // Institutional balance heartbeat
+    activeUserPollers.set(userId, { interval, socketCount: 1, lastData: null });
+    pollFunc(); // Immediate first fetch
+}
 
 // --- GLOBAL PRICE ENGINE (Anti-429 Megaphone) ---
 const marketPriceCache = new Map<string, any>();
@@ -722,26 +790,51 @@ async function startGlobalPriceLoop() {
     console.log("🚀 Global Price Megaphone Initialized...");
 
     const epics = ['GOLD', 'OIL_CRUDE', 'BTCUSD'];
-    
     const runLoop = async () => {
         try {
-            // Find a valid Real account to lead the unified price discovery
-            const { data: accounts } = await supabase.from('capital_accounts')
-                .select('user_id')
-                .eq('account_type', 'real')
-                .limit(5);
+            // Institutional Leader Election: Fetch a pool of both Real and Demo accounts (Item 10)
+            const { data: candidates } = await supabase.from('capital_accounts')
+                .select('user_id, account_type')
+                .eq('is_active', true)
+                .order('created_at', { ascending: false })
+                .limit(20);
 
-            if (!accounts || accounts.length === 0) return;
+            if (!candidates || candidates.length === 0) return;
 
-            let session = null;
-            for (const acc of accounts) {
-                session = await getValidSession(acc.user_id, false, true); // Force Real mode for global prices
-                if (session) break;
+            // Priority 1: Real accounts (Stable data)
+            const realLeaders = candidates.filter(c => c.account_type === 'real');
+            const demoLeaders = candidates.filter(c => c.account_type === 'demo');
+            
+            let leaderSession = null;
+            let currentLeader = null;
+
+            // Try Real leaders first
+            for (const leader of realLeaders) {
+                leaderSession = await getValidSession(leader.user_id, false);
+                if (leaderSession) {
+                    currentLeader = leader;
+                    break;
+                }
             }
 
-            if (!session) return;
+            // Fallback: Demo leaders
+            if (!leaderSession) {
+                for (const leader of demoLeaders) {
+                    leaderSession = await getValidSession(leader.user_id, true);
+                    if (leaderSession) {
+                        currentLeader = leader;
+                        break;
+                    }
+                }
+            }
 
-            const marketData = await getMarketTickers(session.cst, session.xSecurityToken, epics, false, session.serverUrl) as any;
+            if (!leaderSession) {
+                console.warn("[Megaphone] No candidate session available for global pricing.");
+                return;
+            }
+
+            const isDemo = currentLeader?.account_type === 'demo';
+            const marketData = await getMarketTickers(leaderSession.cst, leaderSession.xSecurityToken, epics, isDemo, leaderSession.serverUrl) as any;
             
             if (marketData?.marketDetails) {
                 const formatted = marketData.marketDetails.map((detail: any) => ({
@@ -756,117 +849,41 @@ async function startGlobalPriceLoop() {
 
                 formatted.forEach((p: any) => marketPriceCache.set(p.epic, p));
                 io.emit('market-data', formatted);
+                // Also broadcast to per-user rooms to ensure sync
+                candidates.forEach(c => io.to(`user:${c.user_id}`).emit('market-data', formatted));
             }
         } catch (e: any) {
-            console.warn(`[Unified Price Engine] Skip: ${e.message}`);
+            console.warn(`[Megaphone Sync Skip] ${e.message}`);
         } finally {
-            setTimeout(runLoop, 2500); // 2.5s high-velocity sync
+            setTimeout(runLoop, 2500); // Institutional high-velocity interval
         }
     };
 
     runLoop();
 }
 
-io.on('connection', (socket) => {
-    startGlobalPriceLoop(); // Ensure loop is running
-    const userId = socket.data.userId;
-    console.log(`[Socket] User connected: ${userId} (${socket.id})`);
+io.on('connection', async (socket) => {
+    try {
+        startGlobalPriceLoop();
+        const token = socket.handshake.auth.token;
+        const { payload } = await jose.jwtVerify(token, JWT_SECRET);
+        const userId = payload.userId as string;
 
-    socket.on('start-stream', async (config: { mode: string, epics?: string[] }) => {
-        const { mode, epics = ['GOLD', 'OIL_CRUDE', 'BTCUSD'] } = config;
-        const isDemo = mode === 'demo';
+        console.log(`[Socket] Authorized Connection: ${socket.id} (User: ${userId})`);
+        
+        // Join User Room for Shared Pub-Sub (Scalingfix Item 9)
+        socket.join(`user:${userId}`);
+        startUserPoller(userId, io);
 
-        // Clear existing poll for this socket
-        if (activePolls.has(socket.id)) {
-            clearInterval(activePolls.get(socket.id));
-        }
+        socket.on('disconnect', () => {
+            console.log(`[Socket] Disconnected: ${socket.id}`);
+            stopUserPoller(userId);
+        });
 
-        const pollData = async () => {
-            try {
-                // Unified Heartbeat
-                const syncBalances = async () => {
-                    try {
-                        const real = await getValidSession(userId, false, true);
-                        if (real) {
-                            const accs = await getAccounts(real.cst, real.xSecurityToken, false, real.serverUrl) as any;
-                            const bal = accs.accounts?.find((a: any) => a.accountId === real.activeAccountId);
-                            if (bal) {
-                                // Fetch positions for Real
-                                const positionsData = await getPositions(real.cst, real.xSecurityToken, false, real.serverUrl) as any;
-                                const filteredPoss = (positionsData?.positions || []).filter((p: any) => p.accountId === real.activeAccountId);
-                                const totalPnl = filteredPoss.reduce((s: number, p: any) => s + (p.pnl || 0), 0);
-                                
-                                socket.emit('balance', {
-                                    ...bal.balance,
-                                    pnl: totalPnl,
-                                    profitLoss: totalPnl,
-                                    equity: (bal.balance?.balance || 0) + totalPnl,
-                                    isDemo: false,
-                                    accountId: real.activeAccountId,
-                                    accountName: bal.accountName,
-                                });
-                                socket.emit('positions', filteredPoss);
-                            }
-                        }
-                    } catch (e: any) {
-                        console.warn(`[Sync Heartbeat] REAL Failure for ${userId}: ${e.message}`);
-                    }
-
-                    try {
-                        const demo = await getValidSession(userId, true, true);
-                        if (demo) {
-                            const accs = await getAccounts(demo.cst, demo.xSecurityToken, true, demo.serverUrl) as any;
-                            const bal = accs.accounts?.find((a: any) => a.accountId === demo.activeAccountId);
-                            if (bal) {
-                                // Fetch positions for Demo
-                                const positionsData = await getPositions(demo.cst, demo.xSecurityToken, true, demo.serverUrl) as any;
-                                const filteredPoss = (positionsData?.positions || []).filter((p: any) => p.accountId === demo.activeAccountId);
-                                const totalPnl = filteredPoss.reduce((s: number, p: any) => s + (p.pnl || 0), 0);
-
-                                socket.emit('balance', {
-                                    ...bal.balance,
-                                    pnl: totalPnl,
-                                    profitLoss: totalPnl,
-                                    equity: (bal.balance?.balance || 0) + totalPnl,
-                                    isDemo: true,
-                                    accountId: demo.activeAccountId,
-                                    accountName: bal.accountName,
-                                });
-                                socket.emit('positions', filteredPoss);
-                            }
-                        }
-                    } catch (e: any) {
-                        console.warn(`[Sync Heartbeat] DEMO Failure for ${userId}: ${e.message}`);
-                    }
-                };
-
-                await syncBalances();
-
-                // Broadcast latest prices from the Global Megaphone
-                const cachedPrices = Array.from(marketPriceCache.values());
-                socket.emit('market-data', cachedPrices);
-
-            } catch (error: any) {
-                console.error(`[Socket Poll Error] ${userId}:`, error.message);
-                if (error.message?.includes('401')) {
-                    socket.emit('stream-error', { message: 'Session expired' });
-                }
-            }
-        };
-
-        // Complete Real-Time: 3s heartbeat
-        await pollData();
-        const timer = setInterval(pollData, 3000);
-        activePolls.set(socket.id, timer);
-    });
-
-    socket.on('disconnect', () => {
-        console.log(`[Socket] Disconnected: ${socket.id}`);
-        if (activePolls.has(socket.id)) {
-            clearInterval(activePolls.get(socket.id));
-            activePolls.delete(socket.id);
-        }
-    });
+    } catch (err: any) {
+        console.warn(`[Socket] Authorization Rejected: ${err.message}`);
+        socket.disconnect();
+    }
 });
 
 // --- EMERGENCY RECALIBRATION ---

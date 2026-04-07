@@ -38,14 +38,14 @@ export async function GET(request: Request) {
 
         try {
             const session = await getValidSession(userId, isDemo);
-            const marketData = await getMarketTickers(session.cst, session.xSecurityToken, epics, isDemo);
+            const marketData = await getMarketTickers(session.cst, session.xSecurityToken, epics, isDemo, session.serverUrl);
             return NextResponse.json(marketData);
 
         } catch (err: any) {
             console.error('[Markets API] Institutional Lag:', err.message);
             if (err.message.includes('401') || err.message.toLowerCase().includes('session')) {
                 const session = await getValidSession(userId, isDemo, true);
-                const marketData = await getMarketTickers(session.cst, session.xSecurityToken, epics, isDemo);
+                const marketData = await getMarketTickers(session.cst, session.xSecurityToken, epics, isDemo, session.serverUrl);
                 return NextResponse.json(marketData);
             }
             return NextResponse.json({ warning: 'Brokerage Data Delayed' });

@@ -14,8 +14,21 @@ export async function GET(req: NextRequest) {
         const tokenPayload = await verifyAccessToken(accessToken);
         if (!tokenPayload) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-        // Hit the unified LIVE server once.
-        const session = await getValidSession(tokenPayload.userId);
+        const userId = tokenPayload.userId;
+
+        // 1. Fetch User Settings (Institutional Accuracy - Item 4)
+        const { data: accountConfig } = await supabase
+            .from('capital_accounts')
+            .select('*')
+            .eq('user_id', userId)
+            .single();
+
+        if (!accountConfig) return NextResponse.json({ error: 'Brokerage Link Missing' }, { status: 404 });
+
+        // 2. Fetch session and standard server URL (Item 14)
+        const session = await getValidSession(userId);
+        if (!session) throw new Error("Brokerage Link Unavailable");
+
         const API_BASE = session.serverUrl;
 
         const res = await fetch(`${API_BASE}/accounts`, {
@@ -23,21 +36,21 @@ export async function GET(req: NextRequest) {
             signal: AbortSignal.timeout(8000),
         });
 
-        if (!res.ok) {
-            if (res.status === 401) {
-                const fresh = await getValidSession(tokenPayload.userId, false, true);
-                const retry = await fetch(`${API_BASE}/accounts`, {
-                    headers: { 'CST': fresh.cst, 'X-SECURITY-TOKEN': fresh.xSecurityToken },
-                    signal: AbortSignal.timeout(8000),
-                });
-                if (retry.ok) {
-                    return NextResponse.json(splitAccounts(await retry.json()));
-                }
-            }
-            throw new Error(`Capital.com returned ${res.status}`);
-        }
+        if (!res.ok) throw new Error(`Brokerage returned ${res.status}`);
 
-        return NextResponse.json(splitAccounts(await res.json()));
+        const data = await res.json();
+        const accounts = data?.accounts || [];
+
+        // 3. Explicit ID Mapping (Item 4 fix)
+        const rAcc = accounts.find((a: any) => a.accountId === accountConfig.selected_real_account_id) || accounts[0];
+        const dAcc = accounts.find((a: any) => a.accountId === accountConfig.selected_demo_account_id) || accounts[1] || accounts[0];
+
+        return NextResponse.json({
+            realBalance: extractBalance(rAcc),
+            demoBalance: extractBalance(dAcc),
+            hasLive: !!rAcc,
+            hasDemo: !!dAcc,
+        });
 
     } catch (err: any) {
         console.error('[Balance API] Fatal Error:', err.message);

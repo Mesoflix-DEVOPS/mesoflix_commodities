@@ -105,10 +105,11 @@ export async function GET(req: NextRequest) {
                 }
             };
 
-            // Poll immediately, then every 2 seconds for high-fidelity real-time feel
+            // 🏁 INSTITUTIONAL POLL RELAXATION (Item 13)
+            // Initial burst, then 7.5s interval to prevent API amplification
             await pollData();
             if (!isClosed) {
-                pollingTimer = setInterval(pollData, 2000);
+                pollingTimer = setInterval(pollData, 7500);
             }
 
             req.signal.addEventListener('abort', cleanup);

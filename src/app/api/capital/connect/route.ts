@@ -45,8 +45,8 @@ export async function POST(request: Request) {
             return NextResponse.json({ message: 'Label, Password, and API Key are required' }, { status: 400 });
         }
 
-        const credentials = JSON.stringify({ login: login || '', password, apiKey });
-        const encryptedKey = encrypt(credentials);
+        const encryptedKey = encrypt(apiKey);
+        const encryptedPass = encrypt(password);
 
         const { data: existing } = await supabase.from('capital_accounts').select('id').eq('user_id', userId);
         const isActive = (existing || []).length === 0;
@@ -56,6 +56,7 @@ export async function POST(request: Request) {
             label,
             is_active: isActive,
             encrypted_api_key: encryptedKey,
+            encrypted_api_password: encryptedPass,
             account_type: accountType,
             capital_account_id: login || '',
             created_at: new Date()

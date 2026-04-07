@@ -19,9 +19,11 @@ export async function GET(req: NextRequest) {
         const epicsParam = searchParams.get('epics');
         const epics = epicsParam ? epicsParam.split(',') : ['GOLD', 'OIL_CRUDE', 'BTCUSD'];
 
-        // Institutional Bridge: Fetch session via stable SDK
+        // Institutional Bridge: Fetch session via stable SDK (Item 7 fix)
         const session = await getValidSession(tokenPayload.userId);
-        const API_BASE = getApiUrl(false);
+        if (!session) throw new Error("Brokerage Link Unavailable");
+        
+        const API_BASE = session.serverUrl;
 
         const response = await fetch(`${API_BASE}/markets?epics=${epics.join(',')}`, {
             headers: {

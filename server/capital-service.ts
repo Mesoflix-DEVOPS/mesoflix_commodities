@@ -85,14 +85,18 @@ export async function getValidSession(userId: string, forceDemo?: boolean, skipR
 
 async function performLogin(account: any, isDemo: boolean, existingSessions: any = {}): Promise<SessionTokens> {
     const userId = account.user_id;
-    const apiKeyEnc = account.api_key;
-    const apiPasswordEnc = account.password;
+    const apiKeyEnc = account.encrypted_api_key || account.api_key;
+    const apiPasswordEnc = account.encrypted_api_password || account.password;
     
+    if (!apiKeyEnc || !apiPasswordEnc) {
+        throw new Error("Brokerage Credentials Missing in DB Cluster.");
+    }
+
     const apiKey = decrypt(apiKeyEnc);
     const apiPassword = decrypt(apiPasswordEnc);
 
-    // Fetch Email if not present (Capital identifier)
-    let identifier = account.email;
+    // Fetch Broker Identifier (Item 3 alignment)
+    let identifier = account.capital_account_id;
     if (!identifier) {
         const { data: userData } = await supabase.from('users').select('email').eq('id', userId).single();
         identifier = userData?.email || '';

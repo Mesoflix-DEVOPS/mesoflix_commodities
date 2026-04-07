@@ -17,11 +17,13 @@ export async function POST(req: NextRequest) {
         const tokenPayload = await verifyAccessToken(accessToken);
         if (!tokenPayload) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-        const { accountId, accountType } = await req.json();
+        const { accountId, isDemo: isDemoInput } = await req.json();
         if (!accountId) return NextResponse.json({ error: 'Account ID required' }, { status: 400 });
 
         const userId = tokenPayload.userId;
-        const isDemo = accountType === 'SPREADBET' || (accountId && accountId.toLowerCase().includes('demo'));
+        
+        // Explicit Mode Switch (Item 5 fix)
+        const isDemo = isDemoInput === true;
 
         // Institutional Bridge: Update selection via stable SDK
         const updateField = isDemo ? 'selected_demo_account_id' : 'selected_real_account_id';

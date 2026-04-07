@@ -3,6 +3,34 @@ const DEMO_API_URL = 'https://demo-api-capital.backend-capital.com/api/v1';
 
 const getApiUrl = (isDemo: boolean) => isDemo ? DEMO_API_URL : LIVE_API_URL;
 
+// Unified Resilience Layer (Item 11)
+async function capitalFetch(url: string, options: any = {}, retries = 3, backoff = 1000): Promise<Response> {
+    const timeout = options.timeout || 15000;
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), timeout);
+
+    try {
+        const response = await fetch(url, { ...options, signal: controller.signal });
+        clearTimeout(id);
+
+        if (response.status === 429 || (response.status >= 500 && retries > 0)) {
+            const delay = response.status === 429 ? 2000 : backoff;
+            console.warn(`[Capital API] Transient Error ${response.status}. Retrying in ${delay}ms... (${retries} left)`);
+            await new Promise(r => setTimeout(r, delay));
+            return capitalFetch(url, options, retries - 1, backoff * 2);
+        }
+
+        return response;
+    } catch (err: any) {
+        clearTimeout(id);
+        if (err.name === 'AbortError' && retries > 0) {
+            console.warn(`[Capital API] Timeout. Retrying... (${retries} left)`);
+            return capitalFetch(url, options, retries - 1, backoff * 2);
+        }
+        throw err;
+    }
+}
+
 export const createSession = async (
     identifier: string,
     password: string,
@@ -10,7 +38,7 @@ export const createSession = async (
     isDemo: boolean = false
 ): Promise<any> => {
     const API_URL = getApiUrl(isDemo);
-    const response = await fetch(`${API_URL}/session`, {
+    const response = await capitalFetch(`${API_URL}/session`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -47,7 +75,7 @@ export const switchActiveAccount = async (
     isDemo: boolean = false
 ): Promise<void> => {
     const API_URL = getApiUrl(isDemo);
-    const response = await fetch(`${API_URL}/session`, {
+    const response = await capitalFetch(`${API_URL}/session`, {
         method: 'PUT',
         headers: {
             'Content-Type': 'application/json',
@@ -64,7 +92,7 @@ export const switchActiveAccount = async (
 
 export const getAccounts = async (cst: string, xSecurityToken: string, isDemo: boolean = false, apiUrl?: string) => {
     const API_URL = apiUrl || getApiUrl(isDemo);
-    const response = await fetch(`${API_URL}/accounts`, {
+    const response = await capitalFetch(`${API_URL}/accounts`, {
         headers: {
             'X-SECURITY-TOKEN': xSecurityToken,
             'CST': cst,
@@ -80,7 +108,7 @@ export const getAccounts = async (cst: string, xSecurityToken: string, isDemo: b
 
 export const getPositions = async (cst: string, xSecurityToken: string, isDemo: boolean = false, apiUrl?: string) => {
     const API_URL = apiUrl || getApiUrl(isDemo);
-    const response = await fetch(`${API_URL}/positions`, {
+    const response = await capitalFetch(`${API_URL}/positions`, {
         headers: {
             'X-SECURITY-TOKEN': xSecurityToken,
             'CST': cst,
@@ -96,7 +124,7 @@ export const getPositions = async (cst: string, xSecurityToken: string, isDemo: 
 
 export const getMarketTickers = async (cst: string, xSecurityToken: string, epics: string[], isDemo: boolean = false, apiUrl?: string) => {
     const API_URL = apiUrl || getApiUrl(isDemo);
-    const marketResponse = await fetch(`${API_URL}/markets?epics=${epics.join(',')}`, {
+    const marketResponse = await capitalFetch(`${API_URL}/markets?epics=${epics.join(',')}`, {
         headers: {
             'X-SECURITY-TOKEN': xSecurityToken,
             'CST': cst,
@@ -113,7 +141,7 @@ export const getMarketTickers = async (cst: string, xSecurityToken: string, epic
 export const getHistory = async (cst: string, xSecurityToken: string, isDemo: boolean = false, options: any = {}, apiUrl?: string) => {
     const API_URL = apiUrl || getApiUrl(isDemo);
     const { max = 50 } = options;
-    const response = await fetch(`${API_URL}/history/activity?pageSize=${max}`, {
+    const response = await capitalFetch(`${API_URL}/history/activity?pageSize=${max}`, {
         headers: {
             'X-SECURITY-TOKEN': xSecurityToken,
             'CST': cst,
