@@ -643,7 +643,54 @@ io.use(async (socket, next) => {
     }
 });
 
+// --- GLOBAL PRICE ENGINE (Anti-429 Megaphone) ---
+const marketPriceCache = new Map<string, any>();
+let priceLoopStarted = false;
+
+async function startGlobalPriceLoop() {
+    if (priceLoopStarted) return;
+    priceLoopStarted = true;
+    console.log("🚀 Global Price Megaphone Initialized...");
+
+    const epics = ['GOLD', 'OIL_CRUDE', 'BTCUSD'];
+    
+    const runLoop = async () => {
+        try {
+            // Use the first available valid session to fetch global prices
+            const { data: leadAccount } = await supabase.from('capital_accounts').select('user_id').limit(1).single();
+            if (!leadAccount) return;
+
+            const session = await getValidSession(leadAccount.user_id, true); // Use Demo for global prices (rate limits are usually separate)
+            if (!session) return;
+
+            const marketData = await getMarketTickers(session.cst, session.xSecurityToken, epics, true, session.serverUrl);
+            
+            if (marketData?.marketDetails) {
+                const formatted = marketData.marketDetails.map((detail: any) => ({
+                    epic: detail.instrument.epic,
+                    bid: detail.snapshot.bid,
+                    offer: detail.snapshot.offer,
+                    high: detail.snapshot.high,
+                    low: detail.snapshot.low,
+                    netChange: detail.snapshot.netChange,
+                    percentageChange: detail.snapshot.percentageChange
+                }));
+
+                formatted.forEach((p: any) => marketPriceCache.set(p.epic, p));
+                io.emit('market-data', formatted);
+            }
+        } catch (e: any) {
+            console.warn(`[Global Price Engine] Skip: ${e.message}`);
+        } finally {
+            setTimeout(runLoop, 2500); // 2.5s interval
+        }
+    };
+
+    runLoop();
+}
+
 io.on('connection', (socket) => {
+    startGlobalPriceLoop(); // Ensure loop is running
     const userId = socket.data.userId;
     console.log(`[Socket] User connected: ${userId} (${socket.id})`);
 
@@ -667,34 +714,21 @@ io.on('connection', (socket) => {
                     return; 
                 }
 
-                const [accountsData, positionsData, marketData] = await Promise.all([
+                const [accountsData, positionsData] = await Promise.all([
                     getAccounts(currentSession.cst, currentSession.xSecurityToken, isDemo, currentSession.serverUrl),
-                    getPositions(currentSession.cst, currentSession.xSecurityToken, isDemo, currentSession.serverUrl),
-                    getMarketTickers(currentSession.cst, currentSession.xSecurityToken, epics, isDemo, currentSession.serverUrl)
-                ]) as [any, any, any];
+                    getPositions(currentSession.cst, currentSession.xSecurityToken, isDemo, currentSession.serverUrl)
+                ]) as [any, any];
 
-                // 1. Unified Market Data Emission (matching UI field names)
-                if (marketData?.marketDetails) {
-                    const formattedMarket = marketData.marketDetails.map((detail: any) => ({
-                        epic: detail.instrument.epic,
-                        bid: detail.snapshot.bid,
-                        offer: detail.snapshot.offer,
-                        high: detail.snapshot.high,
-                        low: detail.snapshot.low,
-                        netChange: detail.snapshot.netChange,
-                        percentageChange: detail.snapshot.percentageChange
-                    }));
-                    socket.emit('market-data', formattedMarket);
-                }
+                // 1. Unified Market Data Emission (from Global Cache)
+                const cachedPrices = Array.from(marketPriceCache.values());
+                socket.emit('market-data', cachedPrices);
 
                 // 2. Separate Balance & Positions (Recalibrated Logic)
                 if (accountsData?.accounts) {
                     const allAccs = accountsData.accounts;
                     
-                    // TRUST THE SERVER + PREFER LABELS
-                    let activeAccount = allAccs.find((a: any) => 
-                        (a.accountType || '').toLowerCase().includes(isDemo ? 'demo' : 'live')
-                    ) || allAccs[0];
+                    // TRUST THE HANDSHAKE (Match by Verified ID)
+                    let activeAccount = allAccs.find((a: any) => a.accountId === currentSession.activeAccountId) || allAccs[0];
 
                     if (activeAccount) {
                         const activeId = activeAccount.accountId;
