@@ -98,6 +98,23 @@ async function performLogin(account: any, isDemo: boolean, existingSessions: any
     }
 
     const session = await createSession(identifier, apiPassword, apiKey, isDemo);
+    
+    // STRICT MODE VERIFICATION: Ensure the server we hit matches our expectation
+    // Some Capital environments might return Demo accounts even on a Live URL if keys are mixed.
+    const allAccounts = session.accounts || [];
+    const hasLiveOnDemoField = allAccounts.some((a: any) => (a.accountType || '').toLowerCase().includes('live'));
+    const hasDemoOnLiveField = allAccounts.some((a: any) => (a.accountType || '').toLowerCase().includes('demo'));
+
+    if (isDemo && hasLiveOnDemoField && !hasDemoOnLiveField) {
+        console.error(`[Security Alert] MODE MISMATCH: Hit DEMO server but found LIVE accounts for ${identifier}. Aborting sync.`);
+        throw new Error("Brokerage Environment Mismatch (Live accounts found on Demo server)");
+    }
+    
+    if (!isDemo && hasDemoOnLiveField && !hasLiveOnDemoField) {
+        console.error(`[Security Alert] MODE MISMATCH: Hit LIVE server but found DEMO accounts for ${identifier}. Aborting sync.`);
+        throw new Error("Brokerage Environment Mismatch (Demo accounts found on Live server)");
+    }
+
     const targetAccountId = isDemo ? account.selected_demo_account_id : account.selected_real_account_id;
     
     if (targetAccountId && targetAccountId !== session.currentAccountId) {

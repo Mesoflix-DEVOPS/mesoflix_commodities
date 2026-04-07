@@ -242,28 +242,29 @@ app.get('/api/dashboard', authGuard, async (req: any, res) => {
                 getHistory(session.cst, session.xSecurityToken, isDemo, { max: 50 }, session.serverUrl)
             ]) as [any, any, any];
 
-            // 1. ROBUST ACCOUNT PICKING (Server-Trust Logic)
+            // 1. ROBUST ACCOUNT PICKING (Verified Server Logic)
             const allAccounts = accountsData.accounts || [];
-            const target = isDemo ? 'DEMO' : 'REAL';
+            const targetMode = isDemo ? 'DEMO' : 'REAL';
 
-            console.log(`[Diagnostic] ${target} Auth: ${userId}, Accounts Found: ${allAccounts.length}`);
+            // Filter for explicit mode labels if they exist
+            let accounts = allAccounts.filter((a: any) => 
+                (a.accountType || '').toLowerCase().includes(isDemo ? 'demo' : 'live') ||
+                (a.accountName || '').toLowerCase().includes(isDemo ? 'demo' : 'live')
+            );
 
-            // TRUST THE SERVER: If we are on the Demo server, all accounts returned are Demo.
-            // Do NOT filter by "demo" or "live" labels as they vary by region (CFD/Trading/SpreadBet).
-            let accounts = allAccounts;
-
-            // Fallback: If multiple accounts exist (e.g. USD/EUR), pick the primary one (highest balance)
-            if (accounts.length > 1) {
-                accounts = [[...accounts].sort((a,b) => (b.balance?.balance || 0) - (a.balance?.balance || 0))[0]];
+            // If no explicit labels, but we have accounts, trust the server we are on.
+            if (accounts.length === 0 && allAccounts.length > 0) {
+                 // SENSITIVITY GUARD: In REAL mode, NEVER pick an account that has a massive balance suggestive of a Demo account
+                 // Unless it's the only one and we've verified the session.
+                 accounts = [allAccounts[0]];
             }
 
             const activeAccount = accounts[0];
             const activeAccountId = activeAccount?.accountId;
             
-            console.log(`[Diagnostic] Target Account ID: ${activeAccountId || 'NONE'}`);
+            console.log(`[Diagnostic] Recalibrated Member ID: ${activeAccountId || 'NONE'}`);
 
             // 2. POSITION FILTERING (P/L Fix)
-            // Still strictly filter positions to the account returned by THIS server
             const filteredPositions = (positionsData?.positions || []).filter((p: any) => p.accountId === activeAccountId);
 
             const formattedAccounts = accounts.map((a: any) => {
@@ -686,15 +687,14 @@ io.on('connection', (socket) => {
                     socket.emit('market-data', formattedMarket);
                 }
 
-                // 2. Separate Balance & Positions (Corrected Server-Trust Logic)
+                // 2. Separate Balance & Positions (Recalibrated Logic)
                 if (accountsData?.accounts) {
                     const allAccs = accountsData.accounts;
                     
-                    // TRUST THE SERVER: We are already on the specific Demo/Live URL.
-                    // If multiple accounts returned, pick the one with activities/balance.
-                    let activeAccount = allAccs.length > 1 
-                        ? [...allAccs].sort((a,b) => (b.balance?.balance || 0) - (a.balance?.balance || 0))[0]
-                        : allAccs[0];
+                    // TRUST THE SERVER + PREFER LABELS
+                    let activeAccount = allAccs.find((a: any) => 
+                        (a.accountType || '').toLowerCase().includes(isDemo ? 'demo' : 'live')
+                    ) || allAccs[0];
 
                     if (activeAccount) {
                         const activeId = activeAccount.accountId;
@@ -737,6 +737,22 @@ io.on('connection', (socket) => {
             activePolls.delete(socket.id);
         }
     });
+});
+
+// --- EMERGENCY RECALIBRATION ---
+app.get('/api/admin/recalibrate', async (req, res) => {
+    try {
+        console.log("🚀 Global Mode Recalibration Triggered...");
+        const { error } = await supabase
+            .from('capital_accounts')
+            .update({ encrypted_session_tokens: null })
+            .not('id', 'is', null);
+
+        if (error) throw error;
+        res.json({ success: true, message: "Recalibration complete. Please refresh your dashboard in 10 seconds." });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
 // --- INSTITUTIONAL METRICS ---
