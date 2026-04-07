@@ -781,15 +781,32 @@ io.on('connection', (socket) => {
             clearInterval(activePolls.get(socket.id));
         }
 
-                // Institutional Real-Time Heartbeat: Fetch & Emit both environments instantly
+        const pollData = async () => {
+            try {
+                // Unified Heartbeat
                 const syncBalances = async () => {
-                    // Isolation Guard: Ensure one server failure doesn't kill the other
                     try {
                         const real = await getValidSession(userId, false, true);
                         if (real) {
-                            const accs = await getAccounts(real.cst, real.xSecurityToken, false, real.serverUrl);
+                            const accs = await getAccounts(real.cst, real.xSecurityToken, false, real.serverUrl) as any;
                             const bal = accs.accounts?.find((a: any) => a.accountId === real.activeAccountId);
-                            if (bal) socket.emit('balance', { ...bal, isDemo: false });
+                            if (bal) {
+                                // Fetch positions for Real
+                                const positionsData = await getPositions(real.cst, real.xSecurityToken, false, real.serverUrl) as any;
+                                const filteredPoss = (positionsData?.positions || []).filter((p: any) => p.accountId === real.activeAccountId);
+                                const totalPnl = filteredPoss.reduce((s: number, p: any) => s + (p.pnl || 0), 0);
+                                
+                                socket.emit('balance', {
+                                    ...bal.balance,
+                                    pnl: totalPnl,
+                                    profitLoss: totalPnl,
+                                    equity: (bal.balance?.balance || 0) + totalPnl,
+                                    isDemo: false,
+                                    accountId: real.activeAccountId,
+                                    accountName: bal.accountName,
+                                });
+                                socket.emit('positions', filteredPoss);
+                            }
                         }
                     } catch (e: any) {
                         console.warn(`[Sync Heartbeat] REAL Failure for ${userId}: ${e.message}`);
@@ -798,57 +815,46 @@ io.on('connection', (socket) => {
                     try {
                         const demo = await getValidSession(userId, true, true);
                         if (demo) {
-                            const accs = await getAccounts(demo.cst, demo.xSecurityToken, true, demo.serverUrl);
+                            const accs = await getAccounts(demo.cst, demo.xSecurityToken, true, demo.serverUrl) as any;
                             const bal = accs.accounts?.find((a: any) => a.accountId === demo.activeAccountId);
-                            if (bal) socket.emit('balance', { ...bal, isDemo: true });
+                            if (bal) {
+                                // Fetch positions for Demo
+                                const positionsData = await getPositions(demo.cst, demo.xSecurityToken, true, demo.serverUrl) as any;
+                                const filteredPoss = (positionsData?.positions || []).filter((p: any) => p.accountId === demo.activeAccountId);
+                                const totalPnl = filteredPoss.reduce((s: number, p: any) => s + (p.pnl || 0), 0);
+
+                                socket.emit('balance', {
+                                    ...bal.balance,
+                                    pnl: totalPnl,
+                                    profitLoss: totalPnl,
+                                    equity: (bal.balance?.balance || 0) + totalPnl,
+                                    isDemo: true,
+                                    accountId: demo.activeAccountId,
+                                    accountName: bal.accountName,
+                                });
+                                socket.emit('positions', filteredPoss);
+                            }
                         }
                     } catch (e: any) {
                         console.warn(`[Sync Heartbeat] DEMO Failure for ${userId}: ${e.message}`);
                     }
                 };
 
-                syncBalances();
+                await syncBalances();
 
-                // 1. Unified Market Data Emission (from Global Cache)
+                // Broadcast latest prices from the Global Megaphone
                 const cachedPrices = Array.from(marketPriceCache.values());
                 socket.emit('market-data', cachedPrices);
 
-                // 2. Separate Balance & Positions (Recalibrated Logic)
-                if (accountsData?.accounts) {
-                    const allAccs = accountsData.accounts;
-                    
-                    // TRUST THE HANDSHAKE (Match by Verified ID)
-                    let activeAccount = allAccs.find((a: any) => a.accountId === currentSession.activeAccountId) || allAccs[0];
-
-                    if (activeAccount) {
-                        const activeId = activeAccount.accountId;
-                        const filteredPoss = (positionsData?.positions || []).filter((p: any) => p.accountId === activeId);
-                        const totalPnl = filteredPoss.reduce((s: number, p: any) => s + (p.pnl || 0), 0);
-
-                        socket.emit('balance', {
-                            ...activeAccount.balance,
-                            pnl: totalPnl,
-                            profitLoss: totalPnl, 
-                            equity: (activeAccount.balance?.balance || 0) + totalPnl,
-                            isDemo,
-                            accountId: activeId,
-                            accountName: activeAccount.accountName,
-                        });
-
-                        socket.emit('positions', filteredPoss);
-                    }
-                }
-
             } catch (error: any) {
                 console.error(`[Socket Poll Error] ${userId}:`, error.message);
-                if (error.message?.includes('401') || error.message?.toLowerCase().includes('session')) {
+                if (error.message?.includes('401')) {
                     socket.emit('stream-error', { message: 'Session expired' });
-                    clearInterval(activePolls.get(socket.id));
                 }
             }
         };
 
-        // Complete Real-Time: 3s heartbeat (optimized for API stability)
+        // Complete Real-Time: 3s heartbeat
         await pollData();
         const timer = setInterval(pollData, 3000);
         activePolls.set(socket.id, timer);
