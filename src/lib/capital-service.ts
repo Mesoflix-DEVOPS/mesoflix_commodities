@@ -36,13 +36,34 @@ async function performFailoverLogin(account: any, isDemo: boolean): Promise<Sess
     }
 
     const session = await createSession(identifier, apiPassword, apiKey, isDemo);
-    const serverUrl = isDemo ? DEMO_API : LIVE_API;
     
-    const targetIdFromDb = isDemo ? account.selected_demo_account_id : account.selected_real_account_id;
+    // INSTITUTIONAL AUTO-DISCOVERY (Item 17 Fix)
+    let realId = account.selected_real_account_id;
+    let demoId = account.selected_demo_account_id;
+
+    if (!realId || !demoId) {
+        const accounts = session.accounts || [];
+        // Real: Look for CFD or non-Demo labeled
+        if (!realId) realId = accounts.find((a: any) => a.accountType === 'CFD' || !(a.accountName || '').toLowerCase().includes('demo'))?.accountId;
+        // Demo: Look for SPREADBET or Demo labeled
+        if (!demoId) demoId = accounts.find((a: any) => a.accountType === 'SPREADBET' || (a.accountName || '').toLowerCase().includes('demo'))?.accountId;
+
+        if (realId || demoId) {
+            console.log(`[Auto-Provisioning] Discovered account IDs for ${account.user_id}: Real=${realId}, Demo=${demoId}`);
+            await supabase.from('capital_accounts').update({
+                selected_real_account_id: realId,
+                selected_demo_account_id: demoId,
+                updated_at: new Date()
+            }).eq('id', account.id);
+        }
+    }
+
+    const targetIdFromDb = isDemo ? demoId : realId;
     const activeAccountId = targetIdFromDb || session.currentAccountId;
 
-    if (targetIdFromDb && targetIdFromDb !== session.currentAccountId) {
-        await switchActiveAccount(session.cst, session.xSecurityToken, targetIdFromDb, isDemo);
+    // Use a non-null ID for switching to prevent error.null.accountId
+    if (activeAccountId && activeAccountId !== session.currentAccountId) {
+        await switchActiveAccount(session.cst, session.xSecurityToken, activeAccountId, isDemo);
     }
 
     return {
@@ -50,12 +71,13 @@ async function performFailoverLogin(account: any, isDemo: boolean): Promise<Sess
         xSecurityToken: session.xSecurityToken,
         accountIsDemo: isDemo,
         activeAccountId,
-        serverUrl
+        serverUrl: isDemo ? DEMO_API : LIVE_API
     };
 }
 
 export async function getValidSession(userId: string, isDemo: boolean = false, forceRefresh: boolean = false): Promise<SessionTokens> {
     const cacheKey = `${userId}:${isDemo ? 'demo' : 'live'}`;
+    const modeKey = isDemo ? 'demo' : 'live';
     
     if (authMutex.has(cacheKey)) return authMutex.get(cacheKey)!;
 

@@ -147,6 +147,11 @@ async function performLogin(account: any, isDemo: boolean, existingSessions: any
         await switchActiveAccount(targetAccount.session.cst, targetAccount.session.xSecurityToken, targetAccount.accountId, targetAccount.server === DEMO_API);
     }
 
+    // --- DUAL-ID PERSISTENCE (Item 17 Fix) ---
+    // Extract first available IDs for both environments from the dual discovery
+    const discoveredRealId = liveSession?.accounts?.find((a: any) => a.accountType === 'CFD' || !(a.accountName || '').toLowerCase().includes('demo'))?.accountId;
+    const discoveredDemoId = demoSession?.accounts?.find((a: any) => a.accountType === 'SPREADBET' || (a.accountName || '').toLowerCase().includes('demo'))?.accountId;
+
     const tokens: SessionTokens = {
         cst: targetAccount.session.cst,
         xSecurityToken: targetAccount.session.xSecurityToken,
@@ -168,8 +173,8 @@ async function performLogin(account: any, isDemo: boolean, existingSessions: any
         .from('capital_accounts')
         .update({
             encrypted_session_tokens: encrypt(JSON.stringify(updatedSessions)),
-            selected_real_account_id: !isDemo ? targetAccount.accountId : account.selected_real_account_id,
-            selected_demo_account_id: isDemo ? targetAccount.accountId : account.selected_demo_account_id,
+            selected_real_account_id: discoveredRealId || account.selected_real_account_id,
+            selected_demo_account_id: discoveredDemoId || account.selected_demo_account_id,
             session_updated_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
         })

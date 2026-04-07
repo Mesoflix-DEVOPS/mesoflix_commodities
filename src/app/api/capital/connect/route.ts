@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { encrypt } from '@/lib/crypto';
 import { verifyAccessToken } from '@/lib/auth';
 import { cookies } from 'next/headers';
-import { clearCachedSession } from '@/lib/capital-service';
+import { getValidSession, clearCachedSession } from '@/lib/capital-service';
 
 import { supabase } from '@/lib/supabase';
 
@@ -64,14 +64,23 @@ export async function POST(request: Request) {
 
         if (insError) throw insError;
 
+        // --- INSTITUTIONAL AUTO-PROVISIONING (Item 17 Fix) ---
+        // Immediately trigger a handshake to discover and persist sub-account IDs
+        try {
+            await getValidSession(userId, true, true); // Force Demo discovery
+            await getValidSession(userId, false, true); // Force Real discovery
+        } catch (autoErr: any) {
+            console.warn(`[Auto-Provisioning] Initial ID discovery handshake failed: ${autoErr.message}`);
+        }
+
         await supabase.from('notifications').insert({
             user_id: userId,
-            title: 'New API Token Added',
-            message: `The Capital.com token "${label}" was successfully added to your vault.`,
+            title: 'Institutional Link Active',
+            message: `The Capital.com token "${label}" is now provisioned and live.`,
             type: 'success'
         });
 
-        return NextResponse.json({ message: 'Capital.com token saved successfully' });
+        return NextResponse.json({ message: 'Capital.com token provisioned successfully' });
     } catch (error: any) {
         console.error('Capital POST Error:', error.message);
         return NextResponse.json({ message: 'Failed to save institutional credentials' }, { status: 500 });
