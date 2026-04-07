@@ -33,10 +33,10 @@ async function capitalFetch(url: string, options: any = {}, retries = 3, backoff
         const response = await fetch(url, { ...options, signal: controller.signal });
         clearTimeout(id);
 
-        // 429 = Rate Limit, 5xx = Server Error
-        if (response.status === 429 || (response.status >= 500 && retries > 0)) {
-            const delay = response.status === 429 ? 2000 : backoff;
-            console.warn(`[Trade Bridge] Transient ${response.status}. Silent recovery in ${delay}ms... (${retries} left)`);
+        // 🏁 INSTITUTIONAL GUARD: Strictly respect retry limits for 429 and 5xx (Item 11 Fix)
+        if ((response.status === 429 || response.status >= 500) && retries > 0) {
+            const delay = response.status === 429 ? 5000 : backoff;
+            console.warn(`[Brokerage Backoff] Status ${response.status}. Retrying in ${delay}ms... (${retries} left)`);
             await new Promise(r => setTimeout(r, delay));
             return capitalFetch(url, options, retries - 1, backoff * 2);
         }

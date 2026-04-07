@@ -774,7 +774,7 @@ function startUserPoller(userId: string, io: Server) {
         }
     };
 
-    const interval = setInterval(pollFunc, 2500); // 🏁 High-Velocity Balance Sync
+    const interval = setInterval(pollFunc, 4000); // 🏁 Stabilized Institutional Heartbeat (4.0s)
     activeUserPollers.set(userId, { interval, socketCount: 1, pollFunc });
     pollFunc(); // Immediate first fetch
 }
@@ -870,7 +870,7 @@ async function startGlobalPriceLoop(io: Server) {
         } catch (e: any) {
             console.warn(`[Megaphone Skip] ${e.message}`);
         } finally {
-            setTimeout(runLoop, 1000); // 🚀 High-Velocity Core: 1s updates
+            setTimeout(runLoop, 2500); // 🚀 Institutional Sane Velocity: 2.5s
         }
     };
 
