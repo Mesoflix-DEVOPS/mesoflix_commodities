@@ -74,11 +74,11 @@ export async function POST(request: Request) {
             try {
                 return await executeWithSession();
             } catch (err: any) {
-                if ((err.message.includes('Pending') || err.message.includes('Syncing')) && retryCount < maxRetries) {
-                    retryCount++;
-                    console.log(`[Trade API] Session syncing. Retrying order (${retryCount}/${maxRetries})...`);
-                    await new Promise(res => setTimeout(res, 1500));
-                    return executeOrder();
+                const msg = err.message || '';
+                // If session is stale or syncing, perform an immediate silent refresh execution
+                if (msg.includes('401') || msg.includes('Pending') || msg.includes('Syncing') || msg.toLowerCase().includes('session')) {
+                    console.log(`[Trade API] Silent recovery triggered for: ${msg}`);
+                    return await executeWithSession(true);
                 }
                 throw err;
             }
@@ -110,17 +110,12 @@ export async function POST(request: Request) {
             return NextResponse.json({ success: true, ...result });
 
         } catch (err: any) {
-            console.error('[Trade API] Execution Failure:', err.message);
-            // Session Retry Logic
-            if (err.message.includes('401') || err.message.toLowerCase().includes('session')) {
-                const { result: retryResult, dealId: retryDealId } = await executeWithSession(true);
-                return NextResponse.json({ success: true, ...retryResult, dealId: retryDealId });
-            }
-            throw err;
+            console.error('[Trade API] Execution Fatal:', err.message);
+            return NextResponse.json({ error: err.message }, { status: 502 });
         }
 
     } catch (error: any) {
-        console.error('[Trade API] Fatal error:', error.message);
+        console.error('[Trade API] Request Error:', error.message);
         return NextResponse.json({ error: error.message }, { status: 502 });
     }
 }
@@ -152,7 +147,17 @@ export async function DELETE(request: Request) {
         };
 
         try {
-            const result = await executeClose();
+            // Immediate attempt
+            const result = await (async () => {
+                try {
+                    return await executeClose();
+                } catch (err: any) {
+                    if (err.message.includes('401') || err.message.toLowerCase().includes('session')) {
+                        return await executeClose(true);
+                    }
+                    throw err;
+                }
+            })();
 
             await supabase.from('notifications').insert({
                 user_id: userId,
@@ -179,14 +184,11 @@ export async function DELETE(request: Request) {
             return NextResponse.json({ success: true, ...result });
 
         } catch (err: any) {
-            if (err.message.includes('401') || err.message.toLowerCase().includes('session')) {
-                const result = await executeClose(true);
-                return NextResponse.json({ success: true, ...result });
-            }
-            throw err;
+            console.error('[Close API] Execution Failure:', err.message);
+            return NextResponse.json({ error: err.message }, { status: 502 });
         }
     } catch (error: any) {
-        console.error('[Trade API] Fatal close error:', error.message);
+        console.error('[Close API] Fatal Error:', error.message);
         return NextResponse.json({ error: error.message }, { status: 502 });
     }
 }
