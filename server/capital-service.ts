@@ -159,17 +159,28 @@ export async function refreshAllActiveSessions() {
             const modes: ('demo' | 'live')[] = ['demo', 'live'];
 
             for (const mode of modes) {
-                const specificSession = sessionData[mode];
+                // RE-FETCH: Always get latest DB state before each mode refresh to prevent overwriting other mode's tokens
+                const { data: freshAcc } = await supabase.from('capital_accounts').select('*').eq('id', account.id).single();
+                if (!freshAcc) continue;
+
+                let currentSyncData: any = {};
+                try {
+                    if (freshAcc.encrypted_session_tokens) {
+                        currentSyncData = JSON.parse(decrypt(freshAcc.encrypted_session_tokens));
+                    }
+                } catch (e) { }
+
+                const specificSession = currentSyncData[mode];
                 const lastUpdate = specificSession?.updated_at ? new Date(specificSession.updated_at).getTime() : 0;
                 
-                // Refresh if older than 4.2 minutes (slightly aggressive to ensure overlap)
+                // Refresh if older than 4.2 minutes
                 const NEEDS_REFRESH = (now - lastUpdate > (4.2 * 60 * 1000));
                 
                 if (NEEDS_REFRESH) {
-                    console.log(`[Master Dual-Heartbeat] Refreshing ${mode.toUpperCase()} for User ${account.user_id}`);
-                    await performLogin(account, mode === 'demo', sessionData);
-                    // Pause between modes to avoid account-level burst limits
-                    await new Promise(res => setTimeout(res, 3000));
+                    console.log(`[Master Dual-Heartbeat] Syncing ${mode.toUpperCase()} for User ${account.user_id}`);
+                    await performLogin(freshAcc, mode === 'demo', currentSyncData);
+                    // Critical delay to avoid brokerage burst rate limits
+                    await new Promise(res => setTimeout(res, 3500));
                 }
             }
         }

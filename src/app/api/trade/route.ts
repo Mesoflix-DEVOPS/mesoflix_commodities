@@ -34,6 +34,11 @@ export async function POST(request: Request) {
             const session = await getValidSession(userId, isDemo, forceRefresh);
             const accountIsDemo = session.accountIsDemo ?? false;
 
+            // STRICT ACCOUNT MODE GUARD: Prevent cross-account execution
+            if (accountIsDemo !== isDemo) {
+                 throw new Error(`Account Mode Mismatch: Requested ${isDemo ? 'Demo' : 'Real'} but retrieved ${accountIsDemo ? 'Demo' : 'Real'}. Please refresh.`);
+            }
+
             const result = await placeOrder(
                 session.cst, session.xSecurityToken,
                 epic, direction, parseFloat(size),
