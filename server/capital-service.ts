@@ -16,6 +16,7 @@ export interface SessionTokens {
     activeAccountId?: string | null;
     serverUrl: string;
 }
+
 export const SESSION_TTL_MS = 5 * 60 * 1000; // 5 minutes
 export const REFRESH_LOCK_MS = 15000; // 15 seconds lockout
 
@@ -33,7 +34,6 @@ export async function getValidSession(userId: string, forceDemo?: boolean, skipR
         if (!account) return null;
 
         const now = Date.now();
-        
         let sessionData: any = {};
         try {
             if (account.encrypted_session_tokens) {
@@ -44,18 +44,13 @@ export async function getValidSession(userId: string, forceDemo?: boolean, skipR
         const specificSession = sessionData[modeKey];
         const lastUpdate = specificSession?.updated_at ? new Date(specificSession.updated_at).getTime() : 0;
 
-        // Check if specific mode session is still valid
         if (specificSession?.cst && (now - lastUpdate < SESSION_TTL_MS)) {
-            // Determine if this 'Demo' session actually points to the Live API (Standalone Setup)
-            const useLiveApiForDemo = specificSession.serverUrl?.includes('api-capital'); 
-            
             return {
                 cst: specificSession.cst,
                 xSecurityToken: specificSession.xSecurityToken,
                 accountIsDemo: isDemo,
                 activeAccountId: specificSession.activeAccountId,
-                serverUrl: specificSession.serverUrl || getApiUrl(isDemo),
-                lastUpdate
+                serverUrl: specificSession.serverUrl || getApiUrl(isDemo)
             };
         }
         return { lastUpdate, account, allSessions: sessionData };
@@ -89,88 +84,71 @@ export async function getValidSession(userId: string, forceDemo?: boolean, skipR
 }
 
 async function performLogin(account: any, isDemo: boolean, existingSessions: any = {}): Promise<SessionTokens> {
-    const apiKey = decrypt(account.encrypted_api_key);
-    const apiPassword = decrypt(account.encrypted_api_password || '');
+    const userId = account.user_id;
+    const apiKeyEnc = account.api_key;
+    const apiPasswordEnc = account.password;
     
-    let identifier = account.capital_account_id;
-    if (!identifier || identifier === '') {
-        const { data: userData } = await supabase.from('users').select('email').eq('id', account.user_id).single();
+    const apiKey = decrypt(apiKeyEnc);
+    const apiPassword = decrypt(apiPasswordEnc);
+
+    // Fetch Email if not present (Capital identifier)
+    let identifier = account.email;
+    if (!identifier) {
+        const { data: userData } = await supabase.from('users').select('email').eq('id', userId).single();
         identifier = userData?.email || '';
     }
 
-    // --- SCALABLE HANDSHAKE ENGINE ---
-    // We attempt connection to both servers to correctly map accounts for any user.
-    let targetServerUrl = getApiUrl(isDemo);
-    let session: any = null;
+    console.log(`[Handshake] Universal Discovery for ${identifier} (${isDemo ? 'DEMO' : 'REAL'})`);
+
+    // --- DUAL-SERVER DISCOVERY ENGINE ---
+    let demoSession: any = null;
+    let liveSession: any = null;
 
     try {
-        session = await createSession(identifier, apiPassword, apiKey, isDemo);
-        
-        // Handshake verification
-        if ((!session.accounts || session.accounts.length === 0) && session.cst) {
-            const accData = await getAccounts(session.cst, session.xSecurityToken, isDemo) as any;
-            if (accData?.accounts) session.accounts = accData.accounts;
-        }
-    } catch (err: any) {
-        console.warn(`[Handshake] Direct ${isDemo ? 'DEMO' : 'LIVE'} failed, checking standalone fallback...`);
+        demoSession = await createSession(identifier, apiPassword, apiKey, true).catch(() => null);
+        liveSession = await createSession(identifier, apiPassword, apiKey, false).catch(() => null);
+    } catch (e) { }
+
+    if (!demoSession && !liveSession) {
+        throw new Error("Brokerage Identity Rejected across all servers.");
     }
 
-    // STANDALONE FALLBACK: If Demo server fails, but user needs Demo, check the Real server for multiple accounts.
-    if (isDemo && (!session || !session.accounts || session.accounts.length === 0)) {
-        try {
-            console.log(`[Handshake] Attempting Standalone Demo Discovery on Real server for ${identifier}...`);
-            const realSession = await createSession(identifier, apiPassword, apiKey, false);
-            const accData = await getAccounts(realSession.cst, realSession.xSecurityToken, false);
-            const allRealAccs = accData?.accounts || [];
-            
-            if (allRealAccs.length >= 2) {
-                console.log(`[Handshake] Found ${allRealAccs.length} accounts on Real server. Isolating for Demo Standalone.`);
-                session = realSession;
-                session.accounts = allRealAccs;
-                targetServerUrl = LIVE_API; // Force Live API even for Demo mode
-            }
-        } catch (e: any) {
-            console.error(`[Handshake] Critical: All servers unreachable for ${identifier}`);
-            throw new Error("Brokerage Connection Refused. Please check credentials.");
-        }
+    // Collect all unique accounts across the dual-server cluster
+    const allAccounts: any[] = [];
+    if (demoSession?.accounts) {
+        demoSession.accounts.forEach((a: any) => allAccounts.push({ ...a, server: DEMO_API, session: demoSession }));
+    }
+    if (liveSession?.accounts) {
+        liveSession.accounts.forEach((a: any) => allAccounts.push({ ...a, server: LIVE_API, session: liveSession }));
     }
 
-    if (!session || !session.accounts || session.accounts.length === 0) {
-        throw new Error("No usable accounts found on the brokerage server.");
+    // --- UNIVERSAL MAPPING LOGIC ---
+    let targetAccount: any = null;
+    if (isDemo) {
+        // Priority for Demo: Any account on the Demo server, otherwise a secondary account on the Real server
+        targetAccount = allAccounts.find(a => a.server === DEMO_API) || 
+                        allAccounts.find((a, idx) => a.server === LIVE_API && (a.accountType === 'DEMO' || idx > 0)) ||
+                        allAccounts[0];
+    } else {
+        // Priority for Real: The first account on the Real server
+        targetAccount = allAccounts.find(a => a.server === LIVE_API) || allAccounts[0];
     }
 
-    const allAccounts = session.accounts;
-    
-    // Identification Logic:
-    // 1. If we are on the DEMO server, any account is a demo.
-    // 2. If we are on the LIVE server in Demo mode, we pick the one with the HIGHER balance or the 'CFD' label if others are 'Spread Betting'.
-    // 3. For any user, we prefer the 'account.selected_x_account_id' if set.
+    if (!targetAccount) throw new Error("Account Isolation Failure in discovery cluster.");
 
-    let activeAccount = allAccounts.find((a: any) => 
-        (isDemo ? a.accountId === account.selected_demo_account_id : a.accountId === account.selected_real_account_id)
-    );
+    console.log(`[Handshake] Mapped: ${isDemo ? 'DEMO' : 'REAL'} -> ID ${targetAccount.accountId} on ${targetAccount.server}`);
 
-    if (!activeAccount) {
-        if (isDemo && targetServerUrl === LIVE_API) {
-            // Heuristic for Standalone Demo (Pick the high balance one)
-            activeAccount = allAccounts.sort((a: any, b: any) => (b.balance?.balance || 0) - (a.balance?.balance || 0))[0];
-        } else {
-            activeAccount = allAccounts.find((a: any) => a.preferred === true) || allAccounts[0];
-        }
-    }
-
-    if (!activeAccount) throw new Error("Account resolution failure.");
-
-    if (activeAccount.accountId !== session.currentAccountId) {
-        await switchActiveAccount(session.cst, session.xSecurityToken, activeAccount.accountId, targetServerUrl === DEMO_API);
+    // If session ID differs from active, we switch
+    if (targetAccount.accountId !== targetAccount.session.currentAccountId) {
+        await switchActiveAccount(targetAccount.session.cst, targetAccount.session.xSecurityToken, targetAccount.accountId, targetAccount.server === DEMO_API);
     }
 
     const tokens: SessionTokens = {
-        cst: session.cst,
-        xSecurityToken: session.xSecurityToken,
+        cst: targetAccount.session.cst,
+        xSecurityToken: targetAccount.session.xSecurityToken,
         accountIsDemo: isDemo,
-        activeAccountId: activeAccount.accountId,
-        serverUrl: targetServerUrl
+        activeAccountId: targetAccount.accountId,
+        serverUrl: targetAccount.server
     };
 
     const modeKey = isDemo ? 'demo' : 'live';
@@ -186,8 +164,8 @@ async function performLogin(account: any, isDemo: boolean, existingSessions: any
         .from('capital_accounts')
         .update({
             encrypted_session_tokens: encrypt(JSON.stringify(updatedSessions)),
-            selected_real_account_id: !isDemo && !account.selected_real_account_id ? activeAccount.accountId : account.selected_real_account_id,
-            selected_demo_account_id: isDemo && !account.selected_demo_account_id ? activeAccount.accountId : account.selected_demo_account_id,
+            selected_real_account_id: !isDemo ? targetAccount.accountId : account.selected_real_account_id,
+            selected_demo_account_id: isDemo ? targetAccount.accountId : account.selected_demo_account_id,
             session_updated_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
         })
@@ -200,8 +178,7 @@ export async function refreshAllActiveSessions() {
     try {
         const { data: accounts, error } = await supabase
             .from('capital_accounts')
-            .select('*')
-            .eq('is_active', true);
+            .select('*');
 
         if (error || !accounts) return;
 
@@ -217,7 +194,6 @@ export async function refreshAllActiveSessions() {
             const modes: ('demo' | 'live')[] = ['demo', 'live'];
 
             for (const mode of modes) {
-                // RE-FETCH: Always get latest DB state before each mode refresh to prevent overwriting other mode's tokens
                 const { data: freshAcc } = await supabase.from('capital_accounts').select('*').eq('id', account.id).single();
                 if (!freshAcc) continue;
 
@@ -230,15 +206,12 @@ export async function refreshAllActiveSessions() {
 
                 const specificSession = currentSyncData[mode];
                 const lastUpdate = specificSession?.updated_at ? new Date(specificSession.updated_at).getTime() : 0;
-                
-                // Refresh if older than 4.2 minutes
-                const NEEDS_REFRESH = (now - lastUpdate > (4.2 * 60 * 1000));
+                const NEEDS_REFRESH = (now - lastUpdate > (4 * 60 * 1000));
                 
                 if (NEEDS_REFRESH) {
-                    console.log(`[Master Dual-Heartbeat] Syncing ${mode.toUpperCase()} for User ${account.user_id}`);
-                    await performLogin(freshAcc, mode === 'demo', currentSyncData);
-                    // Critical delay to avoid brokerage burst rate limits
-                    await new Promise(res => setTimeout(res, 3500));
+                    console.log(`[Master Heartbeat] Syncing ${mode.toUpperCase()} for User ${account.user_id}`);
+                    await performLogin(freshAcc, mode === 'demo', currentSyncData).catch(() => null);
+                    await new Promise(res => setTimeout(res, 2000));
                 }
             }
         }

@@ -696,29 +696,23 @@ async function startGlobalPriceLoop() {
     
     const runLoop = async () => {
         try {
-            // Find a valid account to lead the price discovery (Prefer Real for stability)
-            const { data: accounts } = await supabase.from('capital_accounts').select('user_id').eq('account_type', 'real').limit(5);
-            if (!accounts || accounts.length === 0) {
-                // Fallback to any account if no real is found
-                const { data: anyAccounts } = await supabase.from('capital_accounts').select('user_id').limit(5);
-                if (!anyAccounts || anyAccounts.length === 0) return;
-                accounts.push(...anyAccounts);
-            }
+            // Find a valid Real account to lead the unified price discovery
+            const { data: accounts } = await supabase.from('capital_accounts')
+                .select('user_id')
+                .eq('account_type', 'real')
+                .limit(5);
+
+            if (!accounts || accounts.length === 0) return;
 
             let session = null;
             for (const acc of accounts) {
-                session = await getValidSession(acc.user_id, true, true);
+                session = await getValidSession(acc.user_id, false, true); // Force Real mode for global prices
                 if (session) break;
-            }
-
-            if (!session) {
-                // If no session exists, we trigger one high-priority sync
-                session = await getValidSession(accounts[0].user_id, true, false);
             }
 
             if (!session) return;
 
-            const marketData = await getMarketTickers(session.cst, session.xSecurityToken, epics, true, session.serverUrl) as any;
+            const marketData = await getMarketTickers(session.cst, session.xSecurityToken, epics, false, session.serverUrl) as any;
             
             if (marketData?.marketDetails) {
                 const formatted = marketData.marketDetails.map((detail: any) => ({
@@ -735,9 +729,9 @@ async function startGlobalPriceLoop() {
                 io.emit('market-data', formatted);
             }
         } catch (e: any) {
-            console.warn(`[Global Price Engine] Skip: ${e.message}`);
+            console.warn(`[Unified Price Engine] Skip: ${e.message}`);
         } finally {
-            setTimeout(runLoop, 2500); // 2.5s interval
+            setTimeout(runLoop, 2500); // 2.5s high-velocity sync
         }
     };
 
