@@ -27,13 +27,6 @@ export type BalanceData = {
     accountType?: string;
 };
 
-import dynamic from 'next/dynamic';
-
-const ConnectionOverlay = dynamic(
-  () => import('@/components/dashboard/ConnectionOverlay').then((mod) => mod.ConnectionOverlay),
-  { ssr: false }
-);
-
 interface MarketDataContextType {
     marketData: MarketData;
     balanceData: BalanceData | null;
@@ -90,63 +83,6 @@ export function MarketDataProvider({ children }: { children: ReactNode }) {
     // Active balance is strictly the current mode's data — no cross-mode fallback
     const balanceData = mode === 'demo' ? demoBalance : realBalance;
 
-    const performIsolatedHandshake = useCallback(async (newMode: 'demo' | 'real') => {
-        setIsSyncing(true);
-        console.log(`[Isolate Handshake] Initiating 5s deep sync for ${newMode}...`);
-        
-        // --- STRIKE ISOLATION ---
-        // Instantly kill and clear all previous environment states
-        setMarketData({});
-        setPositions([]);
-        setDemoBalance(null);
-        setRealBalance(null);
-
-        try {
-            const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001';
-            const getCookie = (name: string) => {
-                const value = `; ${document.cookie}`;
-                const parts = value.split(`; ${name}=`);
-                if (parts.length === 2) return parts.pop()?.split(';').shift();
-            };
-            const token = getCookie('access_token');
-
-            // 1. Backend Isolate Trigger (Clean Session Reset)
-            const res = await fetch(`${SOCKET_URL}/api/auth/isolate-handshake`, {
-                method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({ mode: newMode })
-            });
-
-            if (res.ok) {
-                // 2. Refresh Socket instantly
-                if (socketRef.current?.connected) {
-                    socketRef.current.emit('start-stream', { mode: newMode });
-                }
-            }
-
-        } catch (e) {
-            console.error("[Isolate Handshake] Deep-Sync Error:", e);
-        }
-
-        // Standardized 5-second institutional buffer
-        setTimeout(async () => {
-            // Fetch the freshly handshaked data after isolation is complete
-            await fetchInitialData(newMode);
-            setIsSyncing(false);
-            console.log(`[Isolate Handshake] ${newMode.toUpperCase()} environment ready.`);
-        }, 5000);
-    }, [fetchInitialData]);
-
-    const setMode = useCallback((newMode: 'demo' | 'real') => {
-        if (newMode === modeRef.current) return;
-        setModeState(newMode);
-        modeRef.current = newMode;
-        performIsolatedHandshake(newMode);
-    }, [performIsolatedHandshake]);
-
     const fetchInitialData = useCallback(async (currentMode: 'demo' | 'real') => {
         try {
             const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001';
@@ -174,6 +110,57 @@ export function MarketDataProvider({ children }: { children: ReactNode }) {
             }
         } catch (e) { console.error("[MarketData] Initial Fetch Failed", e); }
     }, []);
+
+    const performIsolatedHandshake = useCallback(async (newMode: 'demo' | 'real') => {
+        setIsSyncing(true);
+        console.log(`[Isolate Handshake] Initiating 5s deep sync for ${newMode}...`);
+        
+        // --- STRIKE ISOLATION ---
+        setMarketData({});
+        setPositions([]);
+        setDemoBalance(null);
+        setRealBalance(null);
+
+        try {
+            const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001';
+            const getCookie = (name: string) => {
+                const value = `; ${document.cookie}`;
+                const parts = value.split(`; ${name}=`);
+                if (parts.length === 2) return parts.pop()?.split(';').shift();
+            };
+            const token = getCookie('access_token');
+
+            const res = await fetch(`${SOCKET_URL}/api/auth/isolate-handshake`, {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ mode: newMode })
+            });
+
+            if (res.ok) {
+                if (socketRef.current?.connected) {
+                    socketRef.current.emit('start-stream', { mode: newMode });
+                }
+            }
+        } catch (e) {
+            console.error("[Isolate Handshake] Deep-Sync Error:", e);
+        }
+
+        setTimeout(async () => {
+            await fetchInitialData(newMode);
+            setIsSyncing(false);
+            console.log(`[Isolate Handshake] ${newMode.toUpperCase()} environment ready.`);
+        }, 5000);
+    }, [fetchInitialData]);
+
+    const setMode = useCallback((newMode: 'demo' | 'real') => {
+        if (newMode === modeRef.current) return;
+        setModeState(newMode);
+        modeRef.current = newMode;
+        performIsolatedHandshake(newMode);
+    }, [performIsolatedHandshake]);
 
     useEffect(() => {
         fetchInitialData(mode);
@@ -214,7 +201,7 @@ export function MarketDataProvider({ children }: { children: ReactNode }) {
         });
 
         socket.on('market-data', (data: any[]) => {
-            if (isSyncing) return; // Drop updates during sync
+            if (isSyncing) return;
             setMarketData(prev => {
                 const newState = { ...prev };
                 data.forEach((snap: any) => {
@@ -233,7 +220,7 @@ export function MarketDataProvider({ children }: { children: ReactNode }) {
         });
 
         socket.on('balance', (data: any) => {
-            if (isSyncing) return; // Drop updates during sync
+            if (isSyncing) return;
             const balanceObj = parseBalance(data);
             if (data.isDemo) setDemoBalance(balanceObj);
             else setRealBalance(balanceObj);
@@ -258,7 +245,7 @@ export function MarketDataProvider({ children }: { children: ReactNode }) {
             socket.disconnect();
             socketRef.current = null;
         };
-    }, [isSyncing]); // Re-bind listeners when sync state changes
+    }, [isSyncing]);
 
     return (
         <MarketDataContext.Provider value={{
@@ -272,7 +259,6 @@ export function MarketDataProvider({ children }: { children: ReactNode }) {
             mode,
             isSyncing,
         }}>
-            <ConnectionOverlay isVisible={isSyncing} mode={mode} />
             {children}
         </MarketDataContext.Provider>
     );
