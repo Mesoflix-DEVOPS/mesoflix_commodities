@@ -40,7 +40,7 @@ export async function POST(request: Request) {
         const userId = await getUser();
         if (!userId) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
 
-        const { label, login, password, apiKey, accountType = 'live' } = await request.json();
+        const { label, login, password, apiKey, accountType = 'real' } = await request.json();
         if (!label || !password || !apiKey) {
             return NextResponse.json({ message: 'Label, Password, and API Key are required' }, { status: 400 });
         }

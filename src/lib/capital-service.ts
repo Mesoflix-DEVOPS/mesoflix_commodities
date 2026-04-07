@@ -41,8 +41,8 @@ async function performFailoverLogin(account: any, isDemo: boolean): Promise<Sess
         // If 401 occurs in Demo, we fallback to Email.
         if (isDemo && err.message.includes('401')) {
             console.log(`[Discovery] Handshake 401 for ${identifier}. Retrying with User Email...`);
-            const { data: userData } = await supabase.from('users').select('email').eq('id', account.user_id).single();
-            const email = userData?.email;
+            const { data: usersData } = await supabase.from('users').select('email').eq('id', account.user_id).limit(1);
+            const email = usersData?.[0]?.email;
             if (email && email !== identifier) {
                 session = await createSession(email, apiPassword, apiKey, isDemo);
                 // Persistent Fix: Update the identifier if the email works
@@ -99,16 +99,59 @@ export async function getValidSession(userId: string, isDemo: boolean = false, f
     
     if (authMutex.has(cacheKey)) return authMutex.get(cacheKey)!;
 
-    const { data: account } = await supabase.from('capital_accounts').select('*').eq('user_id', userId).single();
+    const { data: accounts } = await supabase.from('capital_accounts').select('*').eq('user_id', userId).order('is_active', { ascending: false }).limit(1);
+    const account = accounts?.[0];
     if (!account) throw new Error('Institutional link missing.');
 
     if (!forceRefresh && account.encrypted_session_tokens) {
-        // ... (Existing cache logic is fine) ...
+        try {
+            const sessions = JSON.parse(decrypt(account.encrypted_session_tokens));
+            const specific = sessions[modeKey];
+            const lastUpdate = specific?.updated_at ? new Date(specific.updated_at).getTime() : 0;
+            const now = Date.now();
+
+            if (specific?.cst && (now - lastUpdate < SESSION_TTL_MS)) {
+                return {
+                    cst: specific.cst,
+                    xSecurityToken: specific.xSecurityToken,
+                    accountIsDemo: isDemo,
+                    activeAccountId: specific.activeAccountId,
+                    serverUrl: specific.serverUrl || getApiUrl(isDemo)
+                };
+            }
+        } catch (e: any) {
+            console.warn(`[Session Cache] Corrupt for ${userId}:`, e.message);
+        }
     }
 
     const loginPromise = (async () => {
         try {
-            return await performFailoverLogin(account, isDemo);
+            const tokens = await performFailoverLogin(account, isDemo);
+            
+            // Sync tokens back to DB for cross-server caching (Item L)
+            const { data: freshList } = await supabase.from('capital_accounts').select('encrypted_session_tokens').eq('id', account.id).limit(1);
+            const fresh = freshList?.[0];
+            let currentSessions = {};
+            try {
+                if (fresh?.encrypted_session_tokens) {
+                    currentSessions = JSON.parse(decrypt(fresh.encrypted_session_tokens));
+                }
+            } catch (e: any) {}
+
+            const updatedSessions = {
+                ...currentSessions,
+                [modeKey]: {
+                    ...tokens,
+                    updated_at: new Date().toISOString()
+                }
+            };
+
+            await supabase.from('capital_accounts').update({
+                encrypted_session_tokens: encrypt(JSON.stringify(updatedSessions)),
+                session_updated_at: new Date().toISOString()
+            }).eq('id', account.id);
+
+            return tokens;
         } finally {
             authMutex.delete(cacheKey);
         }

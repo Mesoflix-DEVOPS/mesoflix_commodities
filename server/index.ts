@@ -44,13 +44,13 @@ app.post('/api/onboarding/chat', async (req, res) => {
 app.post('/api/auth/check-user', async (req, res) => {
     try {
         const { email } = req.body;
-        const { data: existing, error } = await supabase
+        const { data: users, error } = await supabase
             .from('users')
             .select('id')
             .eq('email', email)
-            .single();
+            .limit(1);
             
-        res.json({ exists: !!existing });
+        res.json({ exists: !!users?.[0] });
     } catch (err: any) {
         console.error("Check User Error:", err.message);
         res.status(500).json({ error: "SDK Bridge Failure" });
@@ -73,11 +73,14 @@ app.post('/api/auth/isolate-handshake', async (req, res) => {
         console.log(`[Isolate Handshake] Forcing fresh ${mode.toUpperCase()} sync for User ${userId}`);
 
         // Fetch account record
-        const { data: account } = await supabase
+        const { data: accounts } = await supabase
             .from('capital_accounts')
             .select('*')
             .eq('user_id', userId)
-            .single();
+            .order('is_active', { ascending: false })
+            .limit(1);
+
+        const account = accounts?.[0];
 
         if (!account) return res.status(404).json({ error: 'Connection not found' });
 
@@ -124,7 +127,7 @@ app.post('/api/auth/register', async (req, res) => {
         // 1. Create User with Hashed Password for Unified Login
         const hashedPassword = bcrypt.hashSync(apiPassword || 'temporary_default_key', 10);
 
-        const { data: newUser, error: userError } = await supabase
+        const { data: newUsers, error: userError } = await supabase
             .from('users')
             .insert({
                 email,
@@ -134,9 +137,11 @@ app.post('/api/auth/register', async (req, res) => {
                 created_at: new Date()
             })
             .select()
-            .single();
+            .limit(1);
 
-        if (userError) throw userError;
+        const newUser = newUsers?.[0];
+
+        if (userError || !newUser) throw userError || new Error("User record creation failed.");
 
         // 2. Link Capital Credentials (Secured with Institutional Encryption)
         // Create Capital Account with correct identifier mapping
@@ -173,11 +178,13 @@ app.post('/api/auth/login', async (req, res) => {
         const { email, password } = req.body;
         if (!email || !password) return res.status(400).json({ message: 'Credentials required' });
 
-        const { data: user, error } = await supabase
+        const { data: users, error } = await supabase
             .from('users')
             .select('*')
             .eq('email', email)
-            .single();
+            .limit(1);
+
+        const user = users?.[0];
 
         if (error || !user || !user.password_hash) {
             return res.status(401).json({ message: 'Invalid email or password' });
@@ -254,11 +261,13 @@ app.get('/api/dashboard', authGuard, async (req: any, res) => {
         const isDemo = modeInput === 'demo';
 
         // 1. Fetch User Profile
-        const { data: user, error: userError } = await supabase
+        const { data: users, error: userError } = await supabase
             .from('users')
             .select('id, full_name, email, role')
             .eq('id', userId)
-            .single();
+            .limit(1);
+
+        const user = users?.[0];
 
         if (userError || !user) {
             return res.status(404).json({ error: 'User Not Found' });
@@ -282,8 +291,8 @@ app.get('/api/dashboard', authGuard, async (req: any, res) => {
 
             // Filter for explicit mode labels if they exist
             let accounts = allAccounts.filter((a: any) => 
-                (a.accountType || '').toLowerCase().includes(isDemo ? 'demo' : 'live') ||
-                (a.accountName || '').toLowerCase().includes(isDemo ? 'demo' : 'live')
+                (a.accountType || '').toLowerCase().includes(isDemo ? 'demo' : 'real') ||
+                (a.accountName || '').toLowerCase().includes(isDemo ? 'demo' : 'real')
             );
 
             // If no explicit labels, but we have accounts, trust the server we are on.
@@ -518,12 +527,14 @@ app.post('/api/automation/deploy', authGuard, async (req: any, res) => {
         }
 
         // New Deploy or Upsert
-        const { data: existing } = await supabase
+        const { data: existingList } = await supabase
             .from('automation_deployments')
             .select('id')
             .eq('user_id', userId)
             .eq('engine_id', engine_id)
-            .single();
+            .limit(1);
+
+        const existing = existingList?.[0];
 
         if (existing) {
             const { error } = await supabase
@@ -694,7 +705,7 @@ app.post('/api/capital/select', authGuard, async (req: any, res) => {
 });
 
 // --- INSTITUTIONAL SCALING: SHARED POLLING ENGINE (Items 9 & 13) ---
-const activeUserPollers = new Map<string, { interval: NodeJS.Timeout, socketCount: number, lastData: any }>();
+const activeUserPollers = new Map<string, { interval: NodeJS.Timeout, socketCount: number, lastData?: any, pollFunc: () => Promise<void> }>();
 
 function stopUserPoller(userId: string) {
     const poller = activeUserPollers.get(userId);
@@ -879,7 +890,7 @@ async function startGlobalPriceLoop(io: Server) {
 
 io.on('connection', async (socket) => {
     try {
-        startGlobalPriceLoop();
+        startGlobalPriceLoop(io);
         const token = socket.handshake.auth.token;
         const { payload } = await jose.jwtVerify(token, JWT_SECRET);
         const userId = payload.userId as string;

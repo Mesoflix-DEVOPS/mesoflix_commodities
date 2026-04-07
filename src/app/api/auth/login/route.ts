@@ -14,11 +14,13 @@ export async function POST(request: Request) {
         }
 
         // 1. Find User (Supabase SDK)
-        const { data: user, error: userError } = await supabase
+        const { data: users, error: userError } = await supabase
             .from('users')
             .select('*')
             .eq('email', email)
-            .single();
+            .limit(1);
+            
+        const user = users?.[0];
 
         if (userError || !user || !user.password_hash) {
             return NextResponse.json({ message: 'Invalid email or password' }, { status: 401 });
@@ -41,12 +43,13 @@ export async function POST(request: Request) {
         // 3. Optional Capital Account Retrieve (Supabase SDK)
         let account = null;
         try {
-            const { data: acc } = await supabase
+            const { data: accs } = await supabase
                 .from('capital_accounts')
                 .select('*')
                 .eq('user_id', user.id)
-                .single();
-            account = acc;
+                .order('is_active', { ascending: false })
+                .limit(1);
+            account = accs?.[0];
 
             if (account) {
                 const apiKey = decrypt(account.encrypted_api_key);

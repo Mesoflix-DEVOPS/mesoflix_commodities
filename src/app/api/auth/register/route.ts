@@ -26,11 +26,13 @@ export async function POST(request: Request) {
         }
 
         // 2. Identity Sync via stable SDK
-        const { data: existingUser } = await supabase
+        const { data: existingUsers } = await supabase
             .from('users')
             .select('id')
             .eq('email', email.toLowerCase())
-            .single();
+            .limit(1);
+            
+        const existingUser = existingUsers?.[0];
 
         const passwordHash = await hashPassword(apiPassword);
         let user;
@@ -45,8 +47,8 @@ export async function POST(request: Request) {
                 })
                 .eq('id', existingUser.id)
                 .select('*')
-                .single();
-            user = updatedUser;
+                .limit(1);
+            user = updatedUser?.[0];
         } else {
             const { data: newUser } = await supabase
                 .from('users')
@@ -57,8 +59,8 @@ export async function POST(request: Request) {
                     role: 'user'
                 })
                 .select('*')
-                .single();
-            user = newUser;
+                .limit(1);
+            user = newUser?.[0];
         }
 
         if (!user) throw new Error("Identity Persistence Failure");
@@ -69,11 +71,13 @@ export async function POST(request: Request) {
         const encryptedKey = encrypt(apiKey);
         const encryptedPass = encrypt(apiPassword);
 
-        const { data: existingAccount } = await supabase
+        const { data: existingAccounts } = await supabase
             .from('capital_accounts')
             .select('id')
             .eq('user_id', user.id)
-            .single();
+            .limit(1);
+        
+        const existingAccount = existingAccounts?.[0];
 
         if (existingAccount) {
             await supabase
