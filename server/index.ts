@@ -197,7 +197,15 @@ app.get('/api/user', authGuard, async (req: any, res) => {
 
         if (error || !user) return res.status(401).json({ error: "User Not Found" });
 
-        res.json({ user: { id: user.id, email: user.email, fullName: user.full_name, role: user.role } });
+        res.json({ 
+            user: { 
+                id: user.id, 
+                email: user.email, 
+                fullName: user.full_name, 
+                full_name: user.full_name, // Dual-compat
+                role: user.role 
+            } 
+        });
     } catch (err: any) {
         console.error("[Identity Bridge] Failed:", err.message);
         res.status(500).json({ error: "Identity Bridge Failed" });
@@ -211,7 +219,7 @@ app.get('/api/dashboard', authGuard, async (req: any, res) => {
         const modeInput = req.query.mode || 'demo';
         const isDemo = modeInput === 'demo';
 
-        // 1. Fetch User Profile via Supabase SDK (Ported from Drizzle)
+        // 1. Fetch User Profile
         const { data: user, error: userError } = await supabase
             .from('users')
             .select('id, full_name, email, role')
@@ -219,11 +227,10 @@ app.get('/api/dashboard', authGuard, async (req: any, res) => {
             .single();
 
         if (userError || !user) {
-            console.error(`[Dashboard Bridge] User Lookup Error:`, userError?.message);
             return res.status(404).json({ error: 'User Not Found' });
         }
 
-        const userData = { fullName: user.full_name || 'Trader' };
+        const userData = { fullName: user.full_name || 'Trader', full_name: user.full_name || 'Trader' };
 
         try {
             const session = await getValidSession(userId, isDemo);
@@ -235,31 +242,42 @@ app.get('/api/dashboard', authGuard, async (req: any, res) => {
                 getHistory(session.cst, session.xSecurityToken, isDemo, { max: 50 }, session.serverUrl)
             ]) as [any, any, any];
 
-            // Improved filtering: Use high-balance indicator for CFD fallback
+            // 1. ROBUST ACCOUNT PICKING
             const targetType = isDemo ? 'demo' : 'live';
             let accounts = (accountsData.accounts || [])
                 .filter((a: any) => (a.accountType || '').toLowerCase() === targetType);
 
-            if (accounts.length === 0 && (accountsData.accounts || []).length > 1) {
+            // Fallback: Pick by balance if labels are generic (common in UK/CFD)
+            if (accounts.length === 0 && (accountsData.accounts || []).length > 0) {
                 const sorted = [...accountsData.accounts].sort((a,b) => (b.balance?.balance || 0) - (a.balance?.balance || 0));
+                // In Demo, we want the high balance (9k); In Real, we likely want the low balance (0.24) if it's the other one
                 accounts = isDemo ? [sorted[0]] : [sorted[1] || sorted[0]];
             }
+
+            const activeAccount = accounts[0];
+            const activeAccountId = activeAccount?.accountId || session.activeAccountId;
+
+            // 2. STRICT POSITION FILTERING (P/L Fix)
+            // Only include positions that belong to the current active account
+            const filteredPositions = (positionsData?.positions || []).filter((p: any) => p.accountId === activeAccountId);
 
             const formattedAccounts = accounts.map((a: any) => ({
                 ...a,
                 balance: {
                     ...(a.balance || {}),
+                    pnl: filteredPositions.reduce((sum: number, p: any) => sum + (p.pnl || 0), 0),
                     availableToWithdraw: a.balance?.available ?? a.balance?.availableToWithdraw ?? 0,
-                    equity: (a.balance?.balance ?? 0) + (a.balance?.pnl ?? 0),
+                    equity: (a.balance?.balance ?? 0) + filteredPositions.reduce((sum: number, p: any) => sum + (p.pnl || 0), 0),
                 }
             }));
 
             res.json({
                 ...accountsData,
                 accounts: formattedAccounts,
-                positions: positionsData?.positions || [],
+                positions: filteredPositions,
                 history: historyData?.activityHistory || [],
-                user: userData
+                user: userData,
+                mode: isDemo ? 'demo' : 'real'
             });
         } catch (capitalErr: any) {
             console.warn(`[Bridge Dashboard] Capital Connection Lag for ${userId}:`, capitalErr.message);
@@ -661,34 +679,35 @@ io.on('connection', (socket) => {
 
                 // 2. Separate Balance & Positions (as expected by Frontend listeners)
                 if (accountsData?.accounts) {
-                    // Strict filtering: Only use the account that matches our current stream mode
-                    // 2. Identify Active Account with CFD fallback (for UK users)
                     const targetType = isDemo ? 'demo' : 'live';
                     let activeAccount = accountsData.accounts.find((a: any) => 
                         a.accountId === currentSession.activeAccountId && 
                         (a.accountType || '').toLowerCase() === targetType
                     );
 
+                    // Fallback: Pick by balance if labels are fuzzy (Institutional CFD Environment)
                     if (!activeAccount) {
-                         // Fallback: If we're looking for DEMO but no account has type 'demo', 
-                         // use the highest balance as the indicator.
                          const sorted = [...accountsData.accounts].sort((a,b) => (b.balance?.balance || 0) - (a.balance?.balance || 0));
                          activeAccount = isDemo ? sorted[0] : (sorted[1] || sorted[0]);
                     }
 
                     if (activeAccount) {
+                        const activeId = activeAccount.accountId;
+                        const filteredPoss = (positionsData?.positions || []).filter((p: any) => p.accountId === activeId);
+                        const totalPnl = filteredPoss.reduce((s: number, p: any) => s + (p.pnl || 0), 0);
+
                         socket.emit('balance', {
                             ...activeAccount.balance,
-                            profitLoss: activeAccount.balance.pnl, // Sync for UI 'parseBalance'
+                            pnl: totalPnl,
+                            profitLoss: totalPnl, // Sync for UI 'parseBalance'
+                            equity: (activeAccount.balance?.balance || 0) + totalPnl,
                             isDemo,
-                            accountId: activeAccount.accountId,
+                            accountId: activeId,
                             accountName: activeAccount.accountName,
                         });
-                    }
-                }
 
-                if (positionsData?.positions) {
-                    socket.emit('positions', positionsData.positions);
+                        socket.emit('positions', filteredPoss);
+                    }
                 }
 
             } catch (error: any) {
