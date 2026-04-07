@@ -46,12 +46,15 @@ export async function getValidSession(userId: string, forceDemo?: boolean, skipR
 
         // Check if specific mode session is still valid
         if (specificSession?.cst && (now - lastUpdate < SESSION_TTL_MS)) {
+            // Determine if this 'Demo' session actually points to the Live API (Standalone Setup)
+            const useLiveApiForDemo = specificSession.serverUrl?.includes('api-capital'); 
+            
             return {
                 cst: specificSession.cst,
                 xSecurityToken: specificSession.xSecurityToken,
                 accountIsDemo: isDemo,
                 activeAccountId: specificSession.activeAccountId,
-                serverUrl: getApiUrl(isDemo),
+                serverUrl: specificSession.serverUrl || getApiUrl(isDemo),
                 lastUpdate
             };
         }
@@ -65,8 +68,8 @@ export async function getValidSession(userId: string, forceDemo?: boolean, skipR
 
         if (skipRefresh) return null; 
 
-        // Concurrency Hardening
-        const jitter = Math.floor(Math.random() * 800);
+        // Concurrency Guard
+        const jitter = Math.floor(Math.random() * 500);
         await new Promise(res => setTimeout(res, jitter));
 
         cached = await checkCache();
@@ -80,9 +83,7 @@ export async function getValidSession(userId: string, forceDemo?: boolean, skipR
         const account = cached.account;
         return await performLogin(account, isDemo, cached.allSessions);
     } catch (error: any) {
-        if (error.message?.includes('429')) {
-             console.error(`[Server 429] Rate limited for ${userId}`);
-        }
+        console.error(`[Session Manager] Error for ${userId}:`, error.message);
         return null;
     }
 }
@@ -97,71 +98,97 @@ async function performLogin(account: any, isDemo: boolean, existingSessions: any
         identifier = userData?.email || '';
     }
 
-    let session = await createSession(identifier, apiPassword, apiKey, isDemo);
-    
-    // SECONDARY HANDSHAKE: Catch potential thin session responses (Missing Accounts)
-    if ((!session.accounts || session.accounts.length === 0) && session.cst) {
+    // --- SCALABLE HANDSHAKE ENGINE ---
+    // We attempt connection to both servers to correctly map accounts for any user.
+    let targetServerUrl = getApiUrl(isDemo);
+    let session: any = null;
+
+    try {
+        session = await createSession(identifier, apiPassword, apiKey, isDemo);
+        
+        // Handshake verification
+        if ((!session.accounts || session.accounts.length === 0) && session.cst) {
+            const accData = await getAccounts(session.cst, session.xSecurityToken, isDemo);
+            if (accData?.accounts) session.accounts = accData.accounts;
+        }
+    } catch (err: any) {
+        console.warn(`[Handshake] Direct ${isDemo ? 'DEMO' : 'LIVE'} failed, checking standalone fallback...`);
+    }
+
+    // STANDALONE FALLBACK: If Demo server fails, but user needs Demo, check the Real server for multiple accounts.
+    if (isDemo && (!session || !session.accounts || session.accounts.length === 0)) {
         try {
-            console.log(`[Identity Guard] Initial session accounts missing. Attempting deep-fetch for ${identifier}...`);
-            const accountsData = await getAccounts(session.cst, session.xSecurityToken, isDemo);
-            if (accountsData && accountsData.accounts) {
-                session.accounts = accountsData.accounts;
+            console.log(`[Handshake] Attempting Standalone Demo Discovery on Real server for ${identifier}...`);
+            const realSession = await createSession(identifier, apiPassword, apiKey, false);
+            const accData = await getAccounts(realSession.cst, realSession.xSecurityToken, false);
+            const allRealAccs = accData?.accounts || [];
+            
+            if (allRealAccs.length >= 2) {
+                console.log(`[Handshake] Found ${allRealAccs.length} accounts on Real server. Isolating for Demo Standalone.`);
+                session = realSession;
+                session.accounts = allRealAccs;
+                targetServerUrl = LIVE_API; // Force Live API even for Demo mode
             }
         } catch (e: any) {
-            console.warn(`[Identity Guard] Deep-fetch failed for ${identifier}:`, e.message);
+            console.error(`[Handshake] Critical: All servers unreachable for ${identifier}`);
+            throw new Error("Brokerage Connection Refused. Please check credentials.");
         }
     }
 
-    // SCALABLE MODE VERIFICATION (Trust Brokerage Preferred Flags)
-    const allAccounts = session.accounts || [];
-    
-    // 1. First, check if the brokerage provides a 'preferred' account on this server
-    const preferredAccount = allAccounts.find((a: any) => a.preferred === true);
-    
-    // 2. Identify active account candidates
-    const activeAccount = preferredAccount || allAccounts[0];
-
-    if (!activeAccount) {
-        console.error(`[Identity Guard] Critical: No accounts found on ${isDemo ? 'DEMO' : 'LIVE'} server for ${identifier}.`);
+    if (!session || !session.accounts || session.accounts.length === 0) {
         throw new Error("No usable accounts found on the brokerage server.");
     }
+
+    const allAccounts = session.accounts;
     
-    console.log(`[Identity Guard] Handshake Verified on ${isDemo ? 'DEMO' : 'LIVE'} for ${identifier}. Active ID: ${activeAccount.accountId}`);
-    
-    // 3. Determine if the user has a manually selected account preference in DB
-    const targetAccountId = isDemo ? account.selected_demo_account_id : account.selected_real_account_id;
-    
-    if (targetAccountId && targetAccountId !== session.currentAccountId) {
-        await switchActiveAccount(session.cst, session.xSecurityToken, targetAccountId, isDemo);
+    // Identification Logic:
+    // 1. If we are on the DEMO server, any account is a demo.
+    // 2. If we are on the LIVE server in Demo mode, we pick the one with the HIGHER balance or the 'CFD' label if others are 'Spread Betting'.
+    // 3. For any user, we prefer the 'account.selected_x_account_id' if set.
+
+    let activeAccount = allAccounts.find((a: any) => 
+        (isDemo ? a.accountId === account.selected_demo_account_id : a.accountId === account.selected_real_account_id)
+    );
+
+    if (!activeAccount) {
+        if (isDemo && targetServerUrl === LIVE_API) {
+            // Heuristic for Standalone Demo (Pick the high balance one)
+            activeAccount = allAccounts.sort((a: any, b: any) => (b.balance?.balance || 0) - (a.balance?.balance || 0))[0];
+        } else {
+            activeAccount = allAccounts.find((a: any) => a.preferred === true) || allAccounts[0];
+        }
+    }
+
+    if (!activeAccount) throw new Error("Account resolution failure.");
+
+    if (activeAccount.accountId !== session.currentAccountId) {
+        await switchActiveAccount(session.cst, session.xSecurityToken, activeAccount.accountId, targetServerUrl === DEMO_API);
     }
 
     const tokens: SessionTokens = {
         cst: session.cst,
         xSecurityToken: session.xSecurityToken,
         accountIsDemo: isDemo,
-        activeAccountId: targetAccountId || session.currentAccountId,
-        serverUrl: getApiUrl(isDemo)
+        activeAccountId: activeAccount.accountId,
+        serverUrl: targetServerUrl
     };
 
-    // Update only the target mode in the JSON blob
     const modeKey = isDemo ? 'demo' : 'live';
     const updatedSessions = {
         ...existingSessions,
         [modeKey]: {
-            cst: tokens.cst,
-            xSecurityToken: tokens.xSecurityToken,
-            activeAccountId: tokens.activeAccountId,
+            ...tokens,
             updated_at: new Date().toISOString()
         }
     };
 
-    const encryptedTokens = encrypt(JSON.stringify(updatedSessions));
-
     await supabase
         .from('capital_accounts')
         .update({
-            encrypted_session_tokens: encryptedTokens,
-            session_updated_at: new Date().toISOString(), // Main timestamp for legacy checks
+            encrypted_session_tokens: encrypt(JSON.stringify(updatedSessions)),
+            selected_real_account_id: !isDemo && !account.selected_real_account_id ? activeAccount.accountId : account.selected_real_account_id,
+            selected_demo_account_id: isDemo && !account.selected_demo_account_id ? activeAccount.accountId : account.selected_demo_account_id,
+            session_updated_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
         })
         .eq('id', account.id);

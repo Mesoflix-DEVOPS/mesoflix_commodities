@@ -27,6 +27,8 @@ export type BalanceData = {
     accountType?: string;
 };
 
+import { ConnectionOverlay } from '@/components/dashboard/ConnectionOverlay';
+
 interface MarketDataContextType {
     marketData: MarketData;
     balanceData: BalanceData | null;
@@ -36,6 +38,7 @@ interface MarketDataContextType {
     connectionStatus: 'connecting' | 'connected' | 'disconnected' | 'error';
     setMode: (mode: 'demo' | 'real') => void;
     mode: 'demo' | 'real';
+    isSyncing: boolean;
 }
 
 const MarketDataContext = createContext<MarketDataContextType>({
@@ -47,6 +50,7 @@ const MarketDataContext = createContext<MarketDataContextType>({
     connectionStatus: 'disconnected',
     setMode: () => { },
     mode: 'real',
+    isSyncing: false,
 });
 
 export const useMarketData = () => useContext(MarketDataContext);
@@ -66,12 +70,9 @@ function parseBalance(data: any): BalanceData | null {
     };
 }
 
-function isNonZero(b: BalanceData | null): boolean {
-    return !!b && (b.balance > 0 || b.deposit > 0);
-}
-
 export function MarketDataProvider({ children }: { children: ReactNode }) {
     const [mode, setModeState] = useState<'demo' | 'real'>('real');
+    const [isSyncing, setIsSyncing] = useState(false);
     const [marketData, setMarketData] = useState<MarketData>({});
     const [demoBalance, setDemoBalance] = useState<BalanceData | null>(null);
     const [realBalance, setRealBalance] = useState<BalanceData | null>(null);
@@ -79,13 +80,62 @@ export function MarketDataProvider({ children }: { children: ReactNode }) {
     const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected' | 'error'>('connecting');
 
     const socketRef = useRef<Socket | null>(null);
+    const modeRef = useRef(mode);
 
     // Active balance is strictly the current mode's data — no cross-mode fallback
     const balanceData = mode === 'demo' ? demoBalance : realBalance;
 
-    const setMode = useCallback((newMode: 'demo' | 'real') => {
-        setModeState(newMode);
+    const performIsolatedHandshake = useCallback(async (newMode: 'demo' | 'real') => {
+        setIsSyncing(true);
+        console.log(`[Isolate Handshake] Initiating 5s deep sync for ${newMode}...`);
+        
+        // Clear ghost data immediately
+        setMarketData({});
+        setPositions([]);
+        if (newMode === 'demo') setDemoBalance(null);
+        else setRealBalance(null);
+
+        try {
+            const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001';
+            const getCookie = (name: string) => {
+                const value = `; ${document.cookie}`;
+                const parts = value.split(`; ${name}=`);
+                if (parts.length === 2) return parts.pop()?.split(';').shift();
+            };
+            const token = getCookie('access_token');
+
+            // 1. Backend Isolate Trigger
+            await fetch(`${SOCKET_URL}/api/auth/isolate-handshake`, {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ mode: newMode })
+            });
+
+            // 2. Refresh Socket Logic
+            if (socketRef.current?.connected) {
+                socketRef.current.emit('start-stream', { mode: newMode });
+            }
+
+        } catch (e) {
+            console.error("[Isolate Handshake] Failed", e);
+        }
+
+        // Standardized 5-second buffer (Institutional requirement)
+        setTimeout(() => {
+            setIsSyncing(false);
+            console.log(`[Isolate Handshake] Handshake complete for ${newMode}.`);
+        }, 5000);
     }, []);
+
+    const setMode = useCallback((newMode: 'demo' | 'real') => {
+        if (newMode === modeRef.current) return;
+        setModeState(newMode);
+        modeRef.current = newMode;
+        performIsolatedHandshake(newMode);
+    }, [performIsolatedHandshake]);
 
     const fetchInitialData = useCallback(async (currentMode: 'demo' | 'real') => {
         try {
@@ -104,7 +154,6 @@ export function MarketDataProvider({ children }: { children: ReactNode }) {
             if (res.ok) {
                 const data = await res.json();
                 if (data.accounts) {
-                    // Pre-populate both modes if available
                     data.accounts.forEach((acc: any) => {
                         const isAccDemo = (acc.accountType || '').toLowerCase() === 'demo';
                         if (isAccDemo) setDemoBalance(parseBalance(acc));
@@ -141,11 +190,8 @@ export function MarketDataProvider({ children }: { children: ReactNode }) {
             reconnectionDelay: 2000,
             reconnectionDelayMax: 5000,
             timeout: 20000,
-            transports: ['websocket'], // Use WebSocket for institutional speed
+            transports: ['websocket'],
             autoConnect: true,
-            extraHeaders: {
-                "ngrok-skip-browser-warning": "true" // For development
-            }
         });
 
         socketRef.current = socket;
@@ -154,11 +200,11 @@ export function MarketDataProvider({ children }: { children: ReactNode }) {
         socket.on('connect', () => {
             console.log(`[MarketData] Socket Connected: ${SOCKET_URL}`);
             setConnectionStatus('connected');
-            // Request actual mode immediately on connect
             socket.emit('start-stream', { mode: modeRef.current });
         });
 
         socket.on('market-data', (data: any[]) => {
+            if (isSyncing) return; // Drop updates during sync
             setMarketData(prev => {
                 const newState = { ...prev };
                 data.forEach((snap: any) => {
@@ -177,15 +223,14 @@ export function MarketDataProvider({ children }: { children: ReactNode }) {
         });
 
         socket.on('balance', (data: any) => {
+            if (isSyncing) return; // Drop updates during sync
             const balanceObj = parseBalance(data);
-            if (data.isDemo) {
-                setDemoBalance(balanceObj);
-            } else {
-                setRealBalance(balanceObj);
-            }
+            if (data.isDemo) setDemoBalance(balanceObj);
+            else setRealBalance(balanceObj);
         });
 
         socket.on('positions', (data: any[]) => {
+            if (isSyncing) return;
             setPositions(data);
         });
 
@@ -203,17 +248,7 @@ export function MarketDataProvider({ children }: { children: ReactNode }) {
             socket.disconnect();
             socketRef.current = null;
         };
-    }, []); // Empty dependency array: Socket lives for the life of the App
-
-    // Handle Mode Changes without dropping the socket
-    const modeRef = useRef(mode);
-    useEffect(() => {
-        modeRef.current = mode;
-        if (socketRef.current?.connected) {
-            console.log(`[MarketData] Swapping stream mode to: ${mode}`);
-            socketRef.current.emit('start-stream', { mode });
-        }
-    }, [mode]);
+    }, [isSyncing]); // Re-bind listeners when sync state changes
 
     return (
         <MarketDataContext.Provider value={{
@@ -225,7 +260,9 @@ export function MarketDataProvider({ children }: { children: ReactNode }) {
             connectionStatus,
             setMode,
             mode,
+            isSyncing,
         }}>
+            <ConnectionOverlay isVisible={isSyncing} mode={mode} />
             {children}
         </MarketDataContext.Provider>
     );

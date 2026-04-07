@@ -57,7 +57,41 @@ app.post('/api/auth/check-user', async (req, res) => {
     }
 });
 
-// 3. Human Onboarding Concierge (Meet Requests)
+// 3. Isolated Handshake Bridge (Mode Switch)
+app.post('/api/auth/isolate-handshake', async (req, res) => {
+    try {
+        const authHeader = req.headers.authorization;
+        if (!authHeader) return res.status(401).json({ error: 'Unauthorized' });
+        
+        const token = authHeader.split(' ')[1];
+        const { payload } = await jose.jwtVerify(token, new TextEncoder().encode(process.env.JWT_SECRET || 'mesoflix-bridge-secret-2024'));
+        const userId = (payload as any).userId;
+
+        const { mode } = req.body;
+        const isDemo = mode === 'demo';
+
+        console.log(`[Isolate Handshake] Forcing fresh ${mode.toUpperCase()} sync for User ${userId}`);
+
+        // Fetch account record
+        const { data: account } = await supabase
+            .from('capital_accounts')
+            .select('*')
+            .eq('user_id', userId)
+            .single();
+
+        if (!account) return res.status(404).json({ error: 'Connection not found' });
+
+        // Force a fresh login to the target server
+        const session = await getValidSession(userId, isDemo, false);
+
+        res.json({ success: true, mode, accountId: session?.activeAccountId });
+    } catch (err: any) {
+        console.error("Isolate Handshake Error:", err.message);
+        res.status(500).json({ error: `Handshake Failure: ${err.message}` });
+    }
+});
+
+// 4. Human Onboarding Concierge (Meet Requests)
 app.post('/api/onboarding/request-session', async (req, res) => {
     try {
         const { email, preferredTime, phone } = req.body;
