@@ -21,6 +21,7 @@ export const REFRESH_LOCK_MS = 15000; // 15 seconds lockout
 
 export async function getValidSession(userId: string, forceDemo?: boolean, skipRefresh: boolean = false): Promise<SessionTokens | null> {
     const isDemo = forceDemo !== undefined ? forceDemo : false;
+    const modeKey = isDemo ? 'demo' : 'live';
 
     const checkCache = async () => {
         const { data: account } = await supabase
@@ -32,24 +33,29 @@ export async function getValidSession(userId: string, forceDemo?: boolean, skipR
         if (!account) return null;
 
         const now = Date.now();
-        const lastUpdate = account.session_updated_at ? new Date(account.session_updated_at).getTime() : 0;
-        const isSameMode = account.session_mode === (isDemo ? 'demo' : 'live');
+        
+        let sessionData: any = {};
+        try {
+            if (account.encrypted_session_tokens) {
+                sessionData = JSON.parse(decrypt(account.encrypted_session_tokens));
+            }
+        } catch (e) { }
 
-        // Check if session is still valid
-        if (account.encrypted_session_tokens && isSameMode && (now - lastUpdate < SESSION_TTL_MS)) {
-            try {
-                const decrypted = JSON.parse(decrypt(account.encrypted_session_tokens));
-                return {
-                    cst: decrypted.cst,
-                    xSecurityToken: decrypted.xSecurityToken,
-                    accountIsDemo: isDemo,
-                    activeAccountId: decrypted.activeAccountId,
-                    serverUrl: getApiUrl(isDemo),
-                    lastUpdate
-                };
-            } catch (e) { }
+        const specificSession = sessionData[modeKey];
+        const lastUpdate = specificSession?.updated_at ? new Date(specificSession.updated_at).getTime() : 0;
+
+        // Check if specific mode session is still valid
+        if (specificSession?.cst && (now - lastUpdate < SESSION_TTL_MS)) {
+            return {
+                cst: specificSession.cst,
+                xSecurityToken: specificSession.xSecurityToken,
+                accountIsDemo: isDemo,
+                activeAccountId: specificSession.activeAccountId,
+                serverUrl: getApiUrl(isDemo),
+                lastUpdate
+            };
         }
-        return { lastUpdate, account };
+        return { lastUpdate, account, allSessions: sessionData };
     };
 
     try {
@@ -57,9 +63,9 @@ export async function getValidSession(userId: string, forceDemo?: boolean, skipR
         if (!cached) return null;
         if ('cst' in cached) return cached as SessionTokens;
 
-        if (skipRefresh) return null; // Used by front-end to avoid clashing
+        if (skipRefresh) return null; 
 
-        // --- CONCURRENCY HARDENING ---
+        // Concurrency Hardening
         const jitter = Math.floor(Math.random() * 800);
         await new Promise(res => setTimeout(res, jitter));
 
@@ -68,32 +74,26 @@ export async function getValidSession(userId: string, forceDemo?: boolean, skipR
         if ('cst' in cached) return cached as SessionTokens;
 
         if (Date.now() - cached.lastUpdate < REFRESH_LOCK_MS) {
-            console.warn(`[Server] Session locked for user ${userId}, waiting for propagation...`);
             return null; 
         }
 
         const account = cached.account;
-        return await performLogin(account, isDemo);
+        return await performLogin(account, isDemo, cached.allSessions);
     } catch (error: any) {
         if (error.message?.includes('429')) {
              console.error(`[Server 429] Rate limited for ${userId}`);
         }
-        process.env.NODE_ENV !== 'production' && console.error('[Server Session Error]:', error);
         return null;
     }
 }
 
-async function performLogin(account: any, isDemo: boolean): Promise<SessionTokens> {
+async function performLogin(account: any, isDemo: boolean, existingSessions: any = {}): Promise<SessionTokens> {
     const apiKey = decrypt(account.encrypted_api_key);
     const apiPassword = decrypt(account.encrypted_api_password || '');
     
     let identifier = account.capital_account_id;
     if (!identifier || identifier === '') {
-        const { data: userData } = await supabase
-            .from('users')
-            .select('email')
-            .eq('id', account.user_id)
-            .single();
+        const { data: userData } = await supabase.from('users').select('email').eq('id', account.user_id).single();
         identifier = userData?.email || '';
     }
 
@@ -112,18 +112,25 @@ async function performLogin(account: any, isDemo: boolean): Promise<SessionToken
         serverUrl: getApiUrl(isDemo)
     };
 
-    const encryptedTokens = encrypt(JSON.stringify({
-        cst: tokens.cst,
-        xSecurityToken: tokens.xSecurityToken,
-        activeAccountId: tokens.activeAccountId
-    }));
+    // Update only the target mode in the JSON blob
+    const modeKey = isDemo ? 'demo' : 'live';
+    const updatedSessions = {
+        ...existingSessions,
+        [modeKey]: {
+            cst: tokens.cst,
+            xSecurityToken: tokens.xSecurityToken,
+            activeAccountId: tokens.activeAccountId,
+            updated_at: new Date().toISOString()
+        }
+    };
+
+    const encryptedTokens = encrypt(JSON.stringify(updatedSessions));
 
     await supabase
         .from('capital_accounts')
         .update({
             encrypted_session_tokens: encryptedTokens,
-            session_mode: isDemo ? 'demo' : 'live',
-            session_updated_at: new Date().toISOString(),
+            session_updated_at: new Date().toISOString(), // Main timestamp for legacy checks
             updated_at: new Date().toISOString()
         })
         .eq('id', account.id);
@@ -131,11 +138,6 @@ async function performLogin(account: any, isDemo: boolean): Promise<SessionToken
     return tokens;
 }
 
-/**
- * PROACTIVE MASTER REFRESH
- * Iterates through all linked accounts and refreshes sessions if nearing expiry.
- * This ensures the front-end (Vercel) ALWAYS has valid tokens in Supabase.
- */
 export async function refreshAllActiveSessions() {
     try {
         const { data: accounts, error } = await supabase
@@ -146,20 +148,32 @@ export async function refreshAllActiveSessions() {
         if (error || !accounts) return;
 
         for (const account of accounts) {
+            let sessionData: any = {};
+            try {
+                if (account.encrypted_session_tokens) {
+                    sessionData = JSON.parse(decrypt(account.encrypted_session_tokens));
+                }
+            } catch (e) { }
+
             const now = Date.now();
-            const lastUpdate = account.session_updated_at ? new Date(account.session_updated_at).getTime() : 0;
-            
-            // Refresh if older than 4.5 minutes (Capital sessions last 10-15m)
-            const NEEDS_REFRESH = (now - lastUpdate > (4.5 * 60 * 1000));
-            
-            if (NEEDS_REFRESH) {
-                console.log(`[Master Heartbeat] Proactively refreshing session for User ${account.user_id} (${account.session_mode})`);
-                await performLogin(account, account.session_mode === 'demo');
-                // Brief pause to prevent rapid-fire API hits to Capital
-                await new Promise(res => setTimeout(res, 2000));
+            const modes: ('demo' | 'live')[] = ['demo', 'live'];
+
+            for (const mode of modes) {
+                const specificSession = sessionData[mode];
+                const lastUpdate = specificSession?.updated_at ? new Date(specificSession.updated_at).getTime() : 0;
+                
+                // Refresh if older than 4.2 minutes (slightly aggressive to ensure overlap)
+                const NEEDS_REFRESH = (now - lastUpdate > (4.2 * 60 * 1000));
+                
+                if (NEEDS_REFRESH) {
+                    console.log(`[Master Dual-Heartbeat] Refreshing ${mode.toUpperCase()} for User ${account.user_id}`);
+                    await performLogin(account, mode === 'demo', sessionData);
+                    // Pause between modes to avoid account-level burst limits
+                    await new Promise(res => setTimeout(res, 3000));
+                }
             }
         }
     } catch (err: any) {
-        console.error('[Master Heartbeat] Failed:', err.message);
+        console.error('[Master Heartbeat] Failure:', err.message);
     }
 }

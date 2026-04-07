@@ -26,6 +26,7 @@ export async function getValidSession(
     forceRefresh: boolean = false
 ): Promise<SessionTokens> {
     const isDemo = forceDemo;
+    const modeKey = isDemo ? 'demo' : 'live';
 
     // 1. Fetch credentials and cached session (Master-Sync only)
     const { data: account } = await supabase
@@ -37,29 +38,34 @@ export async function getValidSession(
     if (!account) throw new Error('Institutional connection not found.');
 
     const now = Date.now();
-    const lastUpdate = account.session_updated_at ? new Date(account.session_updated_at).getTime() : 0;
-    const isSameMode = account.session_mode === (isDemo ? 'demo' : 'live');
-
+    
     // FRONTEND: READ-ONLY OBSERVER MODE
-    // We only use the session if it's within the TTL. 
-    // We NEVER perform logins here to avoid 429 thundering herd.
-    if (account.encrypted_session_tokens && isSameMode && (now - lastUpdate < SESSION_TTL_MS) && !forceRefresh) {
+    // We parse the dual-mode JSON blob
+    if (account.encrypted_session_tokens && !forceRefresh) {
         try {
-            const decrypted = JSON.parse(decrypt(account.encrypted_session_tokens));
-            return {
-                cst: decrypted.cst,
-                xSecurityToken: decrypted.xSecurityToken,
-                accountIsDemo: isDemo,
-                activeAccountId: decrypted.activeAccountId,
-                serverUrl: getApiUrl(isDemo)
-            };
+            const allSessions = JSON.parse(decrypt(account.encrypted_session_tokens));
+            const specificSession = allSessions[modeKey];
+            
+            if (specificSession) {
+                const lastUpdate = new Date(specificSession.updated_at).getTime();
+                
+                if (now - lastUpdate < SESSION_TTL_MS) {
+                    return {
+                        cst: specificSession.cst,
+                        xSecurityToken: specificSession.xSecurityToken,
+                        accountIsDemo: isDemo,
+                        activeAccountId: specificSession.activeAccountId,
+                        serverUrl: getApiUrl(isDemo)
+                    };
+                }
+            }
         } catch (e) {
-            console.warn('[Frontend Session] Cache decryption failed');
+            console.warn('[Frontend Session] Dual-cache parse failed');
         }
     }
 
-    // If we land here, the Master (Render) needs to refresh it.
-    throw new Error('Capital.com Syncing: Waiting for Master Authority...');
+    // If we land here, the Master (Render) needs to refresh the specific mode.
+    throw new Error(`Capital.com ${isDemo ? 'Demo' : 'Live'} Syncing: Waiting for Master Authority...`);
 }
 
 export async function clearCachedSession(userId: string): Promise<void> {

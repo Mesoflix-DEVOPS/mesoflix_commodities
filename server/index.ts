@@ -715,6 +715,67 @@ io.on('connection', (socket) => {
     });
 });
 
+// --- INSTITUTIONAL METRICS ---
+const stats = {
+    startTime: Date.now(),
+    requestsReceived: 0,
+    dualHeartbeatsActive: 0,
+    lastHeartbeatTime: null as string | null
+};
+
+app.use((req, res, next) => {
+    stats.requestsReceived++;
+    next();
+});
+
+// 1. Master Status Dashboard (Premium root UI)
+app.get('/', (req, res) => {
+    const uptime = Math.floor((Date.now() - stats.startTime) / 1000);
+    const h = Math.floor(uptime / 3600);
+    const m = Math.floor((uptime % 3600) / 60);
+    const s = uptime % 60;
+
+    res.send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Mesoflix | Institutional Bridge Status</title>
+            <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+            <style>
+                body { background: #050505; color: #fff; font-family: 'Inter', sans-serif; margin: 0; display: flex; align-items: center; justify-content: center; height: 100vh; }
+                .card { background: #0a0a0a; border: 1px solid #111; padding: 40px; border-radius: 24px; width: 500px; box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
+                .logo { font-weight: 800; font-size: 24px; letter-spacing: -1px; margin-bottom: 30px; display: flex; align-items: center; color: #00ffcc; }
+                .logo span { color: #fff; margin-left: 4px; }
+                .status { display: flex; align-items: center; margin-bottom: 40px; }
+                .dot { width: 12px; height: 12px; border-radius: 50%; background: #00ffcc; margin-right: 12px; box-shadow: 0 0 15px #00ffcc; animation: pulse 2s infinite; }
+                @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
+                .metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+                .metric { background: #0f0f0f; padding: 20px; border-radius: 16px; border: 1px solid #151515; }
+                .label { font-size: 11px; text-transform: uppercase; color: #444; font-weight: 600; margin-bottom: 8px; }
+                .value { font-size: 22px; font-weight: 600; color: #eee; }
+                .footer { margin-top: 40px; font-size: 11px; color: #333; text-align: center; }
+            </style>
+        </head>
+        <body>
+            <div class="card">
+                <div class="logo">MESOFLIX<span>BRIDGE</span></div>
+                <div class="status">
+                    <div class="dot"></div>
+                    <div style="font-weight: 600; font-size: 18px">System Operational</div>
+                </div>
+                <div class="metrics">
+                    <div class="metric"><div class="label">Uptime</div><div class="value">${h}h ${m}m ${s}s</div></div>
+                    <div class="metric"><div class="label">Requests</div><div class="value">${stats.requestsReceived}</div></div>
+                    <div class="metric"><div class="label">Dual-Heartbeat</div><div class="value">ACTIVE</div></div>
+                    <div class="metric"><div class="label">Last Sync</div><div class="value" style="font-size: 14px">${stats.lastHeartbeatTime || 'Initializing...'}</div></div>
+                </div>
+                <div class="footer">INSTITUTIONAL GRADE TRADING INFRASTRUCTURE</div>
+            </div>
+        </body>
+        </html>
+    `);
+});
+
 // 5. Bridge Health Diagnostic (Verification Tool)
 app.get('/api/bridge/health', async (req, res) => {
     const health: any = {
@@ -765,8 +826,19 @@ const PORT = process.env.PORT || 3001;
 httpServer.listen(PORT, () => {
     console.log(`🚀 Mesoflix Real-time Server active on port ${PORT}`);
     
-    // START MASTER HEARTBEAT
-    // Proactively refresh sessions every 60s (internal checks avoid redundant hits)
-    console.log(`[Master Heartbeat] Initiated centralized session authority.`);
-    setInterval(refreshAllActiveSessions, 60000);
+    // START MASTER DUAL-HEARTBEAT
+    console.log(`[Master Heartbeat] Initiated centralized dual-session authority.`);
+    
+    const runHeartbeat = async () => {
+        try {
+            await refreshAllActiveSessions();
+            stats.lastHeartbeatTime = new Date().toLocaleTimeString();
+            stats.dualHeartbeatsActive = 1; // Indicator for the UI
+        } catch (e) {
+            console.error("[Master Heartbeat] Loop error:", e);
+        }
+    };
+
+    runHeartbeat(); // Immediate first run
+    setInterval(runHeartbeat, 60000);
 });
