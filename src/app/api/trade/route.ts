@@ -47,12 +47,16 @@ export async function POST(request: Request) {
             );
 
             let dealId = result.dealReference;
+            // Background check for final Deal ID without blocking excessively
             if (result && result.dealReference) {
                 try {
-                    await new Promise(res => setTimeout(res, 800));
+                    // Shorter delay + timeout protection
+                    await new Promise(res => setTimeout(res, 200));
                     const confirmRes = await getConfirm(session.cst, session.xSecurityToken, result.dealReference, accountIsDemo, session.serverUrl);
                     if (confirmRes && confirmRes.dealId) dealId = confirmRes.dealId;
-                } catch { }
+                } catch (e) {
+                    console.warn('[Trade API] Optional confirmation failed, using reference ID');
+                }
             }
 
             return { result, dealId };

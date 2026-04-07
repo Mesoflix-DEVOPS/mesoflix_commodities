@@ -164,14 +164,14 @@ function DetailModal({
                 </div>
 
                 {/* Price chart */}
-                <div className="h-52 w-full mb-6 bg-black/20 rounded-2xl p-4">
+                <div className="relative w-full aspect-[2/1] min-h-[220px] mb-6 bg-black/20 rounded-2xl p-4 overflow-hidden">
                     {loading ? (
-                        <div className="h-full flex items-center justify-center">
+                        <div className="absolute inset-0 flex items-center justify-center">
                             <div className="w-8 h-8 border-2 border-teal/20 border-t-teal rounded-full animate-spin" />
                         </div>
                     ) : chartData.length > 0 ? (
-                        <ResponsiveContainer width="100%" height="100%" minWidth={1}>
-                            <AreaChart data={chartData}>
+                        <ResponsiveContainer width="99%" height="100%">
+                            <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                                 <defs>
                                     <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
                                         <stop offset="5%" stopColor={isUp ? "#00BFA6" : "#ef4444"} stopOpacity={0.3} />
@@ -203,7 +203,8 @@ function DetailModal({
                                     strokeWidth={2}
                                     fill="url(#chartGrad)"
                                     dot={false}
-                                    animationDuration={800}
+                                    isAnimationActive={true}
+                                    animationDuration={1000}
                                 />
                             </AreaChart>
                         </ResponsiveContainer>

@@ -17,10 +17,13 @@ export interface SessionTokens {
     serverUrl: string;
 }
 const SESSION_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const REFRESH_LOCK_MS = 15000; // 15 seconds lockout
 
 export async function getValidSession(userId: string, forceDemo?: boolean): Promise<SessionTokens | null> {
-    try {
-        const { data: account, error } = await supabase
+    const isDemo = forceDemo !== undefined ? forceDemo : false;
+
+    const checkCache = async () => {
+        const { data: account } = await supabase
             .from('capital_accounts')
             .select('*')
             .eq('user_id', userId)
@@ -28,13 +31,10 @@ export async function getValidSession(userId: string, forceDemo?: boolean): Prom
 
         if (!account) return null;
 
-        const isDemo = forceDemo !== undefined ? forceDemo : (account.account_type === 'demo');
-        
-        // Distributed Cache Check
         const now = Date.now();
         const lastUpdate = account.session_updated_at ? new Date(account.session_updated_at).getTime() : 0;
         const isSameMode = account.session_mode === (isDemo ? 'demo' : 'live');
-        
+
         if (account.encrypted_session_tokens && isSameMode && (now - lastUpdate < SESSION_TTL_MS)) {
             try {
                 const decrypted = JSON.parse(decrypt(account.encrypted_session_tokens));
@@ -43,13 +43,33 @@ export async function getValidSession(userId: string, forceDemo?: boolean): Prom
                     xSecurityToken: decrypted.xSecurityToken,
                     accountIsDemo: isDemo,
                     activeAccountId: decrypted.activeAccountId,
-                    serverUrl: getApiUrl(isDemo)
+                    serverUrl: getApiUrl(isDemo),
+                    lastUpdate
                 };
-            } catch (e) {
-                // Silently fall back to login if decryption fails
-            }
+            } catch (e) { }
+        }
+        return { lastUpdate, account };
+    };
+
+    try {
+        let cached: any = await checkCache();
+        if (!cached) return null;
+        if ('cst' in cached) return cached as SessionTokens;
+
+        // --- CONCURRENCY HARDENING ---
+        const jitter = Math.floor(Math.random() * 800);
+        await new Promise(res => setTimeout(res, jitter));
+
+        cached = await checkCache();
+        if (!cached) return null;
+        if ('cst' in cached) return cached as SessionTokens;
+
+        if (Date.now() - cached.lastUpdate < REFRESH_LOCK_MS) {
+            console.warn(`[Server] Session locked for user ${userId}, waiting for propagation...`);
+            return null; // Let the next poll handle it
         }
 
+        const account = cached.account;
         const apiKey = decrypt(account.encrypted_api_key);
         const apiPassword = decrypt(account.encrypted_api_password || '');
         
@@ -97,7 +117,10 @@ export async function getValidSession(userId: string, forceDemo?: boolean): Prom
             .eq('id', account.id);
 
         return tokens;
-    } catch (error) {
+    } catch (error: any) {
+        if (error.message?.includes('429')) {
+             console.error(`[Server 429] Rate limited for ${userId}`);
+        }
         process.env.NODE_ENV !== 'production' && console.error('[Server Session Error]:', error);
         return null;
     }

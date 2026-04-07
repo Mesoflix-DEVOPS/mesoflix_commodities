@@ -17,7 +17,8 @@ export interface SessionTokens {
     serverUrl: string;
 }
 
-const SESSION_TTL_MS = 5 * 60 * 1000; // 5 minutes (Capital sessions last 10m)
+const SESSION_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const REFRESH_LOCK_MS = 15000; // 15 seconds lockout
 
 export async function getValidSession(
     userId: string,
@@ -25,22 +26,20 @@ export async function getValidSession(
     forceRefresh: boolean = false
 ): Promise<SessionTokens> {
     const isDemo = forceDemo;
-    
-    try {
-        // 1. Fetch credentials and cached session via stable SDK
-        const { data: account, error } = await supabase
+
+    const checkCache = async () => {
+        const { data: account } = await supabase
             .from('capital_accounts')
             .select('*')
             .eq('user_id', userId)
             .single();
 
-        if (error || !account) throw new Error('Institutional connection not found.');
+        if (!account) throw new Error('Institutional connection not found.');
 
-        // Distributed Cache Check
         const now = Date.now();
         const lastUpdate = account.session_updated_at ? new Date(account.session_updated_at).getTime() : 0;
         const isSameMode = account.session_mode === (isDemo ? 'demo' : 'live');
-        
+
         if (account.encrypted_session_tokens && isSameMode && (now - lastUpdate < SESSION_TTL_MS) && !forceRefresh) {
             try {
                 const decrypted = JSON.parse(decrypt(account.encrypted_session_tokens));
@@ -49,14 +48,37 @@ export async function getValidSession(
                     xSecurityToken: decrypted.xSecurityToken,
                     accountIsDemo: isDemo,
                     activeAccountId: decrypted.activeAccountId,
-                    serverUrl: getApiUrl(isDemo)
+                    serverUrl: getApiUrl(isDemo),
+                    lastUpdate
                 };
             } catch (e) {
-                console.warn('[Session Cache] Decryption failed, falling back to login');
+                console.warn('[Session Cache] Decryption failed');
             }
+        }
+        return { lastUpdate };
+    };
+
+    try {
+        // First Check
+        let cached = await checkCache();
+        if ('cst' in cached) return cached as SessionTokens;
+
+        // --- CONCURRENCY HARDENING: Jitter & Re-check ---
+        // If expired, wait for a random jitter (0-1000ms) and re-check.
+        // This prevents 10 lambdas from all logging in at once.
+        const jitter = Math.floor(Math.random() * 800);
+        await new Promise(res => setTimeout(res, jitter));
+
+        cached = await checkCache();
+        if ('cst' in cached) return cached as SessionTokens;
+
+        // Lock check: if it was updated < 15s ago, someone just did it.
+        if (Date.now() - (cached as any).lastUpdate < REFRESH_LOCK_MS && !forceRefresh) {
+             throw new Error('Capital.com Session Locked (Wait 15s)');
         }
 
         // 2. Perform fresh login
+        const { data: account } = await supabase.from('capital_accounts').select('*').eq('user_id', userId).single();
         const apiKey = decrypt(account.encrypted_api_key);
         const apiPassword = decrypt(account.encrypted_api_password || '');
         
@@ -103,6 +125,10 @@ export async function getValidSession(
         return tokens;
 
     } catch (e: any) {
+        if (e.message.includes('429')) {
+             console.error('[Session API] 429 Detected, backing off...');
+             throw new Error('Capital.com Rate Limited (429). Please wait 30s.');
+        }
         console.error('[Frontend Session API] Fatal:', e.message);
         throw e;
     }
