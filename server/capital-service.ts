@@ -97,8 +97,21 @@ async function performLogin(account: any, isDemo: boolean, existingSessions: any
         identifier = userData?.email || '';
     }
 
-    const session = await createSession(identifier, apiPassword, apiKey, isDemo);
+    let session = await createSession(identifier, apiPassword, apiKey, isDemo);
     
+    // SECONDARY HANDSHAKE: Catch potential thin session responses (Missing Accounts)
+    if ((!session.accounts || session.accounts.length === 0) && session.cst) {
+        try {
+            console.log(`[Identity Guard] Initial session accounts missing. Attempting deep-fetch for ${identifier}...`);
+            const accountsData = await getAccounts(session.cst, session.xSecurityToken, isDemo);
+            if (accountsData && accountsData.accounts) {
+                session.accounts = accountsData.accounts;
+            }
+        } catch (e: any) {
+            console.warn(`[Identity Guard] Deep-fetch failed for ${identifier}:`, e.message);
+        }
+    }
+
     // SCALABLE MODE VERIFICATION (Trust Brokerage Preferred Flags)
     const allAccounts = session.accounts || [];
     

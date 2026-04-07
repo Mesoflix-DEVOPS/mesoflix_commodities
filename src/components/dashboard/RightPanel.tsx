@@ -72,7 +72,7 @@ function DetailModal({
 
     if (!item) return null;
 
-    const isUp = (snapshot?.percentageChange ?? item.longPct - 50) >= 0;
+    const isUp = (snapshot?.percentageChange ?? (item ? (item.longPct - 50) : 0)) >= 0;
     const spread = snapshot ? (snapshot.offer - snapshot.bid).toFixed(4) : '—';
 
     const RESOLUTIONS = [
@@ -83,7 +83,6 @@ function DetailModal({
     ] as const;
 
     return (
-        // Backdrop — no blur, just dark overlay so content is sharp
         <div
             className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70"
             onClick={onClose}
@@ -100,47 +99,36 @@ function DetailModal({
                             {item.epic} · Capital.com Live
                         </p>
                     </div>
-                    <div className="flex items-center gap-3">
-                        {snapshot && (
-                            <div className={cn(
-                                "flex items-center gap-1 px-3 py-1.5 rounded-xl text-sm font-black",
-                                isUp ? "bg-teal/10 text-teal border border-teal/20" : "bg-red-500/10 text-red-400 border border-red-500/20"
-                            )}>
-                                {isUp ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
-                                {snapshot.percentageChange > 0 ? '+' : ''}{snapshot.percentageChange.toFixed(2)}%
-                            </div>
-                        )}
-                        <button
-                            onClick={fetchChart}
-                            className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white border border-white/5 transition-all"
-                        >
-                            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-                        </button>
-                        <button
-                            onClick={onClose}
-                            className="p-2 rounded-xl bg-white/5 hover:bg-red-500/10 text-gray-400 hover:text-red-400 border border-white/5 transition-all"
-                        >
-                            <X size={16} />
-                        </button>
-                    </div>
+                    <button
+                        onClick={onClose}
+                        className="p-3 bg-white/5 hover:bg-white/10 rounded-2xl text-gray-400 hover:text-white transition-all border border-white/5"
+                    >
+                        <X size={20} />
+                    </button>
                 </div>
 
-                {/* Price strip */}
-                {snapshot && (
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-                        {[
-                            { label: 'Bid', value: snapshot.bid.toLocaleString(undefined, { minimumFractionDigits: 2 }), color: 'text-teal' },
-                            { label: 'Offer', value: snapshot.offer.toLocaleString(undefined, { minimumFractionDigits: 2 }), color: 'text-red-400' },
-                            { label: 'Daily High', value: snapshot.high.toLocaleString(undefined, { minimumFractionDigits: 2 }), color: 'text-white' },
-                            { label: 'Daily Low', value: snapshot.low.toLocaleString(undefined, { minimumFractionDigits: 2 }), color: 'text-white' },
-                        ].map(({ label, value, color }) => (
-                            <div key={label} className="bg-white/5 rounded-2xl p-4 border border-white/5">
-                                <p className="text-[9px] text-gray-500 font-black uppercase tracking-widest mb-1">{label}</p>
-                                <p className={cn("text-base font-black font-mono", color)}>{value}</p>
-                            </div>
-                        ))}
+                {/* Key stats */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+                    <div className="bg-white/5 rounded-2xl p-4 border border-white/5 text-center">
+                        <p className="text-[9px] text-gray-500 font-black uppercase tracking-widest mb-1">Live Bid</p>
+                        <p className="text-xl font-black text-white font-mono">{snapshot?.bid ?? '—'}</p>
                     </div>
-                )}
+                    <div className="bg-white/5 rounded-2xl p-4 border border-white/5 text-center">
+                        <p className="text-[9px] text-gray-500 font-black uppercase tracking-widest mb-1">Live Offer</p>
+                        <p className="text-xl font-black text-white font-mono">{snapshot?.offer ?? '—'}</p>
+                    </div>
+                    <div className="bg-white/5 rounded-2xl p-4 border border-white/5 text-center">
+                        <p className="text-[9px] text-gray-500 font-black uppercase tracking-widest mb-1">24h Change</p>
+                        <p className={cn(
+                            "text-xl font-black font-mono",
+                            isUp ? "text-teal" : "text-red-400"
+                        )}>{snapshot?.percentageChange ? `${snapshot.percentageChange > 0 ? '+' : ''}${snapshot.percentageChange}%` : '—'}</p>
+                    </div>
+                    <div className="bg-white/5 rounded-2xl p-4 border border-white/5 text-center">
+                        <p className="text-[9px] text-gray-500 font-black uppercase tracking-widest mb-1">Market State</p>
+                        <p className="text-xs font-black text-teal uppercase tracking-widest mt-2">{snapshot?.status ?? 'OPEN'}</p>
+                    </div>
+                </div>
 
                 {/* Resolution selector */}
                 <div className="flex items-center gap-2 mb-4">
@@ -164,52 +152,54 @@ function DetailModal({
                 </div>
 
                 {/* Price chart */}
-                <div className="relative w-full aspect-[2/1] min-h-[220px] mb-6 bg-black/20 rounded-2xl p-4 overflow-hidden">
+                <div className="relative w-full min-h-[300px] mb-6 bg-black/20 rounded-2xl p-4 overflow-hidden flex flex-col">
                     {loading ? (
-                        <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="flex-1 flex items-center justify-center">
                             <div className="w-8 h-8 border-2 border-teal/20 border-t-teal rounded-full animate-spin" />
                         </div>
                     ) : chartData.length > 0 ? (
-                        <ResponsiveContainer width="99%" height="100%">
-                            <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                                <defs>
-                                    <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor={isUp ? "#00BFA6" : "#ef4444"} stopOpacity={0.3} />
-                                        <stop offset="95%" stopColor={isUp ? "#00BFA6" : "#ef4444"} stopOpacity={0} />
-                                    </linearGradient>
-                                </defs>
-                                <CartesianGrid strokeDasharray="3 3" stroke="#ffffff06" vertical={false} />
-                                <XAxis
-                                    dataKey="time"
-                                    tick={{ fill: '#4b5563', fontSize: 9, fontWeight: 'bold' }}
-                                    axisLine={false} tickLine={false}
-                                    interval={Math.floor(chartData.length / 6)}
-                                />
-                                <YAxis
-                                    domain={['auto', 'auto']}
-                                    tick={{ fill: '#4b5563', fontSize: 9, fontWeight: 'bold' }}
-                                    axisLine={false} tickLine={false}
-                                    width={60}
-                                    tickFormatter={(v) => v.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                                />
-                                <Tooltip
-                                    contentStyle={{ background: '#0A1622', border: '1px solid #ffffff10', borderRadius: '12px', fontSize: '11px' }}
-                                    labelStyle={{ color: '#9ca3af', marginBottom: '4px', fontWeight: 'bold' }}
-                                />
-                                <Area
-                                    type="monotone"
-                                    dataKey="close"
-                                    stroke={isUp ? "#00BFA6" : "#ef4444"}
-                                    strokeWidth={2}
-                                    fill="url(#chartGrad)"
-                                    dot={false}
-                                    isAnimationActive={true}
-                                    animationDuration={1000}
-                                />
-                            </AreaChart>
-                        </ResponsiveContainer>
+                        <div className="flex-1 min-h-[250px] w-full relative">
+                            <ResponsiveContainer width="100%" height="100%" minHeight={250}>
+                                <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                                    <defs>
+                                        <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="5%" stopColor={isUp ? "#00BFA6" : "#ef4444"} stopOpacity={0.3} />
+                                            <stop offset="95%" stopColor={isUp ? "#00BFA6" : "#ef4444"} stopOpacity={0} />
+                                        </linearGradient>
+                                    </defs>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#ffffff06" vertical={false} />
+                                    <XAxis
+                                        dataKey="time"
+                                        tick={{ fill: '#4b5563', fontSize: 9, fontWeight: 'bold' }}
+                                        axisLine={false} tickLine={false}
+                                        interval={Math.floor(chartData.length / 6)}
+                                    />
+                                    <YAxis
+                                        domain={['auto', 'auto']}
+                                        tick={{ fill: '#4b5563', fontSize: 9, fontWeight: 'bold' }}
+                                        axisLine={false} tickLine={false}
+                                        width={60}
+                                        tickFormatter={(v) => v.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                    />
+                                    <Tooltip
+                                        contentStyle={{ background: '#0A1622', border: '1px solid #ffffff10', borderRadius: '12px', fontSize: '11px' }}
+                                        labelStyle={{ color: '#9ca3af', marginBottom: '4px', fontWeight: 'bold' }}
+                                    />
+                                    <Area
+                                        type="monotone"
+                                        dataKey="close"
+                                        stroke={isUp ? "#00BFA6" : "#ef4444"}
+                                        strokeWidth={2}
+                                        fill="url(#chartGrad)"
+                                        dot={false}
+                                        isAnimationActive={true}
+                                        animationDuration={1000}
+                                    />
+                                </AreaChart>
+                            </ResponsiveContainer>
+                        </div>
                     ) : (
-                        <div className="h-full flex items-center justify-center text-gray-600 text-[10px] font-black uppercase tracking-widest">
+                        <div className="flex-1 flex items-center justify-center text-gray-600 text-[10px] font-black uppercase tracking-widest">
                             Chart data unavailable for this instrument
                         </div>
                     )}
@@ -263,13 +253,12 @@ export default function RightPanel() {
             const res = await fetch(`/api/sentiment?mode=${mode}`);
             if (!res.ok) return;
             const data = await res.json();
-            // Always update — even if empty, clear loading so UI doesn't spin forever
             if (Array.isArray(data.sentiments)) {
                 setSentiments(data.sentiments);
             }
-        } catch { /* keep last data on network error */ }
+        } catch { /* keep last data */ }
         finally {
-            setSentimentLoading(false); // always clear, regardless of result
+            setSentimentLoading(false);
         }
     }, [mode]);
 
@@ -293,7 +282,6 @@ export default function RightPanel() {
         };
     };
 
-    // Map ticker epics to sentiment items for click-through
     const tickerSentiment: Record<string, string> = {
         'GOLD': 'GOLD', 'OIL_CRUDE': 'OIL_CRUDE',
         'BTCUSD': 'BTCUSD',
@@ -309,7 +297,6 @@ export default function RightPanel() {
 
     return (
         <>
-            {/* Detail modal rendered at root level — no z-index competition */}
             {selected && (
                 <DetailModal
                     item={selected}
@@ -334,16 +321,9 @@ export default function RightPanel() {
                         <div className="text-teal p-1 rotate-90 whitespace-nowrap text-[10px] font-black uppercase tracking-[0.3em] origin-center translate-y-20">
                             Market Intelligence
                         </div>
-                        <div className="mt-auto space-y-6">
-                            <Zap size={18} className="text-gray-700 hover:text-teal transition-colors cursor-pointer" />
-                            <BarChart3 size={18} className="text-gray-700 hover:text-teal transition-colors cursor-pointer" />
-                            <Activity size={18} className="text-gray-700 hover:text-teal transition-colors cursor-pointer" />
-                        </div>
                     </div>
                 ) : (
                     <div className="flex-1 flex flex-col overflow-y-auto p-6 space-y-8 scrollbar-hide animate-in slide-in-from-right-4 duration-500">
-
-                        {/* Live Tickers — clickable */}
                         <div>
                             <div className="flex items-center justify-between mb-5">
                                 <h3 className="text-[10px] text-gray-500 font-black uppercase tracking-[0.2em]">Live Intelligence</h3>
@@ -364,21 +344,14 @@ export default function RightPanel() {
                                         onClick={() => handleTickerClick(epic)}
                                     />
                                 ))}
-                                <p className="text-[8px] text-gray-700 text-center mt-2 font-black uppercase tracking-widest">
-                                    Click any ticker for detailed analytics
-                                </p>
                             </div>
                         </div>
 
-                        {/* Sentiment — clickable */}
                         <div>
                             <div className="flex items-center justify-between mb-5">
                                 <h3 className="text-[10px] text-gray-500 font-black uppercase tracking-[0.2em] flex items-center gap-2">
                                     <Users size={12} /> Market Sentiment
                                 </h3>
-                                <span className="text-[8px] text-amber-400 font-black uppercase tracking-widest bg-amber-400/5 px-2 py-0.5 rounded border border-amber-400/10">
-                                    Capital.com
-                                </span>
                             </div>
 
                             {sentimentLoading ? (
@@ -405,8 +378,6 @@ export default function RightPanel() {
         </>
     );
 }
-
-// ─── Sub-components ───────────────────────────────────────────────────────────
 
 function TickerRow({ symbol, price, change, isUp, onClick }: {
     symbol: string; price: string; change: string; isUp: boolean; onClick: () => void;
@@ -454,7 +425,7 @@ function SentimentRow({ label, longPct, shortPct, bias, onClick }: SentimentItem
             </div>
             <div className="flex justify-between mt-1.5">
                 <span className="text-[8px] font-black text-teal">{longPct}% Long</span>
-                <span className="text-[8px] font-black text-gray-600 group-hover:text-teal transition-colors">Click for details →</span>
+                <span className="text-[8px] font-black text-gray-600 group-hover:text-teal transition-colors">Details →</span>
                 <span className="text-[8px] font-black text-red-400">{shortPct}% Short</span>
             </div>
         </button>

@@ -67,8 +67,25 @@ export async function POST(request: Request) {
             return { result, dealId };
         };
 
+        let retryCount = 0;
+        const maxRetries = 3;
+
+        const executeOrder = async (): Promise<any> => {
+            try {
+                return await executeWithSession();
+            } catch (err: any) {
+                if ((err.message.includes('Pending') || err.message.includes('Syncing')) && retryCount < maxRetries) {
+                    retryCount++;
+                    console.log(`[Trade API] Session syncing. Retrying order (${retryCount}/${maxRetries})...`);
+                    await new Promise(res => setTimeout(res, 1500));
+                    return executeOrder();
+                }
+                throw err;
+            }
+        };
+
         try {
-            const { result, dealId } = await executeWithSession();
+            const { result, dealId } = await executeOrder();
 
             // Record Trade & Notification via stable SDK
             await supabase.from('notifications').insert({
