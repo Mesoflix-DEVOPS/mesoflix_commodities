@@ -696,13 +696,18 @@ async function startGlobalPriceLoop() {
     
     const runLoop = async () => {
         try {
-            // Find a valid account to lead the price discovery
-            const { data: accounts } = await supabase.from('capital_accounts').select('user_id').limit(5);
-            if (!accounts || accounts.length === 0) return;
+            // Find a valid account to lead the price discovery (Prefer Real for stability)
+            const { data: accounts } = await supabase.from('capital_accounts').select('user_id').eq('account_type', 'real').limit(5);
+            if (!accounts || accounts.length === 0) {
+                // Fallback to any account if no real is found
+                const { data: anyAccounts } = await supabase.from('capital_accounts').select('user_id').limit(5);
+                if (!anyAccounts || anyAccounts.length === 0) return;
+                accounts.push(...anyAccounts);
+            }
 
             let session = null;
             for (const acc of accounts) {
-                session = await getValidSession(acc.user_id, true, true); // skipRefresh=true to avoid recursive loops
+                session = await getValidSession(acc.user_id, true, true);
                 if (session) break;
             }
 
@@ -713,7 +718,7 @@ async function startGlobalPriceLoop() {
 
             if (!session) return;
 
-            const marketData = await getMarketTickers(session.cst, session.xSecurityToken, epics, true, session.serverUrl);
+            const marketData = await getMarketTickers(session.cst, session.xSecurityToken, epics, true, session.serverUrl) as any;
             
             if (marketData?.marketDetails) {
                 const formatted = marketData.marketDetails.map((detail: any) => ({

@@ -1,6 +1,6 @@
 import { supabase } from './supabase';
 import { decrypt, encrypt } from './crypto';
-import { createSession, switchActiveAccount } from './capital';
+import { createSession, switchActiveAccount, getAccounts } from './capital';
 
 const LIVE_API = 'https://api-capital.backend-capital.com/api/v1';
 const DEMO_API = 'https://demo-api-capital.backend-capital.com/api/v1';
@@ -108,7 +108,7 @@ async function performLogin(account: any, isDemo: boolean, existingSessions: any
         
         // Handshake verification
         if ((!session.accounts || session.accounts.length === 0) && session.cst) {
-            const accData = await getAccounts(session.cst, session.xSecurityToken, isDemo);
+            const accData = await getAccounts(session.cst, session.xSecurityToken, isDemo) as any;
             if (accData?.accounts) session.accounts = accData.accounts;
         }
     } catch (err: any) {
