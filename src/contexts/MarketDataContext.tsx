@@ -27,7 +27,12 @@ export type BalanceData = {
     accountType?: string;
 };
 
-import { ConnectionOverlay } from '@/components/dashboard/ConnectionOverlay';
+import dynamic from 'next/dynamic';
+
+const ConnectionOverlay = dynamic(
+  () => import('@/components/dashboard/ConnectionOverlay').then((mod) => mod.ConnectionOverlay),
+  { ssr: false }
+);
 
 interface MarketDataContextType {
     marketData: MarketData;
