@@ -64,14 +64,7 @@ export async function POST(request: Request) {
 
         if (insError) throw insError;
 
-        // --- INSTITUTIONAL AUTO-PROVISIONING (Item 17 Fix) ---
-        // Immediately trigger a handshake to discover and persist sub-account IDs
-        try {
-            await getValidSession(userId, true, true); // Force Demo discovery
-            await getValidSession(userId, false, true); // Force Real discovery
-        } catch (autoErr: any) {
-            console.warn(`[Auto-Provisioning] Initial ID discovery handshake failed: ${autoErr.message}`);
-        }
+        // --- INSTITUTIONAL PROVISIONING (Handshake deferred to first dashboard visit to prevent 429 spike) ---
 
         await supabase.from('notifications').insert({
             user_id: userId,

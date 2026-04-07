@@ -821,40 +821,59 @@ async function startGlobalPriceLoop(io: Server) {
     priceLoopStarted = true;
     console.log("🚀 Global Price Megaphone Initialized (High-Velocity Mode)...");
 
+    let cachedLeader: any = null;
+    let cachedLeaderSession: any = null;
+    let lastRotation = 0;
+    const ROTATION_INTERVAL = 10 * 60 * 1000; // 10 Minutes Institutional Stickiness
+
     const epics = ['GOLD', 'OIL_CRUDE', 'BTCUSD'];
     const runLoop = async () => {
         try {
-            // Institutional Leader Election (Item 10 Refinement)
-            const { data: candidates } = await supabase.from('capital_accounts')
-                .select('user_id, account_type')
-                .eq('is_active', true)
-                .order('created_at', { ascending: false })
-                .limit(20);
-
-            if (!candidates || candidates.length === 0) return;
-
-            const realLeaders = candidates.filter(c => c.account_type === 'real');
-            const demoLeaders = candidates.filter(c => c.account_type === 'demo');
-            
+            const now = Date.now();
             let leaderSession = null;
             let currentLeader = null;
 
-            for (const leader of realLeaders) {
-                leaderSession = await getValidSession(leader.user_id, false);
-                if (leaderSession) {
-                    currentLeader = leader;
-                    break;
+            // 🏁 SENTINEL OPTIMIZATION: Reuse leader for 10 minutes (Item 11 Fix)
+            if (cachedLeaderSession && (now - lastRotation < ROTATION_INTERVAL)) {
+                leaderSession = cachedLeaderSession;
+                currentLeader = cachedLeader;
+            } else {
+                console.log("[Megaphone] Rotating global price leader...");
+                const { data: candidates } = await supabase.from('capital_accounts')
+                    .select('user_id, account_type')
+                    .eq('is_active', true)
+                    .order('created_at', { ascending: false })
+                    .limit(20);
+
+                if (!candidates || candidates.length === 0) {
+                    setTimeout(runLoop, 5000); // Wait longer for a candidate
+                    return;
+                }
+
+                const realLeaders = candidates.filter(c => c.account_type === 'real');
+                const demoLeaders = candidates.filter(c => c.account_type === 'demo');
+                
+                // Attempt Real then Demo
+                for (const leader of [...realLeaders, ...demoLeaders]) {
+                    try {
+                        leaderSession = await getValidSession(leader.user_id, leader.account_type === 'demo');
+                        if (leaderSession) {
+                            currentLeader = leader;
+                            cachedLeader = leader;
+                            cachedLeaderSession = leaderSession;
+                            lastRotation = now;
+                            break;
+                        }
+                    } catch (e) {
+                         console.warn(`[Megaphone Skip] Leader ${leader.user_id} handshake failed.`);
+                    }
                 }
             }
 
             if (!leaderSession) {
-                for (const leader of demoLeaders) {
-                    leaderSession = await getValidSession(leader.user_id, true);
-                    if (leaderSession) {
-                        currentLeader = leader;
-                        break;
-                    }
-                }
+                console.warn("[Megaphone Sync] All session candidates rejected.");
+                setTimeout(runLoop, 10000); // 🏁 Institutional Cooling: 10s
+                return;
             }
 
             if (!leaderSession) {
