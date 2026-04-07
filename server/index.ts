@@ -25,7 +25,10 @@ const io = new Server(httpServer, {
     cors: {
         origin: "*", // Adjust for production
         methods: ["GET", "POST"]
-    }
+    },
+    pingTimeout: 60000,
+    pingInterval: 25000,
+    connectTimeout: 45000
 });
 
 // --- INSTITUTIONAL BRIDGE ROUTES ---
@@ -293,25 +296,99 @@ app.get('/api/notifications', authGuard, async (req: any, res) => {
     }
 });
 
-// 7. Identity Engine (Stabilized on Render)
+// 7. Identity Engine
 app.get('/api/auth/me', authGuard, async (req: any, res) => {
+    // ... existing ...
+});
+
+// NEW: Centralized Chart Engine (Proxy to Capital via Master Session)
+app.get('/api/chart/:epic', authGuard, async (req: any, res) => {
     try {
         const userId = req.userId;
-        const { data: user, error } = await supabase
-            .from('users')
-            .select('id, email, full_name, role')
-            .eq('id', userId)
-            .single();
+        const { epic } = req.params;
+        const mode = req.query.mode || 'demo';
+        const resolution = req.query.resolution || 'HOUR';
+        const max = req.query.max || '50';
+        const isDemo = mode === 'demo';
 
-        if (error || !user) {
-            console.warn(`[Identity Bridge] User ${userId} lookup failed.`);
-            return res.status(401).json({ error: "Session Expired" });
+        const session = await getValidSession(userId, isDemo);
+        if (!session) return res.status(503).json({ error: 'Brokerage Connection Lag' });
+
+        const priceUrl = `${session.serverUrl}/prices/${encodeURIComponent(epic)}?resolution=${resolution}&max=${max}`;
+        const priceRes = await fetch(priceUrl, {
+            headers: { 'CST': session.cst, 'X-SECURITY-TOKEN': session.xSecurityToken }
+        });
+        
+        const snapUrl = `${session.serverUrl}/markets?epics=${encodeURIComponent(epic)}`;
+        const snapRes = await fetch(snapUrl, {
+            headers: { 'CST': session.cst, 'X-SECURITY-TOKEN': session.xSecurityToken }
+        });
+
+        let chartData = [];
+        let snapshot = null;
+
+        if (priceRes.ok) {
+            const pd: any = await priceRes.json();
+            chartData = (pd.prices || []).map((p: any) => ({
+                time: p.snapshotTime,
+                open: p.openPrice?.bid ?? 0,
+                high: p.highPrice?.bid ?? 0,
+                low: p.lowPrice?.bid ?? 0,
+                close: p.closePrice?.bid ?? 0,
+            }));
         }
 
-        res.json({ user: { id: user.id, email: user.email, fullName: user.full_name, role: user.role } });
+        if (snapRes.ok) {
+            const sd: any = await snapRes.json();
+            const mkt = (sd.marketDetails || [])[0];
+            if (mkt) {
+                snapshot = {
+                    bid: mkt.snapshot?.bid ?? 0,
+                    offer: mkt.snapshot?.offer ?? 0,
+                    high: mkt.snapshot?.high ?? 0,
+                    low: mkt.snapshot?.low ?? 0,
+                    netChange: mkt.snapshot?.netChange ?? 0,
+                    percentageChange: mkt.snapshot?.percentageChange ?? 0,
+                };
+            }
+        }
+
+        res.json({ epic, chartData, snapshot });
     } catch (err: any) {
-        console.error("[Identity Bridge] Critical Failure:", err.message);
-        res.status(500).json({ error: "Identity Bridge Link Offline" });
+        res.status(500).json({ error: 'Chart Bridge Failure' });
+    }
+});
+
+// NEW: Centralized Sentiment Engine
+app.get('/api/sentiment', authGuard, async (req: any, res) => {
+    try {
+        const userId = req.userId;
+        const mode = req.query.mode || 'demo';
+        const isDemo = mode === 'demo';
+
+        const session = await getValidSession(userId, isDemo);
+        if (!session) return res.status(503).json({ error: 'Brokerage Connection Lag' });
+
+        const epics = ['GOLD', 'OIL_CRUDE', 'BTCUSD', 'ETHUSD'];
+        const sentUrl = `${session.serverUrl}/clientsentiment?epics=${epics.join(',')}`;
+        const sentRes = await fetch(sentUrl, {
+            headers: { 'CST': session.cst, 'X-SECURITY-TOKEN': session.xSecurityToken }
+        });
+
+        if (!sentRes.ok) throw new Error('Sentiment rejected');
+        const data: any = await sentRes.json();
+        
+        const sentiments = (data.clientSentiments || []).map((s: any) => ({
+            epic: s.marketId,
+            label: s.marketId.replace('_', ' '),
+            longPct: Math.round(s.longPositionPercentage),
+            shortPct: Math.round(s.shortPositionPercentage),
+            bias: s.longPositionPercentage > 60 ? 'BULLISH' : s.longPositionPercentage < 40 ? 'BEARISH' : 'NEUTRAL'
+        }));
+
+        res.json({ sentiments });
+    } catch (err: any) {
+        res.status(500).json({ error: 'Sentiment Bridge Failure' });
     }
 });
 
@@ -680,7 +757,16 @@ app.get('/api/bridge/health', async (req, res) => {
     res.json(health);
 });
 
+import { refreshAllActiveSessions } from './capital-service';
+
+// ... (existing code)
+
 const PORT = process.env.PORT || 3001;
 httpServer.listen(PORT, () => {
     console.log(`🚀 Mesoflix Real-time Server active on port ${PORT}`);
+    
+    // START MASTER HEARTBEAT
+    // Proactively refresh sessions every 60s (internal checks avoid redundant hits)
+    console.log(`[Master Heartbeat] Initiated centralized session authority.`);
+    setInterval(refreshAllActiveSessions, 60000);
 });

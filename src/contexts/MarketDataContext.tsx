@@ -87,6 +87,39 @@ export function MarketDataProvider({ children }: { children: ReactNode }) {
         setModeState(newMode);
     }, []);
 
+    const fetchInitialData = useCallback(async (currentMode: 'demo' | 'real') => {
+        try {
+            const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001';
+            const getCookie = (name: string) => {
+                const value = `; ${document.cookie}`;
+                const parts = value.split(`; ${name}=`);
+                if (parts.length === 2) return parts.pop()?.split(';').shift();
+            };
+            const token = getCookie('access_token');
+            if (!token) return;
+
+            const res = await fetch(`${SOCKET_URL}/api/dashboard?mode=${currentMode}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                if (data.accounts) {
+                    // Pre-populate both modes if available
+                    data.accounts.forEach((acc: any) => {
+                        const isAccDemo = (acc.accountType || '').toLowerCase() === 'demo';
+                        if (isAccDemo) setDemoBalance(parseBalance(acc));
+                        else setRealBalance(parseBalance(acc));
+                    });
+                }
+                if (data.positions) setPositions(data.positions);
+            }
+        } catch (e) { console.error("[MarketData] Initial Fetch Failed", e); }
+    }, []);
+
+    useEffect(() => {
+        fetchInitialData(mode);
+    }, [mode, fetchInitialData]);
+
     useEffect(() => {
         const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001';
         
@@ -104,9 +137,15 @@ export function MarketDataProvider({ children }: { children: ReactNode }) {
 
         const socket = io(SOCKET_URL, {
             auth: { token },
-            reconnectionAttempts: 20,
+            reconnectionAttempts: Infinity,
             reconnectionDelay: 2000,
-            transports: ['websocket'], // Force websocket for lower latency
+            reconnectionDelayMax: 5000,
+            timeout: 20000,
+            transports: ['websocket'], // Use WebSocket for institutional speed
+            autoConnect: true,
+            extraHeaders: {
+                "ngrok-skip-browser-warning": "true" // For development
+            }
         });
 
         socketRef.current = socket;
