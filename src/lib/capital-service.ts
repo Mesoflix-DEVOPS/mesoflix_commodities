@@ -30,12 +30,30 @@ async function performFailoverLogin(account: any, isDemo: boolean): Promise<Sess
     const apiPassword = decrypt(apiPasswordEnc);
     
     let identifier = account.capital_account_id;
-    if (!identifier) {
-        const { data: userData } = await supabase.from('users').select('email').eq('id', account.user_id).single();
-        identifier = userData?.email || '';
-    }
+    let session = null;
 
-    const session = await createSession(identifier, apiPassword, apiKey, isDemo);
+    try {
+        // Primary Attempt: Use the stored Account ID
+        session = await createSession(identifier || '', apiPassword, apiKey, isDemo);
+    } catch (err: any) {
+        // 🏁 INSTITUTIONAL IDENTITY RECOVERY
+        // Capital.com often requires Email for Demo but Account ID for Real. 
+        // If 401 occurs in Demo, we fallback to Email.
+        if (isDemo && err.message.includes('401')) {
+            console.log(`[Discovery] Handshake 401 for ${identifier}. Retrying with User Email...`);
+            const { data: userData } = await supabase.from('users').select('email').eq('id', account.user_id).single();
+            const email = userData?.email;
+            if (email && email !== identifier) {
+                session = await createSession(email, apiPassword, apiKey, isDemo);
+                // Persistent Fix: Update the identifier if the email works
+                await supabase.from('capital_accounts').update({ capital_account_id: email }).eq('id', account.id);
+            } else {
+                throw err;
+            }
+        } else {
+            throw err;
+        }
+    }
     
     // INSTITUTIONAL AUTO-DISCOVERY (Item 17 Fix)
     let realId = account.selected_real_account_id;

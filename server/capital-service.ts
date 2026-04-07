@@ -108,9 +108,24 @@ async function performLogin(account: any, isDemo: boolean, existingSessions: any
     let demoSession: any = null;
     let liveSession: any = null;
 
+    let demoSession: any = null;
+    let liveSession: any = null;
+
     try {
-        demoSession = await createSession(identifier, apiPassword, apiKey, true).catch(() => null);
-        liveSession = await createSession(identifier, apiPassword, apiKey, false).catch(() => null);
+        // [Discovery] Multi-Identifier Handshake
+        demoSession = await createSession(identifier || '', apiPassword, apiKey, true).catch(async (err: any) => {
+            if (err.message.includes('401')) {
+                const { data: userData } = await supabase.from('users').select('email').eq('id', userId).single();
+                const email = userData?.email;
+                if (email && email !== identifier) {
+                    console.log(`[Discovery] Identity Fallback for ${userId}: Trying email...`);
+                    return await createSession(email, apiPassword, apiKey, true).catch(() => null);
+                }
+            }
+            return null;
+        });
+
+        liveSession = await createSession(identifier || '', apiPassword, apiKey, false).catch(() => null);
     } catch (e) { }
 
     if (!demoSession && !liveSession) {

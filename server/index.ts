@@ -766,33 +766,54 @@ function startUserPoller(userId: string, io: Server) {
                 } catch (e) {}
             }
 
-            // Always broadcast global prices to this user group
-            const cachedPrices = Array.from(marketPriceCache.values());
-            io.to(`user:${userId}`).emit('market-data', cachedPrices);
-
-        } catch (err: any) {
+                // [Item 13 Enhancement] Always broadcast global prices at high velocity
+                const cachedPrices = Array.from(marketPriceCache.values());
+                io.to(`user:${userId}`).emit('market-data', cachedPrices);
+            } catch (err: any) {
             console.error(`[Shared Poller Failure] ${userId}:`, err.message);
         }
     };
 
-    const interval = setInterval(pollFunc, 3500); // Institutional balance heartbeat
-    activeUserPollers.set(userId, { interval, socketCount: 1, lastData: null });
+    const interval = setInterval(pollFunc, 2500); // 🏁 High-Velocity Balance Sync
+    activeUserPollers.set(userId, { interval, socketCount: 1, pollFunc });
     pollFunc(); // Immediate first fetch
+}
+
+// Socket Management Extension: Instant Account Sync
+function registerSyncHandlers(socket: any, io: Server) {
+    const userId = socket.data?.userId;
+    if (!userId) return;
+
+    socket.on('refresh-session', async () => {
+        const poller = activeUserPollers.get(userId);
+        if (poller) {
+            console.log(`[High-Velocity] Instant Sync Triggered for User: ${userId}`);
+            await poller.pollFunc();
+        }
+    });
+
+    socket.on('sync-accounts', async () => {
+        const poller = activeUserPollers.get(userId);
+        if (poller) {
+            console.log(`[High-Velocity] Persistent Account Sync forced for: ${userId}`);
+            await poller.pollFunc();
+        }
+    });
 }
 
 // --- GLOBAL PRICE ENGINE (Anti-429 Megaphone) ---
 const marketPriceCache = new Map<string, any>();
 let priceLoopStarted = false;
 
-async function startGlobalPriceLoop() {
+async function startGlobalPriceLoop(io: Server) {
     if (priceLoopStarted) return;
     priceLoopStarted = true;
-    console.log("🚀 Global Price Megaphone Initialized...");
+    console.log("🚀 Global Price Megaphone Initialized (High-Velocity Mode)...");
 
     const epics = ['GOLD', 'OIL_CRUDE', 'BTCUSD'];
     const runLoop = async () => {
         try {
-            // Institutional Leader Election: Fetch a pool of both Real and Demo accounts (Item 10)
+            // Institutional Leader Election (Item 10 Refinement)
             const { data: candidates } = await supabase.from('capital_accounts')
                 .select('user_id, account_type')
                 .eq('is_active', true)
@@ -801,14 +822,12 @@ async function startGlobalPriceLoop() {
 
             if (!candidates || candidates.length === 0) return;
 
-            // Priority 1: Real accounts (Stable data)
             const realLeaders = candidates.filter(c => c.account_type === 'real');
             const demoLeaders = candidates.filter(c => c.account_type === 'demo');
             
             let leaderSession = null;
             let currentLeader = null;
 
-            // Try Real leaders first
             for (const leader of realLeaders) {
                 leaderSession = await getValidSession(leader.user_id, false);
                 if (leaderSession) {
@@ -817,7 +836,6 @@ async function startGlobalPriceLoop() {
                 }
             }
 
-            // Fallback: Demo leaders
             if (!leaderSession) {
                 for (const leader of demoLeaders) {
                     leaderSession = await getValidSession(leader.user_id, true);
@@ -829,12 +847,11 @@ async function startGlobalPriceLoop() {
             }
 
             if (!leaderSession) {
-                console.warn("[Megaphone] No candidate session available for global pricing.");
+                console.warn("[Megaphone Sync] No session candidate found.");
                 return;
             }
 
-            const isDemo = currentLeader?.account_type === 'demo';
-            const marketData = await getMarketTickers(leaderSession.cst, leaderSession.xSecurityToken, epics, isDemo, leaderSession.serverUrl) as any;
+            const marketData = await getMarketTickers(leaderSession.cst, leaderSession.xSecurityToken, epics, currentLeader?.account_type === 'demo', leaderSession.serverUrl) as any;
             
             if (marketData?.marketDetails) {
                 const formatted = marketData.marketDetails.map((detail: any) => ({
@@ -849,13 +866,11 @@ async function startGlobalPriceLoop() {
 
                 formatted.forEach((p: any) => marketPriceCache.set(p.epic, p));
                 io.emit('market-data', formatted);
-                // Also broadcast to per-user rooms to ensure sync
-                candidates.forEach(c => io.to(`user:${c.user_id}`).emit('market-data', formatted));
             }
         } catch (e: any) {
-            console.warn(`[Megaphone Sync Skip] ${e.message}`);
+            console.warn(`[Megaphone Skip] ${e.message}`);
         } finally {
-            setTimeout(runLoop, 2500); // Institutional high-velocity interval
+            setTimeout(runLoop, 1000); // 🚀 High-Velocity Core: 1s updates
         }
     };
 
