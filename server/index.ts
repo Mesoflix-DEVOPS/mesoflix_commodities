@@ -242,50 +242,43 @@ app.get('/api/dashboard', authGuard, async (req: any, res) => {
                 getHistory(session.cst, session.xSecurityToken, isDemo, { max: 50 }, session.serverUrl)
             ]) as [any, any, any];
 
-            // 1. ROBUST ACCOUNT PICKING (Institutional & UK Env Guard)
+            // 1. ROBUST ACCOUNT PICKING (Server-Trust Logic)
             const allAccounts = accountsData.accounts || [];
-            const target = isDemo ? 'demo' : 'live';
+            const target = isDemo ? 'DEMO' : 'REAL';
 
-            console.log(`[Diagnostic] User: ${userId}, Mode: ${target.toUpperCase()}, Accounts Found: ${allAccounts.length}`);
+            console.log(`[Diagnostic] ${target} Auth: ${userId}, Accounts Found: ${allAccounts.length}`);
 
-            // Try direct mapping first
-            let accounts = allAccounts.filter((a: any) => 
-                (a.accountType || '').toLowerCase().includes(target) || 
-                (a.accountName || '').toLowerCase().includes(target)
-            );
+            // TRUST THE SERVER: If we are on the Demo server, all accounts returned are Demo.
+            // Do NOT filter by "demo" or "live" labels as they vary by region (CFD/Trading/SpreadBet).
+            let accounts = allAccounts;
 
-            // Fuzzy Fallback: Use balance heuristic if labels are generic (e.g. "CFD")
-            if (accounts.length === 0 && allAccounts.length > 0) {
-                const sortedAccountList = [...allAccounts].sort((a,b) => (b.balance?.balance || 0) - (a.balance?.balance || 0));
-                
-                if (allAccounts.length === 1) {
-                    accounts = [allAccounts[0]]; // If only one account exists, it's the target
-                } else if (isDemo) {
-                    // In Demo mode, prioritize the highest balance account (usually the $9k+ demo)
-                    accounts = [sortedAccountList[0]];
-                } else {
-                    // In Real mode, prioritize the secondary account (usually the $0.24 real)
-                    accounts = [sortedAccountList[sortedAccountList.length - 1]];
-                }
+            // Fallback: If multiple accounts exist (e.g. USD/EUR), pick the primary one (highest balance)
+            if (accounts.length > 1) {
+                accounts = [[...accounts].sort((a,b) => (b.balance?.balance || 0) - (a.balance?.balance || 0))[0]];
             }
 
             const activeAccount = accounts[0];
             const activeAccountId = activeAccount?.accountId;
             
-            console.log(`[Diagnostic] Resolved Active ID: ${activeAccountId || 'FAILED'}`);
+            console.log(`[Diagnostic] Target Account ID: ${activeAccountId || 'NONE'}`);
 
-            // 2. STRICT POSITION FILTERING (P/L Fix)
+            // 2. POSITION FILTERING (P/L Fix)
+            // Still strictly filter positions to the account returned by THIS server
             const filteredPositions = (positionsData?.positions || []).filter((p: any) => p.accountId === activeAccountId);
 
-            const formattedAccounts = accounts.map((a: any) => ({
-                ...a,
-                balance: {
-                    ...(a.balance || {}),
-                    pnl: filteredPositions.reduce((sum: number, p: any) => sum + (p.pnl || 0), 0),
-                    availableToWithdraw: a.balance?.available ?? a.balance?.availableToWithdraw ?? 0,
-                    equity: (a.balance?.balance ?? 0) + filteredPositions.reduce((sum: number, p: any) => sum + (p.pnl || 0), 0),
-                }
-            }));
+            const formattedAccounts = accounts.map((a: any) => {
+                // Manually calculate P/L and Equity for the active account to ensure sync
+                const accountPnl = filteredPositions.reduce((sum: number, p: any) => sum + (p.pnl || 0), 0);
+                return {
+                    ...a,
+                    balance: {
+                        ...(a.balance || {}),
+                        pnl: accountPnl,
+                        availableToWithdraw: a.balance?.available ?? a.balance?.availableToWithdraw ?? 0,
+                        equity: (a.balance?.balance ?? 0) + accountPnl,
+                    }
+                };
+            });
 
             res.json({
                 ...accountsData,
@@ -693,22 +686,15 @@ io.on('connection', (socket) => {
                     socket.emit('market-data', formattedMarket);
                 }
 
-                // 2. Separate Balance & Positions (as expected by Frontend listeners)
+                // 2. Separate Balance & Positions (Corrected Server-Trust Logic)
                 if (accountsData?.accounts) {
                     const allAccs = accountsData.accounts;
-                    const logKey = isDemo ? 'demo' : 'live';
                     
-                    // Robust lookup
-                    let activeAccount = allAccs.find((a: any) => 
-                        (a.accountType || '').toLowerCase().includes(logKey) || 
-                        (a.accountName || '').toLowerCase().includes(logKey)
-                    );
-
-                    // Balance Heuristic Fallback
-                    if (!activeAccount && allAccs.length > 0) {
-                         const sorted = [...allAccs].sort((a,b) => (b.balance?.balance || 0) - (a.balance?.balance || 0));
-                         activeAccount = isDemo ? sorted[0] : (sorted[sorted.length - 1] || sorted[0]);
-                    }
+                    // TRUST THE SERVER: We are already on the specific Demo/Live URL.
+                    // If multiple accounts returned, pick the one with activities/balance.
+                    let activeAccount = allAccs.length > 1 
+                        ? [...allAccs].sort((a,b) => (b.balance?.balance || 0) - (a.balance?.balance || 0))[0]
+                        : allAccs[0];
 
                     if (activeAccount) {
                         const activeId = activeAccount.accountId;
