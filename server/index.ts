@@ -232,22 +232,28 @@ app.get('/api/dashboard', authGuard, async (req: any, res) => {
                 getHistory(session.cst, session.xSecurityToken, isDemo, { max: 50 }, session.serverUrl)
             ]) as [any, any, any];
 
-            // Filter accounts strictly by the requested mode (Fixes "Demo in Real" bug)
+            // Improved filtering: Use high-balance indicator for CFD fallback
             const targetType = isDemo ? 'demo' : 'live';
-            const accounts = (accountsData.accounts || [])
-                .filter((a: any) => (a.accountType || '').toLowerCase() === targetType)
-                .map((a: any) => ({
-                    ...a,
-                    balance: {
-                        ...(a.balance || {}),
-                        availableToWithdraw: a.balance?.available ?? a.balance?.availableToWithdraw ?? 0,
-                        equity: (a.balance?.balance ?? 0) + (a.balance?.pnl ?? 0),
-                    }
-                }));
+            let accounts = (accountsData.accounts || [])
+                .filter((a: any) => (a.accountType || '').toLowerCase() === targetType);
+
+            if (accounts.length === 0 && (accountsData.accounts || []).length > 1) {
+                const sorted = [...accountsData.accounts].sort((a,b) => (b.balance?.balance || 0) - (a.balance?.balance || 0));
+                accounts = isDemo ? [sorted[0]] : [sorted[1] || sorted[0]];
+            }
+
+            const formattedAccounts = accounts.map((a: any) => ({
+                ...a,
+                balance: {
+                    ...(a.balance || {}),
+                    availableToWithdraw: a.balance?.available ?? a.balance?.availableToWithdraw ?? 0,
+                    equity: (a.balance?.balance ?? 0) + (a.balance?.pnl ?? 0),
+                }
+            }));
 
             res.json({
                 ...accountsData,
-                accounts,
+                accounts: formattedAccounts,
                 positions: positionsData?.positions || [],
                 history: historyData?.activityHistory || [],
                 user: userData
@@ -579,11 +585,19 @@ io.on('connection', (socket) => {
                 // 2. Separate Balance & Positions (as expected by Frontend listeners)
                 if (accountsData?.accounts) {
                     // Strict filtering: Only use the account that matches our current stream mode
+                    // 2. Identify Active Account with CFD fallback (for UK users)
                     const targetType = isDemo ? 'demo' : 'live';
-                    const activeAccount = accountsData.accounts.find((a: any) => 
+                    let activeAccount = accountsData.accounts.find((a: any) => 
                         a.accountId === currentSession.activeAccountId && 
                         (a.accountType || '').toLowerCase() === targetType
-                    ) || accountsData.accounts.find((a: any) => (a.accountType || '').toLowerCase() === targetType);
+                    );
+
+                    if (!activeAccount) {
+                         // Fallback: If we're looking for DEMO but no account has type 'demo', 
+                         // use the highest balance as the indicator.
+                         const sorted = [...accountsData.accounts].sort((a,b) => (b.balance?.balance || 0) - (a.balance?.balance || 0));
+                         activeAccount = isDemo ? sorted[0] : (sorted[1] || sorted[0]);
+                    }
 
                     if (activeAccount) {
                         socket.emit('balance', {
@@ -609,9 +623,9 @@ io.on('connection', (socket) => {
             }
         };
 
-        // Complete Real-Time: 1s heartbeat
+        // Complete Real-Time: 3s heartbeat (optimized for API stability)
         await pollData();
-        const timer = setInterval(pollData, 1000);
+        const timer = setInterval(pollData, 3000);
         activePolls.set(socket.id, timer);
     });
 

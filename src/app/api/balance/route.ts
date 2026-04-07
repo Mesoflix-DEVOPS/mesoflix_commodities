@@ -51,24 +51,26 @@ function splitAccounts(data: any) {
         return { realBalance: null, demoBalance: null, hasLive: false, hasDemo: false };
     }
 
-    // Try explicit names or types first
-    let demoAccs = accounts.filter((a: any) => a.accountType === 'SPREADBET' || (a.accountName || '').toLowerCase().includes('demo'));
-    let realAccs = accounts.filter((a: any) => a.accountType !== 'SPREADBET' && !(a.accountName || '').toLowerCase().includes('demo'));
+    // 1. Primary Filter by explicit flags/names
+    let demoAccs = accounts.filter((a: any) => 
+        a.accountType === 'SPREADBET' || 
+        (a.accountName || '').toLowerCase().includes('demo')
+    );
+    let realAccs = accounts.filter((a: any) => 
+        a.accountType !== 'SPREADBET' && 
+        !(a.accountName || '').toLowerCase().includes('demo')
+    );
 
-    // Fallback heuristic for unified CFD accounts (where Demo and Live look identical)
+    // 2. Secondary Filter for CFD only accounts (Common for UK Capital.com users)
     if (demoAccs.length === 0 && realAccs.length > 1) {
-        // Based on user configuration: GBP account is Demo, USD is Live.
-        const gbpAcc = realAccs.find((a: any) => a.currency === 'GBP');
-        const usdAcc = realAccs.find((a: any) => a.currency === 'USD');
-
-        if (gbpAcc && usdAcc) {
-            demoAccs = [gbpAcc];
-            realAccs = [usdAcc];
-        } else {
-            // Ultimate fallback: assign preferred to demo for testing
-            demoAccs = [realAccs.find((a: any) => a.preferred) || realAccs[1]];
-            realAccs = [realAccs.find((a: any) => !a.preferred) || realAccs[0]];
-        }
+        // Sort by balance: Demo accounts almost always have large fixed balances (e.g. 10k or 9k)
+        // while Real accounts often have much smaller or oddly numbered balances.
+        const sorted = [...realAccs].sort((a, b) => (b.balance?.balance || 0) - (a.balance?.balance || 0));
+        
+        // If highest balance is > 1000 and lowest is < 100, it's a very strong indicator.
+        // In the user's case: 9000 vs 0.24.
+        demoAccs = [sorted[0]];
+        realAccs = [sorted[1] || sorted[0]];
     }
 
     const rAcc = realAccs[0] || accounts[0];

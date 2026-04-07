@@ -17,8 +17,7 @@ export interface SessionTokens {
     serverUrl: string;
 }
 
-const memCache = new Map<string, { tokens: SessionTokens; expiresAt: number }>();
-const SESSION_TTL_MS = 8 * 60 * 1000;
+const SESSION_TTL_MS = 5 * 60 * 1000; // 5 minutes (Capital sessions last 10m)
 
 export async function getValidSession(
     userId: string,
@@ -26,15 +25,9 @@ export async function getValidSession(
     forceRefresh: boolean = false
 ): Promise<SessionTokens> {
     const isDemo = forceDemo;
-    const cacheKey = `${userId}-${isDemo ? 'demo' : 'live'}`;
-    const cached = memCache.get(cacheKey);
-
-    if (cached && cached.expiresAt > Date.now() && !forceRefresh) {
-        return cached.tokens;
-    }
-
+    
     try {
-        // 1. Fetch credentials via stable SDK
+        // 1. Fetch credentials and cached session via stable SDK
         const { data: account, error } = await supabase
             .from('capital_accounts')
             .select('*')
@@ -43,6 +36,27 @@ export async function getValidSession(
 
         if (error || !account) throw new Error('Institutional connection not found.');
 
+        // Distributed Cache Check
+        const now = Date.now();
+        const lastUpdate = account.session_updated_at ? new Date(account.session_updated_at).getTime() : 0;
+        const isSameMode = account.session_mode === (isDemo ? 'demo' : 'live');
+        
+        if (account.encrypted_session_tokens && isSameMode && (now - lastUpdate < SESSION_TTL_MS) && !forceRefresh) {
+            try {
+                const decrypted = JSON.parse(decrypt(account.encrypted_session_tokens));
+                return {
+                    cst: decrypted.cst,
+                    xSecurityToken: decrypted.xSecurityToken,
+                    accountIsDemo: isDemo,
+                    activeAccountId: decrypted.activeAccountId,
+                    serverUrl: getApiUrl(isDemo)
+                };
+            } catch (e) {
+                console.warn('[Session Cache] Decryption failed, falling back to login');
+            }
+        }
+
+        // 2. Perform fresh login
         const apiKey = decrypt(account.encrypted_api_key);
         const apiPassword = decrypt(account.encrypted_api_password || '');
         
@@ -52,7 +66,6 @@ export async function getValidSession(
             identifier = user?.email || '';
         }
 
-        // 2. Clear stale state & Authenticate
         const session = await createSession(identifier, apiPassword, apiKey, isDemo);
 
         // 3. Match user preference with broker availability
@@ -70,7 +83,23 @@ export async function getValidSession(
             serverUrl: getApiUrl(isDemo)
         };
 
-        memCache.set(cacheKey, { tokens, expiresAt: Date.now() + SESSION_TTL_MS });
+        // 4. Update Distributed Cache (Supabase)
+        const encryptedTokens = encrypt(JSON.stringify({
+            cst: tokens.cst,
+            xSecurityToken: tokens.xSecurityToken,
+            activeAccountId: tokens.activeAccountId
+        }));
+
+        await supabase
+            .from('capital_accounts')
+            .update({
+                encrypted_session_tokens: encryptedTokens,
+                session_mode: isDemo ? 'demo' : 'live',
+                session_updated_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', account.id);
+
         return tokens;
 
     } catch (e: any) {
@@ -80,12 +109,14 @@ export async function getValidSession(
 }
 
 export async function clearCachedSession(userId: string): Promise<void> {
-    // Clear all entries for this user in the local memory cache
-    for (const key of memCache.keys()) {
-        if (key.startsWith(`${userId}-`)) {
-            memCache.delete(key);
-        }
-    }
+    await supabase
+        .from('capital_accounts')
+        .update({
+            encrypted_session_tokens: null,
+            session_updated_at: null,
+            updated_at: new Date().toISOString()
+        })
+        .eq('user_id', userId);
 }
 
 
