@@ -99,27 +99,23 @@ async function performLogin(account: any, isDemo: boolean, existingSessions: any
 
     const session = await createSession(identifier, apiPassword, apiKey, isDemo);
     
-    // REFINED MODE VERIFICATION
+    // SCALABLE MODE VERIFICATION (Trust Brokerage Preferred Flags)
     const allAccounts = session.accounts || [];
-    const demoAccounts = allAccounts.filter((a: any) => 
-        (a.accountType || '').toLowerCase().includes('demo') || 
-        (a.accountName || '').toLowerCase().includes('demo') ||
-        (a.balance?.balance > 5000) // Heuristic: Demo accounts usually start with 10k/50k
-    );
-    const liveAccounts = allAccounts.filter((a: any) => 
-        (a.accountType || '').toLowerCase().includes('live') || 
-        (a.accountName || '').toLowerCase().includes('live') ||
-        (a.balance?.balance < 5000 && a.balance?.balance > 0) // Heuristic: Real accounts are usually smaller than the 10k demo pool
-    );
+    
+    // 1. First, check if the brokerage provides a 'preferred' account on this server
+    const preferredAccount = allAccounts.find((a: any) => a.preferred === true);
+    
+    // 2. Identify active account candidates
+    const activeAccount = preferredAccount || allAccounts[0];
 
-    if (isDemo && demoAccounts.length === 0 && liveAccounts.length > 0) {
-        console.warn(`[Security Guard] Demo requested but only Live accounts found for ${identifier}.`);
+    if (!activeAccount) {
+        console.error(`[Identity Guard] Critical: No accounts found on ${isDemo ? 'DEMO' : 'LIVE'} server for ${identifier}.`);
+        throw new Error("No usable accounts found on the brokerage server.");
     }
     
-    if (!isDemo && liveAccounts.length === 0 && demoAccounts.length > 0) {
-        console.warn(`[Security Guard] Real requested but only Demo accounts found for ${identifier}.`);
-    }
-
+    console.log(`[Identity Guard] Handshake Verified on ${isDemo ? 'DEMO' : 'LIVE'} for ${identifier}. Active ID: ${activeAccount.accountId}`);
+    
+    // 3. Determine if the user has a manually selected account preference in DB
     const targetAccountId = isDemo ? account.selected_demo_account_id : account.selected_real_account_id;
     
     if (targetAccountId && targetAccountId !== session.currentAccountId) {
