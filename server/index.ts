@@ -666,13 +666,19 @@ const activePolls = new Map<string, NodeJS.Timeout>();
 
 io.use(async (socket, next) => {
     const token = socket.handshake.auth.token;
-    if (!token) return next(new Error('Unauthorized: Missing Token'));
+    if (!token) {
+        console.warn(`[Socket Auth] Missing Token for ${socket.id}`);
+        return next(new Error('Unauthorized: Missing Token'));
+    }
 
     try {
-        const { payload } = await jose.jwtVerify(token, JWT_SECRET);
-        socket.data.userId = payload.userId;
+        const secret = new TextEncoder().encode(process.env.JWT_SECRET || 'mesoflix-bridge-secret-2024');
+        const { payload } = await jose.jwtVerify(token, secret);
+        socket.data.userId = (payload as any).userId;
+        console.log(`[Socket Auth] Handshake Successful for User ${socket.data.userId}`);
         next();
-    } catch (err) {
+    } catch (err: any) {
+        console.error(`[Socket Auth] Verification Failed for ${socket.id}:`, err.message);
         next(new Error('Unauthorized: Invalid Token'));
     }
 });
@@ -690,11 +696,21 @@ async function startGlobalPriceLoop() {
     
     const runLoop = async () => {
         try {
-            // Use the first available valid session to fetch global prices
-            const { data: leadAccount } = await supabase.from('capital_accounts').select('user_id').limit(1).single();
-            if (!leadAccount) return;
+            // Find a valid account to lead the price discovery
+            const { data: accounts } = await supabase.from('capital_accounts').select('user_id').limit(5);
+            if (!accounts || accounts.length === 0) return;
 
-            const session = await getValidSession(leadAccount.user_id, true); // Use Demo for global prices (rate limits are usually separate)
+            let session = null;
+            for (const acc of accounts) {
+                session = await getValidSession(acc.user_id, true, true); // skipRefresh=true to avoid recursive loops
+                if (session) break;
+            }
+
+            if (!session) {
+                // If no session exists, we trigger one high-priority sync
+                session = await getValidSession(accounts[0].user_id, true, false);
+            }
+
             if (!session) return;
 
             const marketData = await getMarketTickers(session.cst, session.xSecurityToken, epics, true, session.serverUrl);

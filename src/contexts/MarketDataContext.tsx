@@ -89,11 +89,12 @@ export function MarketDataProvider({ children }: { children: ReactNode }) {
         setIsSyncing(true);
         console.log(`[Isolate Handshake] Initiating 5s deep sync for ${newMode}...`);
         
-        // Clear ghost data immediately
+        // --- STRIKE ISOLATION ---
+        // Instantly kill and clear all previous environment states
         setMarketData({});
         setPositions([]);
-        if (newMode === 'demo') setDemoBalance(null);
-        else setRealBalance(null);
+        setDemoBalance(null);
+        setRealBalance(null);
 
         try {
             const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001';
@@ -104,8 +105,8 @@ export function MarketDataProvider({ children }: { children: ReactNode }) {
             };
             const token = getCookie('access_token');
 
-            // 1. Backend Isolate Trigger
-            await fetch(`${SOCKET_URL}/api/auth/isolate-handshake`, {
+            // 1. Backend Isolate Trigger (Clean Session Reset)
+            const res = await fetch(`${SOCKET_URL}/api/auth/isolate-handshake`, {
                 method: 'POST',
                 headers: { 
                     'Content-Type': 'application/json',
@@ -114,21 +115,25 @@ export function MarketDataProvider({ children }: { children: ReactNode }) {
                 body: JSON.stringify({ mode: newMode })
             });
 
-            // 2. Refresh Socket Logic
-            if (socketRef.current?.connected) {
-                socketRef.current.emit('start-stream', { mode: newMode });
+            if (res.ok) {
+                // 2. Refresh Socket instantly
+                if (socketRef.current?.connected) {
+                    socketRef.current.emit('start-stream', { mode: newMode });
+                }
             }
 
         } catch (e) {
-            console.error("[Isolate Handshake] Failed", e);
+            console.error("[Isolate Handshake] Deep-Sync Error:", e);
         }
 
-        // Standardized 5-second buffer (Institutional requirement)
-        setTimeout(() => {
+        // Standardized 5-second institutional buffer
+        setTimeout(async () => {
+            // Fetch the freshly handshaked data after isolation is complete
+            await fetchInitialData(newMode);
             setIsSyncing(false);
-            console.log(`[Isolate Handshake] Handshake complete for ${newMode}.`);
+            console.log(`[Isolate Handshake] ${newMode.toUpperCase()} environment ready.`);
         }, 5000);
-    }, []);
+    }, [fetchInitialData]);
 
     const setMode = useCallback((newMode: 'demo' | 'real') => {
         if (newMode === modeRef.current) return;
