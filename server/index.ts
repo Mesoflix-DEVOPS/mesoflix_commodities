@@ -242,23 +242,39 @@ app.get('/api/dashboard', authGuard, async (req: any, res) => {
                 getHistory(session.cst, session.xSecurityToken, isDemo, { max: 50 }, session.serverUrl)
             ]) as [any, any, any];
 
-            // 1. ROBUST ACCOUNT PICKING
-            const targetType = isDemo ? 'demo' : 'live';
-            let accounts = (accountsData.accounts || [])
-                .filter((a: any) => (a.accountType || '').toLowerCase() === targetType);
+            // 1. ROBUST ACCOUNT PICKING (Institutional & UK Env Guard)
+            const allAccounts = accountsData.accounts || [];
+            const target = isDemo ? 'demo' : 'live';
 
-            // Fallback: Pick by balance if labels are generic (common in UK/CFD)
-            if (accounts.length === 0 && (accountsData.accounts || []).length > 0) {
-                const sorted = [...accountsData.accounts].sort((a,b) => (b.balance?.balance || 0) - (a.balance?.balance || 0));
-                // In Demo, we want the high balance (9k); In Real, we likely want the low balance (0.24) if it's the other one
-                accounts = isDemo ? [sorted[0]] : [sorted[1] || sorted[0]];
+            console.log(`[Diagnostic] User: ${userId}, Mode: ${target.toUpperCase()}, Accounts Found: ${allAccounts.length}`);
+
+            // Try direct mapping first
+            let accounts = allAccounts.filter((a: any) => 
+                (a.accountType || '').toLowerCase().includes(target) || 
+                (a.accountName || '').toLowerCase().includes(target)
+            );
+
+            // Fuzzy Fallback: Use balance heuristic if labels are generic (e.g. "CFD")
+            if (accounts.length === 0 && allAccounts.length > 0) {
+                const sortedAccountList = [...allAccounts].sort((a,b) => (b.balance?.balance || 0) - (a.balance?.balance || 0));
+                
+                if (allAccounts.length === 1) {
+                    accounts = [allAccounts[0]]; // If only one account exists, it's the target
+                } else if (isDemo) {
+                    // In Demo mode, prioritize the highest balance account (usually the $9k+ demo)
+                    accounts = [sortedAccountList[0]];
+                } else {
+                    // In Real mode, prioritize the secondary account (usually the $0.24 real)
+                    accounts = [sortedAccountList[sortedAccountList.length - 1]];
+                }
             }
 
             const activeAccount = accounts[0];
-            const activeAccountId = activeAccount?.accountId || session.activeAccountId;
+            const activeAccountId = activeAccount?.accountId;
+            
+            console.log(`[Diagnostic] Resolved Active ID: ${activeAccountId || 'FAILED'}`);
 
             // 2. STRICT POSITION FILTERING (P/L Fix)
-            // Only include positions that belong to the current active account
             const filteredPositions = (positionsData?.positions || []).filter((p: any) => p.accountId === activeAccountId);
 
             const formattedAccounts = accounts.map((a: any) => ({
@@ -679,16 +695,19 @@ io.on('connection', (socket) => {
 
                 // 2. Separate Balance & Positions (as expected by Frontend listeners)
                 if (accountsData?.accounts) {
-                    const targetType = isDemo ? 'demo' : 'live';
-                    let activeAccount = accountsData.accounts.find((a: any) => 
-                        a.accountId === currentSession.activeAccountId && 
-                        (a.accountType || '').toLowerCase() === targetType
+                    const allAccs = accountsData.accounts;
+                    const logKey = isDemo ? 'demo' : 'live';
+                    
+                    // Robust lookup
+                    let activeAccount = allAccs.find((a: any) => 
+                        (a.accountType || '').toLowerCase().includes(logKey) || 
+                        (a.accountName || '').toLowerCase().includes(logKey)
                     );
 
-                    // Fallback: Pick by balance if labels are fuzzy (Institutional CFD Environment)
-                    if (!activeAccount) {
-                         const sorted = [...accountsData.accounts].sort((a,b) => (b.balance?.balance || 0) - (a.balance?.balance || 0));
-                         activeAccount = isDemo ? sorted[0] : (sorted[1] || sorted[0]);
+                    // Balance Heuristic Fallback
+                    if (!activeAccount && allAccs.length > 0) {
+                         const sorted = [...allAccs].sort((a,b) => (b.balance?.balance || 0) - (a.balance?.balance || 0));
+                         activeAccount = isDemo ? sorted[0] : (sorted[sorted.length - 1] || sorted[0]);
                     }
 
                     if (activeAccount) {
@@ -699,7 +718,7 @@ io.on('connection', (socket) => {
                         socket.emit('balance', {
                             ...activeAccount.balance,
                             pnl: totalPnl,
-                            profitLoss: totalPnl, // Sync for UI 'parseBalance'
+                            profitLoss: totalPnl, 
                             equity: (activeAccount.balance?.balance || 0) + totalPnl,
                             isDemo,
                             accountId: activeId,
