@@ -358,9 +358,38 @@ app.get('/api/notifications', authGuard, async (req: any, res) => {
     }
 });
 
+app.patch('/api/notifications', authGuard, async (req: any, res) => {
+    try {
+        const userId = req.userId;
+        const { error } = await supabase
+            .from('notifications')
+            .update({ read: true })
+            .eq('user_id', userId)
+            .eq('read', false);
+
+        if (error) throw error;
+        res.json({ success: true });
+    } catch (err: any) {
+        res.status(500).json({ error: "Failed to update notifications" });
+    }
+});
+
 // 7. Identity Engine
 app.get('/api/auth/me', authGuard, async (req: any, res) => {
-    // ... existing ...
+    try {
+        const userId = req.userId;
+        const { data: user, error } = await supabase
+            .from('users')
+            .select('id, email, full_name, role')
+            .eq('id', userId)
+            .single();
+
+        if (error || !user) return res.status(401).json({ error: "User Not Found" });
+
+        res.json({ user });
+    } catch (err: any) {
+        res.status(500).json({ error: "Identity Bridge Failed" });
+    }
 });
 
 // NEW: Centralized Chart Engine (Proxy to Capital via Master Session)
@@ -752,21 +781,33 @@ io.on('connection', (socket) => {
             clearInterval(activePolls.get(socket.id));
         }
 
-        const pollData = async () => {
-            try {
-                // Use the same logic as the SSE stream but emit via Socket.io
-                const currentSession = await getValidSession(userId, isDemo);
+                // Institutional Real-Time Heartbeat: Fetch & Emit both environments instantly
+                const syncBalances = async () => {
+                    // Isolation Guard: Ensure one server failure doesn't kill the other
+                    try {
+                        const real = await getValidSession(userId, false, true);
+                        if (real) {
+                            const accs = await getAccounts(real.cst, real.xSecurityToken, false, real.serverUrl);
+                            const bal = accs.accounts?.find((a: any) => a.accountId === real.activeAccountId);
+                            if (bal) socket.emit('balance', { ...bal, isDemo: false });
+                        }
+                    } catch (e: any) {
+                        console.warn(`[Sync Heartbeat] REAL Failure for ${userId}: ${e.message}`);
+                    }
 
-                // CRITICAL CRASH GUARD: If session is null, don't attempt to use .cst
-                if (!currentSession) {
-                    console.warn(`[Socket Poll] Brokerage Session Unavailable for ${userId} (Mode: ${mode})`);
-                    return; 
-                }
+                    try {
+                        const demo = await getValidSession(userId, true, true);
+                        if (demo) {
+                            const accs = await getAccounts(demo.cst, demo.xSecurityToken, true, demo.serverUrl);
+                            const bal = accs.accounts?.find((a: any) => a.accountId === demo.activeAccountId);
+                            if (bal) socket.emit('balance', { ...bal, isDemo: true });
+                        }
+                    } catch (e: any) {
+                        console.warn(`[Sync Heartbeat] DEMO Failure for ${userId}: ${e.message}`);
+                    }
+                };
 
-                const [accountsData, positionsData] = await Promise.all([
-                    getAccounts(currentSession.cst, currentSession.xSecurityToken, isDemo, currentSession.serverUrl),
-                    getPositions(currentSession.cst, currentSession.xSecurityToken, isDemo, currentSession.serverUrl)
-                ]) as [any, any];
+                syncBalances();
 
                 // 1. Unified Market Data Emission (from Global Cache)
                 const cachedPrices = Array.from(marketPriceCache.values());
