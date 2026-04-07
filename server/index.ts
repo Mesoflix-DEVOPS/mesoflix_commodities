@@ -728,13 +728,22 @@ app.use((req, res, next) => {
     next();
 });
 
-// 1. Master Status Dashboard (Premium root UI)
-app.get('/', (req, res) => {
-    const uptime = Math.floor((Date.now() - stats.startTime) / 1000);
-    const h = Math.floor(uptime / 3600);
-    const m = Math.floor((uptime % 3600) / 60);
-    const s = uptime % 60;
+// 1. Master Status Dashboard (Premium Reactive UI)
+app.get('/api/bridge/stats', (req, res) => {
+    const uptimeInSeconds = Math.floor((Date.now() - stats.startTime) / 1000);
+    const h = Math.floor(uptimeInSeconds / 3600);
+    const m = Math.floor((uptimeInSeconds % 3600) / 60);
+    const s = uptimeInSeconds % 60;
+    
+    res.json({
+        uptime: `${h}h ${m}m ${s}s`,
+        requests: stats.requestsReceived,
+        lastSync: stats.lastHeartbeatTime || 'Syncing...',
+        status: 'Operational'
+    });
+});
 
+app.get('/', (req, res) => {
     res.send(`
         <!DOCTYPE html>
         <html>
@@ -742,35 +751,55 @@ app.get('/', (req, res) => {
             <title>Mesoflix | Institutional Bridge Status</title>
             <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
             <style>
-                body { background: #050505; color: #fff; font-family: 'Inter', sans-serif; margin: 0; display: flex; align-items: center; justify-content: center; height: 100vh; }
-                .card { background: #0a0a0a; border: 1px solid #111; padding: 40px; border-radius: 24px; width: 500px; box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
+                body { background: #050505; color: #fff; font-family: 'Inter', sans-serif; margin: 0; display: flex; align-items: center; justify-content: center; height: 100vh; overflow: hidden; }
+                .card { background: #0a0a0a; border: 1px solid #111; padding: 40px; border-radius: 24px; width: 500px; box-shadow: 0 20px 50px rgba(0,0,0,0.5); position: relative; }
                 .logo { font-weight: 800; font-size: 24px; letter-spacing: -1px; margin-bottom: 30px; display: flex; align-items: center; color: #00ffcc; }
                 .logo span { color: #fff; margin-left: 4px; }
                 .status { display: flex; align-items: center; margin-bottom: 40px; }
                 .dot { width: 12px; height: 12px; border-radius: 50%; background: #00ffcc; margin-right: 12px; box-shadow: 0 0 15px #00ffcc; animation: pulse 2s infinite; }
-                @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
+                @keyframes pulse { 0% { opacity: 1; transform: scale(1); } 50% { opacity: 0.3; transform: scale(0.8); } 100% { opacity: 1; transform: scale(1); } }
                 .metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-                .metric { background: #0f0f0f; padding: 20px; border-radius: 16px; border: 1px solid #151515; }
+                .metric { background: #0f0f0f; padding: 20px; border-radius: 16px; border: 1px solid #151515; transition: border 0.3s; }
+                .metric:hover { border-color: #222; }
                 .label { font-size: 11px; text-transform: uppercase; color: #444; font-weight: 600; margin-bottom: 8px; }
                 .value { font-size: 22px; font-weight: 600; color: #eee; }
                 .footer { margin-top: 40px; font-size: 11px; color: #333; text-align: center; }
+                .live-tag { position: absolute; top: 40px; right: 40px; background: rgba(0,255,204,0.1); color: #00ffcc; padding: 4px 10px; border-radius: 100px; font-size: 10px; font-weight: 800; text-transform: uppercase; }
             </style>
         </head>
         <body>
             <div class="card">
+                <div class="live-tag">Live Engine</div>
                 <div class="logo">MESOFLIX<span>BRIDGE</span></div>
                 <div class="status">
                     <div class="dot"></div>
-                    <div style="font-weight: 600; font-size: 18px">System Operational</div>
+                    <div id="status-text" style="font-weight: 600; font-size: 18px">System Operational</div>
                 </div>
                 <div class="metrics">
-                    <div class="metric"><div class="label">Uptime</div><div class="value">${h}h ${m}m ${s}s</div></div>
-                    <div class="metric"><div class="label">Requests</div><div class="value">${stats.requestsReceived}</div></div>
-                    <div class="metric"><div class="label">Dual-Heartbeat</div><div class="value">ACTIVE</div></div>
-                    <div class="metric"><div class="label">Last Sync</div><div class="value" style="font-size: 14px">${stats.lastHeartbeatTime || 'Initializing...'}</div></div>
+                    <div class="metric"><div class="label">Uptime</div><div id="uptime" class="value">--</div></div>
+                    <div class="metric"><div class="label">Requests</div><div id="requests" class="value">0</div></div>
+                    <div class="metric"><div class="label">Dual-Heartbeat</div><div class="value" style="color:#00ffcc">ACTIVE</div></div>
+                    <div class="metric"><div class="label">Last Sync</div><div id="last-sync" class="value" style="font-size: 14px">Syncing...</div></div>
                 </div>
                 <div class="footer">INSTITUTIONAL GRADE TRADING INFRASTRUCTURE</div>
             </div>
+
+            <script>
+                async function updateStats() {
+                    try {
+                        const res = await fetch('/api/bridge/stats');
+                        const data = await res.json();
+                        document.getElementById('uptime').innerText = data.uptime;
+                        document.getElementById('requests').innerText = data.requests;
+                        document.getElementById('last-sync').innerText = data.lastSync;
+                    } catch (e) {
+                        document.getElementById('status-text').innerText = 'Reconnecting...';
+                        document.getElementById('status-text').style.color = '#ff3366';
+                    }
+                }
+                setInterval(updateStats, 1000);
+                updateStats();
+            </script>
         </body>
         </html>
     `);
