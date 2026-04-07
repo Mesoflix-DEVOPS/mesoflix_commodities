@@ -7,6 +7,18 @@ import { cookies } from 'next/headers';
 
 export const dynamic = 'force-dynamic';
 
+// Helper: Trigger Instant Sync on Render Bridge (Item 11 Hot-Link)
+const triggerSync = (userId: string) => {
+    const bridgeUrl = process.env.RENDER_URL || 'https://mesoflix-commodities.onrender.com';
+    const secret = process.env.BRIDGE_SECRET || 'mesoflix-bridge-internal-2024';
+    
+    fetch(`${bridgeUrl}/api/bridge/sync-trigger`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, secret })
+    }).catch(e => console.warn(`[Sync Signal] Deferred: ${e.message}`));
+};
+
 export async function POST(request: Request) {
     try {
         const cookieStore = await cookies();
@@ -67,25 +79,18 @@ export async function POST(request: Request) {
             return { result, dealId };
         };
 
-        let retryCount = 0;
-        const maxRetries = 3;
-
-        const executeOrder = async (): Promise<any> => {
-            try {
-                return await executeWithSession();
-            } catch (err: any) {
-                const msg = err.message || '';
-                // If session is stale or syncing, perform an immediate silent refresh execution
-                if (msg.includes('401') || msg.includes('Pending') || msg.includes('Syncing') || msg.toLowerCase().includes('session')) {
-                    console.log(`[Trade API] Silent recovery triggered for: ${msg}`);
-                    return await executeWithSession(true);
-                }
-                throw err;
-            }
-        };
-
         try {
-            const { result, dealId } = await executeOrder();
+            const { result, dealId } = await (async () => {
+                try {
+                    return await executeWithSession();
+                } catch (err: any) {
+                    const msg = err.message || '';
+                    if (msg.includes('401') || msg.toLowerCase().includes('session')) {
+                        return await executeWithSession(true);
+                    }
+                    throw err;
+                }
+            })();
 
             // Record Trade & Notification via stable SDK
             await supabase.from('notifications').insert({
@@ -106,6 +111,9 @@ export async function POST(request: Request) {
                     created_at: new Date()
                 });
             }
+
+            // 🏁 INSTANT SYNC TRIGGER: Pulse the dashboard (Item 11 Fix)
+            triggerSync(userId);
 
             return NextResponse.json({ success: true, ...result });
 
@@ -180,6 +188,9 @@ export async function DELETE(request: Request) {
                     created_at: new Date()
                 });
             }
+
+            // 🏁 INSTANT SYNC TRIGGER: Pulse the dashboard (Item 11 Fix)
+            triggerSync(userId);
 
             return NextResponse.json({ success: true, ...result });
 

@@ -1081,67 +1081,57 @@ app.get('/', (req, res) => {
 
 // 5. Bridge Health Diagnostic (Verification Tool)
 app.get('/api/bridge/health', async (req, res) => {
-    const health: any = {
-        status: "OPERATIONAL",
-        ai_handshake: "PENDING",
-        database_handshake: "PENDING",
-        timestamp: new Date().toISOString()
-    };
-
     try {
-        // 1. Test Database (Supabase SDK)
         const { data, error } = await supabase.from('users').select('id').limit(1);
-        if (error) throw error;
-        health.database_handshake = "SUCCESS (Render SDK -> Supabase HTTPS Stable)";
-    } catch (err: any) {
-        health.database_handshake = `FAILED: ${err.message}`;
-        health.status = "DEGRADED";
-    }
-
-    try {
-        // 2. Test AI (Simple check)
-        const API_KEY = process.env.GEMINI_API_KEY;
-        const aiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${API_KEY}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: 'ping' }] }] })
+        res.json({
+            status: error ? "DEGRADED" : "OPERATIONAL",
+            database: error ? "FAILED" : "CONNECTED",
+            timestamp: new Date().toISOString()
         });
-        if (aiRes.ok) {
-            health.ai_handshake = "SUCCESS (Render -> Gemini 2.0 Stable)";
-        } else {
-            const errData: any = await aiRes.json();
-            health.ai_handshake = `FAILED: ${errData.error?.message || 'API rejected'}`;
-            health.status = "DEGRADED";
-        }
     } catch (err: any) {
-        health.ai_handshake = `FAILED: ${err.message}`;
-        health.status = "DEGRADED";
+        res.status(500).json({ status: "ERROR", error: err.message });
     }
+});
 
-    res.json(health);
+// 6. High-Velocity Sync Trigger (Cross-Server Signal)
+app.post('/api/bridge/sync-trigger', async (req, res) => {
+    try {
+        const { userId, secret } = req.body;
+        const internalSecret = process.env.BRIDGE_SECRET || 'mesoflix-bridge-internal-2024';
+        
+        if (secret !== internalSecret) {
+            return res.status(403).json({ error: "Unauthorized" });
+        }
+
+        const poller = activeUserPollers.get(userId);
+        if (poller) {
+            console.log(`[High-Velocity] Sync Signal Executed for: ${userId}`);
+            await poller.pollFunc();
+            return res.json({ success: true, message: "Sync Pushed" });
+        }
+        res.json({ success: false, message: "No active poller" });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
 import { refreshAllActiveSessions } from './capital-service';
-
-// ... (existing code)
 
 const PORT = process.env.PORT || 3001;
 httpServer.listen(PORT, () => {
     console.log(`🚀 Mesoflix Real-time Server active on port ${PORT}`);
     
     // START MASTER DUAL-HEARTBEAT
-    console.log(`[Master Heartbeat] Initiated centralized dual-session authority.`);
-    
     const runHeartbeat = async () => {
         try {
             await refreshAllActiveSessions();
             stats.lastHeartbeatTime = new Date().toLocaleTimeString();
-            stats.dualHeartbeatsActive = 1; // Indicator for the UI
+            stats.dualHeartbeatsActive = 1; 
         } catch (e) {
             console.error("[Master Heartbeat] Loop error:", e);
         }
     };
 
-    runHeartbeat(); // Immediate first run
+    runHeartbeat(); 
     setInterval(runHeartbeat, 60000);
 });
