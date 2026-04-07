@@ -110,7 +110,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         }>
             <AutomationProvider>
                 <MarketDataProvider>
-                    <DashboardLayoutInner>{children}</MarketDataProviderInner>
+                    <DashboardLayoutInner>{children}</DashboardLayoutInner>
                 </MarketDataProvider>
             </AutomationProvider>
         </Suspense>
