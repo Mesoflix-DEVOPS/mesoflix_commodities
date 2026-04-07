@@ -1,10 +1,6 @@
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from './supabase';
 import { decrypt, encrypt } from './crypto';
-import { createSession, switchActiveAccount, getAccounts } from './capital';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''; // Prefer Service Role if possible
-export const supabase = createClient(supabaseUrl, supabaseKey);
+import { createSession, switchActiveAccount } from './capital';
 
 const LIVE_API = 'https://api-capital.backend-capital.com/api/v1';
 const DEMO_API = 'https://demo-api-capital.backend-capital.com/api/v1';

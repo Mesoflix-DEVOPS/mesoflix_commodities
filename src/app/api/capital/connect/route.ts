@@ -5,9 +5,7 @@ import { verifyAccessToken } from '@/lib/auth';
 import { cookies } from 'next/headers';
 import { clearCachedSession } from '@/lib/capital-service';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-const supabase = createClient(supabaseUrl, supabaseKey);
+import { supabase } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
 

@@ -4,9 +4,9 @@ import crypto from 'crypto';
 import { signAccessToken, setAuthCookies, generateRefreshToken } from '@/lib/auth';
 import { jwtVerify } from 'jose';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-const supabase = createClient(supabaseUrl, supabaseKey);
+import { supabase } from '@/lib/supabase';
+
+export const dynamic = 'force-dynamic';
 
 // Helper to Base32 decode a TOTP secret natively without libraries
 function base32Decode(base32String: string): Buffer {

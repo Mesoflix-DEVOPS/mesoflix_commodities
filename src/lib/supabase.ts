@@ -1,19 +1,23 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+// Environment variables are required for runtime but can be missing during Next.js static analysis/build steps.
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'placeholder_key';
 
-if (!supabaseUrl || !supabaseServiceKey) {
+if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
     if (process.env.NODE_ENV === 'production') {
-        console.error('❌ CRITICAL: Supabase URL or Service Role Key missing in environment.');
+        console.warn('⚠️ WARNING: Supabase configurations missing. Using build-time placeholders.');
     }
 }
 
-// Institutional-grade Admin Client for Next.js (HTTPS/Port 443)
-// This client is used in API routes to bypass all networking restrictions.
+/**
+ * Institutional-grade Admin Client for Next.js (HTTPS/Port 443)
+ * This client is used in API routes to bypass all networking restrictions.
+ * It is safeguarded with placeholder values to prevent build-time crashes.
+ */
 export const supabase = createClient(
-    supabaseUrl || '',
-    supabaseServiceKey || '',
+    supabaseUrl,
+    supabaseServiceKey,
     {
         auth: {
             autoRefreshToken: false,
