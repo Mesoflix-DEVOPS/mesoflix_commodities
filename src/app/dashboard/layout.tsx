@@ -16,7 +16,7 @@ const ConnectionOverlay = dynamic(
 );
 
 function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
-    const { isSyncing, mode } = useMarketData();
+    const { mode } = useMarketData();
     const [isCollapsed, setCollapsed] = useState(false);
     const [isMobileOpen, setMobileOpen] = useState(false);
     const [userData, setUserData] = useState<any>(null);
@@ -95,8 +95,6 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
                     onClick={() => setMobileOpen(false)}
                 />
             )}
-
-            <ConnectionOverlay isVisible={isSyncing} mode={mode} />
         </div>
     );
 }

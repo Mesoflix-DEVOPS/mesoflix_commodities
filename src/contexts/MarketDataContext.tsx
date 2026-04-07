@@ -36,7 +36,6 @@ interface MarketDataContextType {
     connectionStatus: 'connecting' | 'connected' | 'disconnected' | 'error';
     setMode: (mode: 'demo' | 'real') => void;
     mode: 'demo' | 'real';
-    isSyncing: boolean;
 }
 
 const MarketDataContext = createContext<MarketDataContextType>({
@@ -48,7 +47,6 @@ const MarketDataContext = createContext<MarketDataContextType>({
     connectionStatus: 'disconnected',
     setMode: () => { },
     mode: 'real',
-    isSyncing: false,
 });
 
 export const useMarketData = () => useContext(MarketDataContext);
@@ -70,7 +68,6 @@ function parseBalance(data: any): BalanceData | null {
 
 export function MarketDataProvider({ children }: { children: ReactNode }) {
     const [mode, setModeState] = useState<'demo' | 'real'>('real');
-    const [isSyncing, setIsSyncing] = useState(false);
     const [marketData, setMarketData] = useState<MarketData>({});
     const [demoBalance, setDemoBalance] = useState<BalanceData | null>(null);
     const [realBalance, setRealBalance] = useState<BalanceData | null>(null);
@@ -80,7 +77,6 @@ export function MarketDataProvider({ children }: { children: ReactNode }) {
     const socketRef = useRef<Socket | null>(null);
     const modeRef = useRef(mode);
 
-    // Active balance is strictly the current mode's data — no cross-mode fallback
     const balanceData = mode === 'demo' ? demoBalance : realBalance;
 
     const fetchInitialData = useCallback(async (currentMode: 'demo' | 'real') => {
@@ -111,56 +107,16 @@ export function MarketDataProvider({ children }: { children: ReactNode }) {
         } catch (e) { console.error("[MarketData] Initial Fetch Failed", e); }
     }, []);
 
-    const performIsolatedHandshake = useCallback(async (newMode: 'demo' | 'real') => {
-        setIsSyncing(true);
-        console.log(`[Isolate Handshake] Initiating 5s deep sync for ${newMode}...`);
-        
-        // --- STRIKE ISOLATION ---
-        setMarketData({});
-        setPositions([]);
-        setDemoBalance(null);
-        setRealBalance(null);
-
-        try {
-            const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001';
-            const getCookie = (name: string) => {
-                const value = `; ${document.cookie}`;
-                const parts = value.split(`; ${name}=`);
-                if (parts.length === 2) return parts.pop()?.split(';').shift();
-            };
-            const token = getCookie('access_token');
-
-            const res = await fetch(`${SOCKET_URL}/api/auth/isolate-handshake`, {
-                method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({ mode: newMode })
-            });
-
-            if (res.ok) {
-                if (socketRef.current?.connected) {
-                    socketRef.current.emit('start-stream', { mode: newMode });
-                }
-            }
-        } catch (e) {
-            console.error("[Isolate Handshake] Deep-Sync Error:", e);
-        }
-
-        setTimeout(async () => {
-            await fetchInitialData(newMode);
-            setIsSyncing(false);
-            console.log(`[Isolate Handshake] ${newMode.toUpperCase()} environment ready.`);
-        }, 5000);
-    }, [fetchInitialData]);
-
     const setMode = useCallback((newMode: 'demo' | 'real') => {
         if (newMode === modeRef.current) return;
         setModeState(newMode);
         modeRef.current = newMode;
-        performIsolatedHandshake(newMode);
-    }, [performIsolatedHandshake]);
+        // Background Silent Trigger
+        fetchInitialData(newMode);
+        if (socketRef.current?.connected) {
+            socketRef.current.emit('start-stream', { mode: newMode });
+        }
+    }, [fetchInitialData]);
 
     useEffect(() => {
         fetchInitialData(mode);
@@ -168,14 +124,12 @@ export function MarketDataProvider({ children }: { children: ReactNode }) {
 
     useEffect(() => {
         const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001';
-        
-        const getCookie = (name: string) => {
+        const token = (() => {
             const value = `; ${document.cookie}`;
-            const parts = value.split(`; ${name}=`);
+            const parts = value.split(`; access_token=`);
             if (parts.length === 2) return parts.pop()?.split(';').shift();
-        };
+        })();
 
-        const token = getCookie('access_token');
         if (!token) {
             setConnectionStatus('disconnected');
             return;
@@ -195,13 +149,11 @@ export function MarketDataProvider({ children }: { children: ReactNode }) {
         setConnectionStatus('connecting');
 
         socket.on('connect', () => {
-            console.log(`[MarketData] Socket Connected: ${SOCKET_URL}`);
             setConnectionStatus('connected');
             socket.emit('start-stream', { mode: modeRef.current });
         });
 
         socket.on('market-data', (data: any[]) => {
-            if (isSyncing) return;
             setMarketData(prev => {
                 const newState = { ...prev };
                 data.forEach((snap: any) => {
@@ -220,14 +172,13 @@ export function MarketDataProvider({ children }: { children: ReactNode }) {
         });
 
         socket.on('balance', (data: any) => {
-            if (isSyncing) return;
+            // Backend now sends both or identified accounts
             const balanceObj = parseBalance(data);
             if (data.isDemo) setDemoBalance(balanceObj);
             else setRealBalance(balanceObj);
         });
 
         socket.on('positions', (data: any[]) => {
-            if (isSyncing) return;
             setPositions(data);
         });
 
@@ -245,7 +196,7 @@ export function MarketDataProvider({ children }: { children: ReactNode }) {
             socket.disconnect();
             socketRef.current = null;
         };
-    }, [isSyncing]);
+    }, []);
 
     return (
         <MarketDataContext.Provider value={{
@@ -257,7 +208,6 @@ export function MarketDataProvider({ children }: { children: ReactNode }) {
             connectionStatus,
             setMode,
             mode,
-            isSyncing,
         }}>
             {children}
         </MarketDataContext.Provider>
