@@ -108,9 +108,6 @@ async function performLogin(account: any, isDemo: boolean, existingSessions: any
     let demoSession: any = null;
     let liveSession: any = null;
 
-    let demoSession: any = null;
-    let liveSession: any = null;
-
     try {
         // [Discovery] Multi-Identifier Handshake
         demoSession = await createSession(identifier || '', apiPassword, apiKey, true).catch(async (err: any) => {
