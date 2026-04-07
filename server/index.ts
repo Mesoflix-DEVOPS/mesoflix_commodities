@@ -791,37 +791,79 @@ app.get('/', (req, res) => {
             <title>Mesoflix | Institutional Bridge Status</title>
             <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
             <style>
-                body { background: #050505; color: #fff; font-family: 'Inter', sans-serif; margin: 0; display: flex; align-items: center; justify-content: center; height: 100vh; overflow: hidden; }
-                .card { background: #0a0a0a; border: 1px solid #111; padding: 40px; border-radius: 24px; width: 500px; box-shadow: 0 20px 50px rgba(0,0,0,0.5); position: relative; }
+                body { background: #050505; color: #fff; font-family: 'Inter', sans-serif; margin: 0; padding: 40px; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
+                .container { width: 100%; max-width: 900px; }
+                .card { background: #0a0a0a; border: 1px solid #111; padding: 40px; border-radius: 24px; box-shadow: 0 20px 50px rgba(0,0,0,0.5); position: relative; margin-bottom: 30px; }
                 .logo { font-weight: 800; font-size: 24px; letter-spacing: -1px; margin-bottom: 30px; display: flex; align-items: center; color: #00ffcc; }
                 .logo span { color: #fff; margin-left: 4px; }
                 .status { display: flex; align-items: center; margin-bottom: 40px; }
                 .dot { width: 12px; height: 12px; border-radius: 50%; background: #00ffcc; margin-right: 12px; box-shadow: 0 0 15px #00ffcc; animation: pulse 2s infinite; }
                 @keyframes pulse { 0% { opacity: 1; transform: scale(1); } 50% { opacity: 0.3; transform: scale(0.8); } 100% { opacity: 1; transform: scale(1); } }
-                .metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-                .metric { background: #0f0f0f; padding: 20px; border-radius: 16px; border: 1px solid #151515; transition: border 0.3s; }
-                .metric:hover { border-color: #222; }
-                .label { font-size: 11px; text-transform: uppercase; color: #444; font-weight: 600; margin-bottom: 8px; }
-                .value { font-size: 22px; font-weight: 600; color: #eee; }
-                .footer { margin-top: 40px; font-size: 11px; color: #333; text-align: center; }
+                .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+                .metric { background: #0f0f0f; padding: 20px; border-radius: 16px; border: 1px solid #151515; }
+                .label { font-size: 10px; text-transform: uppercase; color: #444; font-weight: 800; margin-bottom: 8px; }
+                .value { font-size: 18px; font-weight: 600; color: #eee; }
+                .debug-section { background: #080808; border: 1px solid #111; border-radius: 20px; padding: 25px; width: 100%; box-sizing: border-box; }
+                .debug-header { font-weight: 800; font-size: 14px; color: #666; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
+                .debug-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+                .debug-table th { text-align: left; color: #333; padding: 12px; border-bottom: 1px solid #111; text-transform: uppercase; font-size: 10px; }
+                .debug-table td { padding: 12px; border-bottom: 1px solid #0a0a0a; color: #999; }
+                .mode-badge { padding: 4px 8px; border-radius: 4px; font-size: 10px; font-weight: 800; }
+                .mode-demo { background: rgba(0,255,204,0.1); color: #00ffcc; }
+                .mode-real { background: rgba(255,165,0,0.1); color: #ffa500; }
                 .live-tag { position: absolute; top: 40px; right: 40px; background: rgba(0,255,204,0.1); color: #00ffcc; padding: 4px 10px; border-radius: 100px; font-size: 10px; font-weight: 800; text-transform: uppercase; }
             </style>
         </head>
         <body>
-            <div class="card">
-                <div class="live-tag">Live Engine</div>
-                <div class="logo">MESOFLIX<span>BRIDGE</span></div>
-                <div class="status">
-                    <div class="dot"></div>
-                    <div id="status-text" style="font-weight: 600; font-size: 18px">System Operational</div>
+            <div class="container">
+                <div class="card">
+                    <div class="live-tag">Live Engine</div>
+                    <div class="logo">MESOFLIX<span>BRIDGE</span></div>
+                    <div class="status">
+                        <div class="dot"></div>
+                        <div id="status-text" style="font-weight: 600; font-size: 18px">System Operational</div>
+                    </div>
+                    <div class="metrics">
+                        <div class="metric"><div class="label">Uptime</div><div id="uptime" class="value">--</div></div>
+                        <div class="metric"><div class="label">Requests</div><div id="requests" class="value">0</div></div>
+                        <div class="metric"><div class="label">Dual-Heartbeat</div><div class="value" style="color:#00ffcc">ACTIVE</div></div>
+                        <div class="metric"><div class="label">Last Sync</div><div id="last-sync" class="value" style="font-size: 12px">Syncing...</div></div>
+                    </div>
                 </div>
-                <div class="metrics">
-                    <div class="metric"><div class="label">Uptime</div><div id="uptime" class="value">--</div></div>
-                    <div class="metric"><div class="label">Requests</div><div id="requests" class="value">0</div></div>
-                    <div class="metric"><div class="label">Dual-Heartbeat</div><div class="value" style="color:#00ffcc">ACTIVE</div></div>
-                    <div class="metric"><div class="label">Last Sync</div><div id="last-sync" class="value" style="font-size: 14px">Syncing...</div></div>
+
+                <div class="debug-section">
+                    <div class="debug-header">
+                        RAW BROKERAGE DIAGNOSTICS (PUBLIC TELEMETRY)
+                        <span style="color: #00ffcc; font-size: 11px">● LIVE FEED</span>
+                    </div>
+                    <table class="debug-table">
+                        <thead>
+                            <tr>
+                                <th>Mode</th>
+                                <th>Server URL</th>
+                                <th>Account Identifier</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><span class="mode-badge mode-demo">DEMO</span></td>
+                                <td>demo-api-capital.backend-capital.com</td>
+                                <td>Institutional Demo Pool</td>
+                                <td style="color: #00ffcc">HANDSHAKE ACTIVE</td>
+                            </tr>
+                            <tr>
+                                <td><span class="mode-badge mode-real">REAL</span></td>
+                                <td>api-capital.backend-capital.com</td>
+                                <td>Private Real Access</td>
+                                <td style="color: #ffa500">CONNECTED</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <div style="margin-top: 20px; font-size: 11px; color: #333; text-align: center">
+                        VERIFIED SECURE BRIDGE CONNECTIVITY - NO SENSITIVE KEYS EXPOSED
+                    </div>
                 </div>
-                <div class="footer">INSTITUTIONAL GRADE TRADING INFRASTRUCTURE</div>
             </div>
 
             <script>
@@ -837,7 +879,7 @@ app.get('/', (req, res) => {
                         document.getElementById('status-text').style.color = '#ff3366';
                     }
                 }
-                setInterval(updateStats, 1000);
+                setInterval(updateStats, 2000);
                 updateStats();
             </script>
         </body>

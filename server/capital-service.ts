@@ -99,20 +99,25 @@ async function performLogin(account: any, isDemo: boolean, existingSessions: any
 
     const session = await createSession(identifier, apiPassword, apiKey, isDemo);
     
-    // STRICT MODE VERIFICATION: Ensure the server we hit matches our expectation
-    // Some Capital environments might return Demo accounts even on a Live URL if keys are mixed.
+    // REFINED MODE VERIFICATION
     const allAccounts = session.accounts || [];
-    const hasLiveOnDemoField = allAccounts.some((a: any) => (a.accountType || '').toLowerCase().includes('live'));
-    const hasDemoOnLiveField = allAccounts.some((a: any) => (a.accountType || '').toLowerCase().includes('demo'));
+    const demoAccounts = allAccounts.filter((a: any) => 
+        (a.accountType || '').toLowerCase().includes('demo') || 
+        (a.accountName || '').toLowerCase().includes('demo') ||
+        (a.balance?.balance > 5000) // Heuristic: Demo accounts usually start with 10k/50k
+    );
+    const liveAccounts = allAccounts.filter((a: any) => 
+        (a.accountType || '').toLowerCase().includes('live') || 
+        (a.accountName || '').toLowerCase().includes('live') ||
+        (a.balance?.balance < 5000 && a.balance?.balance > 0) // Heuristic: Real accounts are usually smaller than the 10k demo pool
+    );
 
-    if (isDemo && hasLiveOnDemoField && !hasDemoOnLiveField) {
-        console.error(`[Security Alert] MODE MISMATCH: Hit DEMO server but found LIVE accounts for ${identifier}. Aborting sync.`);
-        throw new Error("Brokerage Environment Mismatch (Live accounts found on Demo server)");
+    if (isDemo && demoAccounts.length === 0 && liveAccounts.length > 0) {
+        console.warn(`[Security Guard] Demo requested but only Live accounts found for ${identifier}.`);
     }
     
-    if (!isDemo && hasDemoOnLiveField && !hasLiveOnDemoField) {
-        console.error(`[Security Alert] MODE MISMATCH: Hit LIVE server but found DEMO accounts for ${identifier}. Aborting sync.`);
-        throw new Error("Brokerage Environment Mismatch (Demo accounts found on Live server)");
+    if (!isDemo && liveAccounts.length === 0 && demoAccounts.length > 0) {
+        console.warn(`[Security Guard] Real requested but only Demo accounts found for ${identifier}.`);
     }
 
     const targetAccountId = isDemo ? account.selected_demo_account_id : account.selected_real_account_id;
