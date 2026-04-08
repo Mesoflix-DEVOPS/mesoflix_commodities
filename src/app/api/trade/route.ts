@@ -9,8 +9,13 @@ export const dynamic = 'force-dynamic';
 
 // Helper: Trigger Instant Sync on Render Bridge (Item 11 Hot-Link)
 const triggerSync = (userId: string) => {
-    const bridgeUrl = process.env.RENDER_URL || 'https://mesoflix-commodities.onrender.com';
-    const secret = process.env.BRIDGE_SECRET || 'mesoflix-bridge-internal-2024';
+    const bridgeUrl = process.env.RENDER_URL;
+    const secret = process.env.BRIDGE_SECRET;
+    
+    if (!bridgeUrl || !secret) {
+        console.warn(`[Sync Signal] Skipping: RENDER_URL or BRIDGE_SECRET missing`);
+        return;
+    }
     
     fetch(`${bridgeUrl}/api/bridge/sync-trigger`, {
         method: 'POST',
@@ -167,6 +172,10 @@ export async function DELETE(request: Request) {
                 }
             })();
 
+            // Robust Persistence: Ensure trade is recorded even if epic is missing from requestBody
+            // We can try to derive info from the deletion result if needed, but requestBody is preferred.
+            const epic = requestBody?.epic || 'UNKNOWN';
+
             await supabase.from('notifications').insert({
                 user_id: userId,
                 title: 'Position Closed',
@@ -174,12 +183,12 @@ export async function DELETE(request: Request) {
                 type: 'info'
             });
 
-            if (requestBody?.epic) {
+            if (epic) {
                 await supabase.from('closed_trades').insert({
                     user_id: userId,
                     deal_id: dealId,
-                    epic: requestBody.epic,
-                    direction: requestBody.direction || 'BUY',
+                    epic: epic,
+                    direction: requestBody?.direction || 'BUY',
                     size: String(requestBody.size || 0),
                     open_price: String(requestBody.openPrice || 0),
                     close_price: String(result.level ?? 0),

@@ -55,8 +55,10 @@ export async function POST(request: Request) {
                 const apiKey = decrypt(account.encrypted_api_key);
                 const apiPassword = account.encrypted_api_password ? decrypt(account.encrypted_api_password) : password;
                 const isDemo = account.account_type === 'demo';
-                await createSession(email, apiPassword, apiKey, isDemo);
-                console.log(`[Login] Capital.com session established for ${email}`);
+                // Item H2 Fix: Use brokerage identifier (Account ID or specific Login) instead of user email
+                const identifier = account.capital_account_id || email;
+                await createSession(identifier, apiPassword, apiKey, isDemo);
+                console.log(`[Login] Capital.com session established for ${identifier}`);
             } else {
                 console.log(`[Login] No Capital.com account linked for ${email} — will use master credentials for trading`);
             }
@@ -71,14 +73,14 @@ export async function POST(request: Request) {
             .update({ last_login_at: new Date() })
             .eq('id', user.id);
 
-        // 5.5 2FA Interception Logic (Bypassed for the automated debug account)
-        if (user.two_factor_enabled && email !== 'lemicmelic@gmail.com') {
+        // 5.5 2FA Interception Logic (Production Hardened)
+        if (user.two_factor_enabled) {
             // Generate a strictly short-lived 5-minute Temp Token containing only the userId
             const tempToken = await new SignJWT({ userId: user.id })
                 .setProtectedHeader({ alg: 'HS256' })
                 .setIssuedAt()
                 .setExpirationTime('5m')
-                .sign(new TextEncoder().encode(process.env.JWT_SECRET || 'mesoflix-commodity-terminal-internal-fallback-v1'));
+                .sign(new TextEncoder().encode(process.env.JWT_SECRET));
 
             return NextResponse.json({
                 message: '2FA Verification Required',

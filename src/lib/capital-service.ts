@@ -99,10 +99,17 @@ export async function getValidSession(userId: string, isDemo: boolean = false, f
     
     if (authMutex.has(cacheKey)) return authMutex.get(cacheKey)!;
 
-    const { data: accounts } = await supabase.from('capital_accounts').select('*').eq('user_id', userId).order('is_active', { ascending: false }).limit(1);
-    const account = accounts?.[0];
-    if (!account) throw new Error('Institutional link missing.');
+    // Tightened Selection Logic: Only select the strictly active institutional link
+    const { data: account, error: accError } = await supabase
+        .from('capital_accounts')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('is_active', true)
+        .maybeSingle();
 
+    if (accError || !account) {
+        throw new Error('Institutional link missing or inactive. Please link your brokerage account.');
+    }
     if (!forceRefresh && account.encrypted_session_tokens) {
         try {
             const sessions = JSON.parse(decrypt(account.encrypted_session_tokens));

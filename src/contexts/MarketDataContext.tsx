@@ -82,12 +82,12 @@ export function MarketDataProvider({ children }: { children: ReactNode }) {
     const fetchInitialData = useCallback(async (currentMode: 'demo' | 'real') => {
         try {
             const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001';
-            const getCookie = (name: string) => {
-                const value = `; ${document.cookie}`;
-                const parts = value.split(`; ${name}=`);
-                if (parts.length === 2) return parts.pop()?.split(';').shift();
-            };
-            const token = getCookie('access_token');
+            
+            // Item C2 Fix: Fetch a short-lived bridge token
+            const tokenRes = await fetch('/api/auth/bridge-token');
+            if (!tokenRes.ok) return;
+            const { bridgeToken: token } = await tokenRes.json();
+            
             if (!token) return;
 
             const res = await fetch(`${SOCKET_URL}/api/dashboard?mode=${currentMode}`, {
@@ -124,76 +124,91 @@ export function MarketDataProvider({ children }: { children: ReactNode }) {
 
     useEffect(() => {
         const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001';
-        const token = (() => {
-            const value = `; ${document.cookie}`;
-            const parts = value.split(`; access_token=`);
-            if (parts.length === 2) return parts.pop()?.split(';').shift();
-        })();
+        
+        let socket: Socket | null = null;
 
-        if (!token) {
-            setConnectionStatus('disconnected');
-            return;
-        }
+        const initSocket = async () => {
+            try {
+                // Item C2 Fix: Fetch a short-lived bridge token instead of reading httpOnly cookie
+                const tokenRes = await fetch('/api/auth/bridge-token');
+                if (!tokenRes.ok) {
+                    setConnectionStatus('disconnected');
+                    return;
+                }
+                const { bridgeToken: token } = await tokenRes.json();
 
-        const socket = io(SOCKET_URL, {
-            auth: { token },
-            reconnectionAttempts: Infinity,
-            reconnectionDelay: 2000,
-            reconnectionDelayMax: 5000,
-            timeout: 20000,
-            transports: ['websocket'],
-            autoConnect: true,
-        });
+                if (!token) {
+                    setConnectionStatus('disconnected');
+                    return;
+                }
 
-        socketRef.current = socket;
-        setConnectionStatus('connecting');
-
-        socket.on('connect', () => {
-            setConnectionStatus('connected');
-            socket.emit('start-stream', { mode: modeRef.current });
-        });
-
-        socket.on('market-data', (data: any[]) => {
-            setMarketData(prev => {
-                const newState = { ...prev };
-                data.forEach((snap: any) => {
-                    const epic = snap.epic;
-                    newState[epic] = {
-                        bid: snap.bid ?? prev[epic]?.bid ?? 0,
-                        offer: snap.offer ?? prev[epic]?.offer ?? 0,
-                        high: snap.high ?? prev[epic]?.high ?? 0,
-                        low: snap.low ?? prev[epic]?.low ?? 0,
-                        change: snap.netChange ?? prev[epic]?.change ?? 0,
-                        changePct: snap.percentageChange ?? prev[epic]?.changePct ?? 0,
-                    };
+                const createdSocket = io(SOCKET_URL, {
+                    auth: { token },
+                    reconnectionAttempts: Infinity,
+                    reconnectionDelay: 2000,
+                    reconnectionDelayMax: 5000,
+                    timeout: 20000,
+                    transports: ['websocket'],
+                    autoConnect: true,
                 });
-                return newState;
-            });
-        });
 
-        socket.on('balance', (data: any) => {
-            // Backend now sends both or identified accounts
-            const balanceObj = parseBalance(data);
-            if (data.isDemo) setDemoBalance(balanceObj);
-            else setRealBalance(balanceObj);
-        });
+                socket = createdSocket;
+                socketRef.current = createdSocket;
+                setConnectionStatus('connecting');
 
-        socket.on('positions', (data: any[]) => {
-            setPositions(data);
-        });
+                createdSocket.on('connect', () => {
+                    setConnectionStatus('connected');
+                    createdSocket.emit('start-stream', { mode: modeRef.current });
+                });
 
-        socket.on('connect_error', (error) => {
-            console.error('[MarketData] Socket Connection Error:', error);
-            setConnectionStatus('error');
-        });
+                createdSocket.on('market-data', (data: any[]) => {
+                    setMarketData(prev => {
+                        const newState = { ...prev };
+                        data.forEach((snap: any) => {
+                            const epic = snap.epic;
+                            newState[epic] = {
+                                bid: snap.bid ?? prev[epic]?.bid ?? 0,
+                                offer: snap.offer ?? prev[epic]?.offer ?? 0,
+                                high: snap.high ?? prev[epic]?.high ?? 0,
+                                low: snap.low ?? prev[epic]?.low ?? 0,
+                                change: snap.netChange ?? prev[epic]?.change ?? 0,
+                                changePct: snap.percentageChange ?? prev[epic]?.changePct ?? 0,
+                            };
+                        });
+                        return newState;
+                    });
+                });
 
-        socket.on('disconnect', (reason) => {
-            console.warn('[MarketData] Socket Disconnected:', reason);
-            setConnectionStatus('disconnected');
-        });
+                createdSocket.on('balance', (data: any) => {
+                    const balanceObj = parseBalance(data);
+                    if (data.isDemo) setDemoBalance(balanceObj);
+                    else setRealBalance(balanceObj);
+                });
+
+                createdSocket.on('positions', (data: any[]) => {
+                    setPositions(data);
+                });
+
+                createdSocket.on('connect_error', (error) => {
+                    console.error('[MarketData] Socket Connection Error:', error);
+                    setConnectionStatus('error');
+                });
+
+                createdSocket.on('disconnect', (reason) => {
+                    console.warn('[MarketData] Socket Disconnected:', reason);
+                    setConnectionStatus('disconnected');
+                });
+
+            } catch (err) {
+                console.error('[MarketData] Socket Init Failed:', err);
+                setConnectionStatus('error');
+            }
+        };
+
+        initSocket();
 
         return () => {
-            socket.disconnect();
+            if (socket) socket.disconnect();
             socketRef.current = null;
         };
     }, []);

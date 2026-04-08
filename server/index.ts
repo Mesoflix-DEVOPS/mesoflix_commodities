@@ -64,7 +64,8 @@ app.post('/api/auth/isolate-handshake', async (req, res) => {
         if (!authHeader) return res.status(401).json({ error: 'Unauthorized' });
         
         const token = authHeader.split(' ')[1];
-        const { payload } = await jose.jwtVerify(token, new TextEncoder().encode(process.env.JWT_SECRET || 'mesoflix-bridge-secret-2024'));
+        if (!process.env.JWT_SECRET) throw new Error("JWT_SECRET missing in environment");
+        const { payload } = await jose.jwtVerify(token, new TextEncoder().encode(process.env.JWT_SECRET));
         const userId = (payload as any).userId;
 
         const { mode } = req.body;
@@ -168,8 +169,13 @@ app.post('/api/auth/register', async (req, res) => {
 
 // --- IDENTITY GUARD & SECURE ENGINES ---
 
+const JWT_SECRET_STRING = process.env.JWT_SECRET;
+if (!JWT_SECRET_STRING && process.env.NODE_ENV === 'production') {
+    throw new Error("FATAL: JWT_SECRET environment variable is required in production.");
+}
+
 const JWT_SECRET = new TextEncoder().encode(
-    process.env.JWT_SECRET || 'mesoflix-commodity-terminal-internal-fallback-v1'
+    JWT_SECRET_STRING || 'mesoflix-commodity-terminal-internal-fallback-v1'
 );
 
 // 0. Login Engine (Stabilized on Render)
@@ -308,14 +314,18 @@ app.get('/api/dashboard', authGuard, async (req: any, res) => {
             console.log(`[Diagnostic] Recalibrated Member ID: ${activeAccountId || 'NONE'}`);
 
             // 2. POSITION FILTERING (P/L Fix)
-            const filteredPositions = (positionsData?.positions || []).filter((p: any) => (p?.position?.accountId || p?.accountId) === activeAccountId);
+            // Item: Return ALL positions from the session as requested by user
+            const allPositions = positionsData?.positions || [];
 
             const formattedAccounts = accounts.map((a: any) => {
-                // Manually calculate P/L and Equity for the active account to ensure sync
-                const accountPnl = filteredPositions.reduce((sum: number, p: any) => sum + (p?.position?.upl ?? p?.pnl ?? 0), 0);
+                // Manually calculate P/L for this specific sub-account
+                const accountPnl = allPositions
+                    .filter((p: any) => (p?.position?.accountId || p?.accountId) === a.accountId)
+                    .reduce((sum: number, p: any) => sum + (p?.position?.upl ?? p?.pnl ?? 0), 0);
+                
                 return {
                     ...a,
-                    isDemo, // Item 6 alignment: Explicitly flag mode from server
+                    isDemo,
                     balance: {
                         ...(a.balance || {}),
                         pnl: accountPnl,
@@ -328,7 +338,7 @@ app.get('/api/dashboard', authGuard, async (req: any, res) => {
             res.json({
                 ...accountsData,
                 accounts: formattedAccounts,
-                positions: filteredPositions,
+                positions: allPositions,
                 history: historyData?.activityHistory || [],
                 user: userData,
                 mode: isDemo ? 'demo' : 'real'
@@ -744,14 +754,14 @@ function startUserPoller(userId: string, io: Server) {
                     
                     const bal = accs.accounts?.find((a: any) => a.accountId === real.activeAccountId);
                     if (bal) {
-                        const filteredPoss = (positionsData?.positions || []).filter((p: any) => (p?.position?.accountId || p?.accountId) === real.activeAccountId);
-                        const totalPnl = filteredPoss.reduce((s: number, p: any) => s + (p?.position?.upl ?? p?.pnl ?? 0), 0);
+                        const allUserPositions = positionsData?.positions || [];
+                        const totalPnl = allUserPositions.reduce((s: number, p: any) => s + (p?.position?.upl ?? p?.pnl ?? 0), 0);
                         io.to(`user:${userId}`).emit('balance', {
                             ...bal.balance, pnl: totalPnl, profitLoss: totalPnl,
                             equity: (bal.balance?.balance || 0) + totalPnl,
                             isDemo: false, accountId: real.activeAccountId, accountName: bal.accountName
                         });
-                        io.to(`user:${userId}`).emit('positions', filteredPoss);
+                        io.to(`user:${userId}`).emit('positions', allUserPositions);
                     }
                 } catch (e) {}
             }
@@ -765,14 +775,14 @@ function startUserPoller(userId: string, io: Server) {
                     
                     const bal = accs.accounts?.find((a: any) => a.accountId === demo.activeAccountId);
                     if (bal) {
-                        const filteredPoss = (positionsData?.positions || []).filter((p: any) => (p?.position?.accountId || p?.accountId) === demo.activeAccountId);
-                        const totalPnl = filteredPoss.reduce((s: number, p: any) => s + (p?.position?.upl ?? p?.pnl ?? 0), 0);
+                        const allUserPositions = positionsData?.positions || [];
+                        const totalPnl = allUserPositions.reduce((s: number, p: any) => s + (p?.position?.upl ?? p?.pnl ?? 0), 0);
                         io.to(`user:${userId}`).emit('balance', {
                             ...bal.balance, pnl: totalPnl, profitLoss: totalPnl,
                             equity: (bal.balance?.balance || 0) + totalPnl,
-                            isDemo: true, accountId: demo.activeAccountId, accountName: demo.accountName
+                            isDemo: true, accountId: demo.activeAccountId, accountName: bal.accountName
                         });
-                        io.to(`user:${userId}`).emit('positions', filteredPoss);
+                        io.to(`user:${userId}`).emit('positions', allUserPositions);
                     }
                 } catch (e) {}
             }

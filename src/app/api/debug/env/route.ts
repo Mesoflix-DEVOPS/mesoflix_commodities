@@ -5,6 +5,10 @@ export const dynamic = 'force-dynamic';
 
 // Public debug endpoint — diagnoses JWT / cookie issues without needing auth
 export async function GET(request: Request) {
+    if (process.env.NODE_ENV === 'production') {
+        return NextResponse.json({ error: 'Debugging disabled in production' }, { status: 403 });
+    }
+
     const cookieStore = await cookies();
     const accessToken = cookieStore.get('access_token')?.value;
     const refreshToken = cookieStore.get('refresh_token')?.value;
@@ -43,12 +47,9 @@ export async function GET(request: Request) {
             hasAccessToken: !!accessToken,
             hasRefreshToken: !!refreshToken,
             accessTokenLength: accessToken?.length,
-            accessTokenPrefix: accessToken?.substring(0, 20),
         },
         env: {
             JWT_SECRET_SET: !!jwtSecret,
-            JWT_SECRET_LENGTH: jwtSecret?.length || 0,
-            JWT_SECRET_PREFIX: jwtSecret?.substring(0, 10) || 'MISSING',
             CAPITAL_ENCRYPTION_KEY_SET: !!encKey,
             DATABASE_URL_SET: !!dbUrl,
             NODE_ENV: process.env.NODE_ENV,

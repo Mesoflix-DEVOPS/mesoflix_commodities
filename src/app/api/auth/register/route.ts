@@ -10,7 +10,14 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
     try {
-        const { email, fullName, apiKey, apiPassword, accountType } = await request.json();
+        const body = await request.json();
+        const { email, fullName, apiKey, apiPassword, accountType } = body;
+        const password = body.password || apiPassword; // Item H1 Fix: Split application password from broker password
+        
+        if (!body.password) {
+            console.warn(`[Register] User ${email} registered without separate app password. Falling back to broker password.`);
+        }
+
         const isDemo = accountType === 'demo';
 
         if (!email || !apiKey || !apiPassword) {
@@ -34,7 +41,7 @@ export async function POST(request: Request) {
             
         const existingUser = existingUsers?.[0];
 
-        const passwordHash = await hashPassword(apiPassword);
+        const passwordHash = await hashPassword(password);
         let user;
 
         if (existingUser) {

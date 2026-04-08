@@ -7,10 +7,14 @@ const SALT_LENGTH = 64;
 const TAG_LENGTH = 16;
 
 // Validate Encryption Key
-if (!process.env.CAPITAL_ENCRYPTION_KEY || process.env.CAPITAL_ENCRYPTION_KEY.length < 32) {
+const RAW_ENC_KEY = process.env.CAPITAL_ENCRYPTION_KEY;
+if (!RAW_ENC_KEY || RAW_ENC_KEY.length < 32) {
+    if (process.env.NODE_ENV === 'production') {
+        throw new Error("FATAL: CAPITAL_ENCRYPTION_KEY on Render is missing or too short.");
+    }
     console.warn("WARNING: CAPITAL_ENCRYPTION_KEY on Render is missing or too short. Using a default unsafe key.");
 }
-const ENCRYPTION_KEY = crypto.scryptSync(process.env.CAPITAL_ENCRYPTION_KEY || 'default-unsafe-key', 'salt', 32);
+const ENCRYPTION_KEY = crypto.scryptSync(RAW_ENC_KEY || 'default-unsafe-key', 'salt', 32);
 
 /**
  * Hash a password using bcrypt

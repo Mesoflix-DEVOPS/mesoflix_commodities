@@ -7,8 +7,13 @@ import { supabase } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
 
+const JWT_SECRET_STRING = process.env.JWT_SECRET;
+if (!JWT_SECRET_STRING && process.env.NODE_ENV === 'production') {
+    throw new Error("FATAL: JWT_SECRET environment variable is required for support backend in production.");
+}
+
 const JWT_SECRET = new TextEncoder().encode(
-    process.env.JWT_SECRET || 'fallback_secret_must_change_in_prod'
+    JWT_SECRET_STRING || 'mesoflix-commodity-terminal-internal-fallback-v1'
 );
 
 export async function GET(req: Request) {
@@ -19,7 +24,11 @@ export async function GET(req: Request) {
         if (!token) return NextResponse.json({ error: "Unauthorized access" }, { status: 401 });
 
         try {
-            await jose.jwtVerify(token, JWT_SECRET);
+            const { payload } = await jose.jwtVerify(token, JWT_SECRET);
+            // Verify payload has required fields
+            if (!payload.sub || (payload.role !== 'admin' && payload.role !== 'staff' && payload.role !== 'agent')) {
+                 return NextResponse.json({ error: "Access Denied: Insufficient Role" }, { status: 403 });
+            }
         } catch (e) {
             return NextResponse.json({ error: "Invalid or expired agent session" }, { status: 401 });
         }

@@ -7,8 +7,13 @@ import { supabase } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
 
+const JWT_SECRET_STRING = process.env.JWT_SECRET;
+if (!JWT_SECRET_STRING && process.env.NODE_ENV === 'production') {
+    throw new Error("FATAL: JWT_SECRET environment variable is required for support 2FA bridge in production.");
+}
+
 const JWT_SECRET = new TextEncoder().encode(
-    process.env.JWT_SECRET || 'fallback_secret_must_change_in_prod'
+    JWT_SECRET_STRING || 'mesoflix-commodity-terminal-internal-fallback-v1'
 );
 
 function generateTOTP(secret: string): string {

@@ -12,7 +12,10 @@ export interface JWTPayload {
  */
 export function getJwtSecret() {
     const secret = process.env.JWT_SECRET;
-    // Using a more specific fallback to ensure parity between Edge and Node if env var is missing during deployment
+    if (!secret && process.env.NODE_ENV === 'production') {
+        throw new Error("FATAL: JWT_SECRET environment variable is required in production.");
+    }
+    // Using a more specific fallback to ensure parity between Edge and Node if env var is missing during development
     return new TextEncoder().encode(
         secret || 'mesoflix-commodity-terminal-internal-fallback-v1'
     );

@@ -4,6 +4,9 @@ import { users } from "@/lib/db/schema";
 import { sql } from "drizzle-orm";
 
 export async function GET(req: NextRequest) {
+    if (process.env.NODE_ENV === 'production') {
+        return NextResponse.json({ error: 'Debugging disabled in production' }, { status: 403 });
+    }
     try {
         const API_KEY = process.env.GEMINI_API_KEY;
         const result: any = {
