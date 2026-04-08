@@ -706,9 +706,17 @@ export default function LearnHubPage() {
 }
 
 function LessonCard({ lesson, onClick }: { lesson: any; onClick: () => void }) {
-    const videoId = lesson.youtube_url.includes('v=')
-        ? lesson.youtube_url.split('v=')[1]?.split('&')[0]
-        : lesson.youtube_url.split('/').pop();
+    const extractVideoId = (url: string) => {
+        // Handle full URLs
+        const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+        const match = url.match(regExp);
+        const result = (match && match[2].length === 11) ? match[2] : url;
+        
+        // Strip tracking/query params (e.g., ?si=...) if they survived
+        return result.split('?')[0].split('&')[0].trim();
+    };
+
+    const videoId = extractVideoId(lesson.youtube_url);
     const thumbnail = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
 
     return (
