@@ -501,7 +501,7 @@ function DashboardPageInner() {
                         </h3>
                         {recentActivity.length > 0 ? (
                             <div className="space-y-4">
-                                {recentActivity.map((item, i) => (
+                                {recentActivity.map((item: any, i: number) => (
                                     <div key={i} className="flex items-start gap-3 group">
                                         <div className="w-1.5 h-1.5 rounded-full bg-teal mt-1.5 shrink-0 group-hover:shadow-[0_0_8px_#00BFA6]" />
                                         <div className="flex-1 min-w-0">
