@@ -685,6 +685,14 @@ export default function AgentDashboard() {
                 </div>
             )}
 
+            {activeTab === "academy" && (
+                <div className="flex-1 overflow-y-auto p-4 md:p-12 bg-[#060D14]">
+                    <div className="max-w-6xl mx-auto animate-in fade-in zoom-in-95 duration-500 pb-20">
+                        <AcademyManagement />
+                    </div>
+                </div>
+            )}
+
             {/* Modals */}
             {showFreezeModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">

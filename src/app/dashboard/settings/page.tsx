@@ -304,8 +304,9 @@ export default function SettingsPage() {
                                             {token.is_active ? (
                                                 <button
                                                     onClick={() => handleTokenAction(token.id, 'disconnect')}
-                                                    disabled={isProcessing}
-                                                    className="flex items-center gap-2 px-4 py-2 bg-red-500/10 text-red-500 hover:bg-red-500/20 font-bold text-xs rounded-lg transition-all"
+                                                    disabled={isProcessing || (savedTokens.filter(t => t.is_active).length <= 1)}
+                                                    title={savedTokens.filter(t => t.is_active).length <= 1 ? "You must connect another token before disconnecting this one" : "Disconnect token"}
+                                                    className="flex items-center gap-2 px-4 py-2 bg-red-500/10 text-red-500 hover:bg-red-500/20 font-bold text-xs rounded-lg transition-all disabled:opacity-30 disabled:cursor-not-allowed"
                                                 >
                                                     <Power size={14} /> Disconnect
                                                 </button>

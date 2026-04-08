@@ -102,6 +102,19 @@ export async function PATCH(request: Request) {
                 type: 'info'
             });
         } else {
+            // Check if this is the only active token
+            const { data: activeAccounts } = await supabase
+                .from('capital_accounts')
+                .select('id')
+                .eq('user_id', userId)
+                .eq('is_active', true);
+            
+            if (activeAccounts && activeAccounts.length <= 1) {
+                return NextResponse.json({ 
+                    message: 'Cannot disconnect the only active token. Add and connect another one first.' 
+                }, { status: 400 });
+            }
+
             await supabase.from('capital_accounts').update({ is_active: false, updated_at: new Date() }).eq('id', accountId);
             await clearCachedSession(userId);
         }
@@ -121,6 +134,18 @@ export async function DELETE(request: Request) {
         const { searchParams } = new URL(request.url);
         const accountId = searchParams.get('id');
         if (!accountId) return NextResponse.json({ message: 'ID required' }, { status: 400 });
+
+        // Check if token is active before deleting
+        const { data: account } = await supabase
+            .from('capital_accounts')
+            .select('is_active')
+            .eq('id', accountId)
+            .eq('user_id', userId)
+            .single();
+        
+        if (account?.is_active) {
+            return NextResponse.json({ message: 'Cannot delete an active token. Disconnect it first (by connecting another one).' }, { status: 400 });
+        }
 
         const { error } = await supabase.from('capital_accounts').delete().eq('id', accountId).eq('user_id', userId);
         if (error) throw error;

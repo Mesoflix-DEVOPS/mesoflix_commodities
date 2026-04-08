@@ -80,12 +80,15 @@ function DashboardPageInner() {
 
     // Update liveHistory when positions change via Socket.io context
     useEffect(() => {
-        if (!livePositions || livePositions.length === 0) return;
+        // If livePositions is null (not yet loaded), do nothing to avoid clearing fetched data
+        if (livePositions === null) return;
 
         setData((prev: any) => ({
             ...prev,
             positions: livePositions
         }));
+
+        if (livePositions.length === 0) return;
 
         const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
         const tickData: any = { name: now };
