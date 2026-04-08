@@ -30,8 +30,12 @@ export async function GET(req: NextRequest) {
             notes: noteRes.data?.content || "",
         });
     } catch (error: any) {
-        console.error("Error fetching progress/notes:", error.message);
-        return NextResponse.json({ error: "Failed to fetch data" }, { status: 500 });
+        console.error("Error fetching progress/notes:", error.message || error);
+        return NextResponse.json({ 
+            error: "Failed to fetch data", 
+            details: error.message,
+            code: error.code
+        }, { status: 500 });
     }
 }
 
@@ -63,7 +67,11 @@ export async function POST(req: NextRequest) {
 
         return NextResponse.json({ success: true });
     } catch (error: any) {
-        console.error("Error updating progress:", error.message);
-        return NextResponse.json({ error: "Failed to update progress" }, { status: 500 });
+        console.error("Error updating progress:", error.message || error);
+        return NextResponse.json({ 
+            error: "Failed to update progress", 
+            details: error.message,
+            code: error.code
+        }, { status: 500 });
     }
 }

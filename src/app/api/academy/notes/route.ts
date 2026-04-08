@@ -33,7 +33,11 @@ export async function POST(req: NextRequest) {
 
         return NextResponse.json({ success: true });
     } catch (error: any) {
-        console.error("Error saving notes:", error.message);
-        return NextResponse.json({ error: "Failed to save notes" }, { status: 500 });
+        console.error("Error saving notes:", error.message || error);
+        return NextResponse.json({ 
+            error: "Failed to save notes", 
+            details: error.message,
+            code: error.code 
+        }, { status: 500 });
     }
 }

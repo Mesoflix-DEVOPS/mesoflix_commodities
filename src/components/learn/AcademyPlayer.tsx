@@ -165,9 +165,13 @@ export default function AcademyPlayer({ lesson, onBack }: AcademyPlayerProps) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ class_id: lesson.id, content }),
             });
-            if (!res.ok) throw new Error("Save failed");
-        } catch (err) {
-            console.error("Failed to save notes", err);
+            if (!res.ok) {
+                const errorData = await res.json().catch(() => ({}));
+                console.error("API Error Detailed:", errorData);
+                throw new Error(errorData.error || "Save failed");
+            }
+        } catch (err: any) {
+            console.error("Internal Save Error:", err.message);
         } finally {
             setIsSaving(false);
         }
