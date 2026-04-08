@@ -717,7 +717,7 @@ function LessonCard({ lesson, onClick }: { lesson: any; onClick: () => void }) {
     };
 
     const videoId = extractVideoId(lesson.youtube_url);
-    const thumbnail = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
+    const thumbnail = lesson.thumbnail_url || `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
 
     return (
         <div

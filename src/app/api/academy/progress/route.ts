@@ -1,14 +1,14 @@
-import { db } from "@/lib/db";
-import { userProgress, userNotes } from "@/lib/db/schema";
+import { supabase } from "@/lib/supabase";
 import { NextRequest, NextResponse } from "next/server";
-import { eq, and } from "drizzle-orm";
 import { auth } from "@/lib/auth";
+
+export const dynamic = 'force-dynamic';
 
 // GET progress and notes
 export async function GET(req: NextRequest) {
     try {
         const session = await auth();
-        if (!session) {
+        if (!session || !session.user) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
         const userId = session.user.id;
@@ -19,34 +19,18 @@ export async function GET(req: NextRequest) {
             return NextResponse.json({ error: "Missing class_id" }, { status: 400 });
         }
 
-        // Fetch progress
-        const [progress] = await db
-            .select()
-            .from(userProgress)
-            .where(
-                and(
-                    eq(userProgress.user_id, userId),
-                    eq(userProgress.class_id, classId)
-                )
-            );
-
-        // Fetch notes
-        const [note] = await db
-            .select()
-            .from(userNotes)
-            .where(
-                and(
-                    eq(userNotes.user_id, userId),
-                    eq(userNotes.class_id, classId)
-                )
-            );
+        // Parallel fetch for progress and notes using Supabase
+        const [progressRes, noteRes] = await Promise.all([
+            supabase.from('user_progress').select('is_done').eq('user_id', userId).eq('class_id', classId).maybeSingle(),
+            supabase.from('user_notes').select('content').eq('user_id', userId).eq('class_id', classId).maybeSingle()
+        ]);
 
         return NextResponse.json({
-            is_done: progress?.is_done || false,
-            notes: note?.content || "",
+            is_done: progressRes.data?.is_done || false,
+            notes: noteRes.data?.content || "",
         });
-    } catch (error) {
-        console.error("Error fetching progress/notes:", error);
+    } catch (error: any) {
+        console.error("Error fetching progress/notes:", error.message);
         return NextResponse.json({ error: "Failed to fetch data" }, { status: 500 });
     }
 }
@@ -54,45 +38,32 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
     try {
         const session = await auth();
-        if (!session) {
+        if (!session || !session.user) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
         const userId = session.user.id;
-
-        const body = await req.json();
-        const { class_id, is_done } = body;
+        const { class_id, is_done } = await req.json();
 
         if (!class_id) {
             return NextResponse.json({ error: "Missing class_id" }, { status: 400 });
         }
 
-        // Check if progress already exists
-        const [existing] = await db
-            .select()
-            .from(userProgress)
-            .where(
-                and(
-                    eq(userProgress.user_id, userId),
-                    eq(userProgress.class_id, class_id)
-                )
-            );
-
-        if (existing) {
-            await db
-                .update(userProgress)
-                .set({ is_done, updated_at: new Date() })
-                .where(eq(userProgress.id, existing.id));
-        } else {
-            await db.insert(userProgress).values({
+        const { error } = await supabase
+            .from('user_progress')
+            .upsert({
                 user_id: userId,
-                class_id,
-                is_done,
+                class_id: class_id,
+                is_done: is_done,
+                updated_at: new Date().toISOString()
+            }, {
+                onConflict: 'user_id,class_id'
             });
-        }
+
+        if (error) throw error;
 
         return NextResponse.json({ success: true });
-    } catch (error) {
-        console.error("Error updating progress:", error);
+    } catch (error: any) {
+        console.error("Error updating progress:", error.message);
         return NextResponse.json({ error: "Failed to update progress" }, { status: 500 });
     }
 }

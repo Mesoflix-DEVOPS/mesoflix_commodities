@@ -22,6 +22,7 @@ interface AcademyPlayerProps {
         description: string;
         youtube_url: string;
         category: string;
+        thumbnail_url?: string;
     };
     onBack: () => void;
 }
@@ -104,9 +105,13 @@ export default function AcademyPlayer({ lesson, onBack }: AcademyPlayerProps) {
     }, [isApiLoaded, lesson.youtube_url]);
 
     const extractVideoId = (url: string) => {
+        // Handle full URLs
         const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
         const match = url.match(regExp);
-        return (match && match[2].length === 11) ? match[2] : url;
+        const result = (match && match[2].length === 11) ? match[2] : url;
+        
+        // Strip tracking/query params (e.g., ?si=...) if they survived
+        return result.split('?')[0].split('&')[0].trim();
     };
 
     const handleNotesChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -286,7 +291,7 @@ export default function AcademyPlayer({ lesson, onBack }: AcademyPlayerProps) {
 
                         {!player && (
                             <img
-                                src={`https://img.youtube.com/vi/${extractVideoId(lesson.youtube_url)}/maxresdefault.jpg`}
+                                src={lesson.thumbnail_url || `https://img.youtube.com/vi/${extractVideoId(lesson.youtube_url)}/maxresdefault.jpg`}
                                 alt="Video Thumbnail"
                                 className="absolute inset-0 w-full h-full object-cover opacity-50 blur-sm group-hover:blur-0 transition-all duration-700"
                             />

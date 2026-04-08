@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, Youtube, MessageSquare, GraduationCap, Trash2, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
+import { Plus, Youtube, MessageSquare, GraduationCap, Trash2, CheckCircle2, AlertCircle, Loader2, Edit3, Image as ImageIcon, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface Class {
@@ -9,6 +9,7 @@ interface Class {
     title: string;
     description: string;
     youtube_url: string;
+    thumbnail_url?: string;
     category: string;
 }
 
@@ -17,11 +18,13 @@ export default function AcademyManagement() {
     const [isLoading, setIsLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [showForm, setShowForm] = useState(false);
+    const [editingId, setEditingId] = useState<string | null>(null);
 
     // Form state
     const [title, setTitle] = useState("");
     const [description, setDescription] = useState("");
     const [youtubeUrl, setYoutubeUrl] = useState("");
+    const [thumbnailUrl, setThumbnailUrl] = useState("");
     const [category, setCategory] = useState("Beginner");
     const [error, setError] = useState("");
     const [success, setSuccess] = useState("");
@@ -44,6 +47,42 @@ export default function AcademyManagement() {
         }
     };
 
+    const resetForm = () => {
+        setTitle("");
+        setDescription("");
+        setYoutubeUrl("");
+        setThumbnailUrl("");
+        setCategory("Beginner");
+        setEditingId(null);
+        setError("");
+    };
+
+    const handleEdit = (cls: Class) => {
+        setTitle(cls.title);
+        setDescription(cls.description);
+        setYoutubeUrl(cls.youtube_url);
+        setThumbnailUrl(cls.thumbnail_url || "");
+        setCategory(cls.category);
+        setEditingId(cls.id);
+        setShowForm(true);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    const handleDelete = async (id: string) => {
+        if (!confirm("Are you sure you want to delete this class? This will also remove all user notes and progress associated with it.")) return;
+
+        try {
+            const res = await fetch(`/api/academy/classes?id=${id}`, { method: "DELETE" });
+            if (res.ok) {
+                setClasses(prev => prev.filter(c => c.id !== id));
+            } else {
+                alert("Failed to delete class");
+            }
+        } catch (err) {
+            console.error("Delete failed", err);
+        }
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsSubmitting(true);
@@ -51,23 +90,32 @@ export default function AcademyManagement() {
         setSuccess("");
 
         try {
+            // Institutional Sanitization: Strip tracking parameters (e.g., ?si=) at the source
+            const sanitizedUrl = youtubeUrl.split('?')[0].split('&')[0].trim();
+            
+            const payload = { 
+                id: editingId, 
+                title, 
+                description, 
+                youtube_url: sanitizedUrl, 
+                thumbnail_url: thumbnailUrl,
+                category 
+            };
+
             const res = await fetch("/api/academy/classes", {
-                method: "POST",
+                method: editingId ? "PUT" : "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ title, description, youtube_url: youtubeUrl, category }),
+                body: JSON.stringify(payload),
             });
 
             if (res.ok) {
-                setSuccess("Class uploaded successfully!");
-                setTitle("");
-                setDescription("");
-                setYoutubeUrl("");
-                setCategory("Beginner");
+                setSuccess(editingId ? "Class updated successfully!" : "Class uploaded successfully!");
+                resetForm();
                 setShowForm(false);
                 fetchClasses();
             } else {
                 const data = await res.json();
-                setError(data.error || "Failed to upload class");
+                setError(data.error || "Failed to process request");
             }
         } catch (err) {
             setError("A network error occurred.");
@@ -87,10 +135,16 @@ export default function AcademyManagement() {
                     <p className="text-gray-400 text-sm mt-1">Upload and manage trading lessons for users.</p>
                 </div>
                 <button
-                    onClick={() => setShowForm(!showForm)}
-                    className="flex items-center gap-2 bg-teal/10 hover:bg-teal/20 text-teal px-4 py-2 rounded-xl border border-teal/20 transition-all font-bold"
+                    onClick={() => {
+                        if (showForm) resetForm();
+                        setShowForm(!showForm);
+                    }}
+                    className={cn(
+                        "flex items-center gap-2 px-4 py-2 rounded-xl border transition-all font-bold",
+                        showForm ? "bg-red-400/10 border-red-400/20 text-red-400 hover:bg-red-400/20" : "bg-teal/10 border-teal/20 text-teal hover:bg-teal/20"
+                    )}
                 >
-                    <Plus size={20} />
+                    {showForm ? <X size={20} /> : <Plus size={20} />}
                     {showForm ? "Cancel" : "New Class"}
                 </button>
             </div>
@@ -98,6 +152,13 @@ export default function AcademyManagement() {
             {showForm && (
                 <div className="bg-white/5 border border-white/10 rounded-2xl p-6 animate-in slide-in-from-top-4 duration-300">
                     <form onSubmit={handleSubmit} className="space-y-4">
+                        <div className="flex items-center gap-2 mb-2">
+                            <div className="w-2 h-2 rounded-full bg-teal animate-pulse" />
+                            <span className="text-[10px] font-black uppercase tracking-widest text-teal">
+                                {editingId ? "Editing Mode" : "New Entry Mode"}
+                            </span>
+                        </div>
+
                         <div className="grid md:grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <label className="text-xs font-bold text-gray-500 uppercase">Lesson Title</label>
@@ -123,17 +184,31 @@ export default function AcademyManagement() {
                             </div>
                         </div>
 
-                        <div className="space-y-2">
-                            <label className="text-xs font-bold text-gray-500 uppercase">YouTube Link</label>
-                            <div className="relative">
-                                <Youtube className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
-                                <input
-                                    required
-                                    value={youtubeUrl}
-                                    onChange={(e) => setYoutubeUrl(e.target.value)}
-                                    placeholder="https://www.youtube.com/watch?v=..."
-                                    className="w-full bg-black/20 border border-white/10 rounded-xl pl-12 pr-4 py-3 focus:border-teal outline-none transition-all"
-                                />
+                        <div className="grid md:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-gray-500 uppercase">YouTube Link</label>
+                                <div className="relative">
+                                    <Youtube className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
+                                    <input
+                                        required
+                                        value={youtubeUrl}
+                                        onChange={(e) => setYoutubeUrl(e.target.value)}
+                                        placeholder="https://www.youtube.com/watch?v=..."
+                                        className="w-full bg-black/20 border border-white/10 rounded-xl pl-12 pr-4 py-3 focus:border-teal outline-none transition-all"
+                                    />
+                                </div>
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-gray-500 uppercase">Custom Cover Image URL (Optional)</label>
+                                <div className="relative">
+                                    <ImageIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
+                                    <input
+                                        value={thumbnailUrl}
+                                        onChange={(e) => setThumbnailUrl(e.target.value)}
+                                        placeholder="https://example.com/cover.jpg"
+                                        className="w-full bg-black/20 border border-white/10 rounded-xl pl-12 pr-4 py-3 focus:border-teal outline-none transition-all"
+                                    />
+                                </div>
                             </div>
                         </div>
 
@@ -168,7 +243,7 @@ export default function AcademyManagement() {
                             type="submit"
                             className="w-full bg-teal text-dark-blue font-black py-4 rounded-xl hover:shadow-[0_0_20px_rgba(0,191,166,0.4)] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                         >
-                            {isSubmitting ? <Loader2 className="animate-spin" /> : "Upload to Academy"}
+                            {isSubmitting ? <Loader2 className="animate-spin" /> : (editingId ? "Update Class" : "Upload to Academy")}
                         </button>
                     </form>
                 </div>
@@ -189,27 +264,42 @@ export default function AcademyManagement() {
                         {classes.map((cls) => (
                             <div key={cls.id} className="bg-white/5 border border-white/10 p-4 rounded-2xl flex items-center justify-between group hover:border-white/20 transition-all">
                                 <div className="flex items-center gap-4">
-                                    <div className="w-12 h-12 bg-black/20 rounded-xl flex items-center justify-center text-teal">
-                                        <Youtube size={24} />
+                                    <div className="w-16 h-10 bg-black/40 rounded-lg overflow-hidden flex items-center justify-center text-teal border border-white/5">
+                                        {cls.thumbnail_url ? (
+                                            <img src={cls.thumbnail_url} className="w-full h-full object-cover" alt="" />
+                                        ) : (
+                                            <Youtube size={20} />
+                                        )}
                                     </div>
                                     <div>
-                                        <h4 className="font-bold">{cls.title}</h4>
+                                        <h4 className="font-bold text-sm">{cls.title}</h4>
                                         <div className="flex items-center gap-3 mt-1">
                                             <span className={cn(
-                                                "text-[10px] font-bold uppercase px-2 py-0.5 rounded-full",
+                                                "text-[9px] font-black uppercase px-2 py-0.5 rounded-full",
                                                 cls.category === "Beginner" && "bg-teal/10 text-teal",
-                                                cls.category === "Intermediate" && "bg-gold/10 text-gold",
+                                                cls.category === "Intermediate" && "bg-yellow-500/10 text-yellow-500",
                                                 cls.category === "Advanced" && "bg-red-400/10 text-red-400"
                                             )}>
                                                 {cls.category}
                                             </span>
-                                            <span className="text-xs text-gray-500 truncate max-w-[200px] md:max-w-md">{cls.description}</span>
+                                            <span className="text-[10px] text-gray-500 truncate max-w-[200px] md:max-w-md">{cls.description}</span>
                                         </div>
                                     </div>
                                 </div>
-                                <button className="p-2 opacity-0 group-hover:opacity-100 hover:text-red-400 transition-all">
-                                    <Trash2 size={18} />
-                                </button>
+                                <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all">
+                                    <button 
+                                        onClick={() => handleEdit(cls)}
+                                        className="p-2 bg-white/5 hover:bg-teal/20 text-gray-400 hover:text-teal rounded-lg transition-all border border-transparent hover:border-teal/20"
+                                    >
+                                        <Edit3 size={16} />
+                                    </button>
+                                    <button 
+                                        onClick={() => handleDelete(cls.id)}
+                                        className="p-2 bg-white/5 hover:bg-red-400/20 text-gray-400 hover:text-red-400 rounded-lg transition-all border border-transparent hover:border-red-400/20"
+                                    >
+                                        <Trash2 size={16} />
+                                    </button>
+                                </div>
                             </div>
                         ))}
                     </div>

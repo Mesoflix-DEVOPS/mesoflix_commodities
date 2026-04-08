@@ -247,6 +247,7 @@ export const learnClasses = pgTable('learn_classes', {
     title: text('title').notNull(),
     description: text('description').notNull(),
     youtube_url: text('youtube_url').notNull(),
+    thumbnail_url: text('thumbnail_url'),
     category: text('category').notNull().default('Beginner'), // 'Beginner', 'Intermediate', 'Advanced'
     created_at: timestamp('created_at').defaultNow(),
     updated_at: timestamp('updated_at').defaultNow(),
