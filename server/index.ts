@@ -389,8 +389,7 @@ app.get('/api/user', authGuard, async (req: any, res) => {
                 email: user.email, 
                 fullName: user.full_name, 
                 full_name: user.full_name, // Dual-compat
-                role: user.role,
-                two_factor_enabled: !!user.two_factor_enabled
+                two_factor_enabled: !!(user as any).two_factor_enabled
             } 
         });
     } catch (err: any) {
@@ -742,8 +741,21 @@ app.delete('/api/trade', authGuard, async (req: any, res) => {
         const isDemo = modeInput === 'demo';
 
         const session = await getValidSession(userId, isDemo);
-        // Execute position closure via stable SDK library
-        // Note: For now we proxy the request to ensure 100% driver stability
+        if (!session) throw new Error("Brokerage session unavailable");
+
+        // 1. Fetch position details before closing (to record metrics)
+        const positionsRes = (await getPositions(session.cst, session.xSecurityToken, isDemo, session.serverUrl)) as any;
+        const position = (positionsRes.positions || []).find((p: any) => (p.dealId === dealId || p.position?.dealId === dealId));
+        
+        const metrics = position ? {
+            epic: position.market?.epic || position.position?.epic || 'Unknown',
+            direction: position.position?.direction || 'Unknown',
+            size: position.position?.size || '0',
+            profit: position.position?.upl || position.upl || 0,
+            level: position.position?.level || 0
+        } : null;
+
+        // 2. Execute position closure
         const API_URL = isDemo ? 'https://demo-api-capital.backend-capital.com/api/v1' : 'https://api-capital.backend-capital.com/api/v1';
         
         const closeRes = await fetch(`${API_URL}/positions/${dealId}`, {
@@ -756,10 +768,71 @@ app.delete('/api/trade', authGuard, async (req: any, res) => {
         });
 
         if (!closeRes.ok) throw new Error("Broker rejected position closure");
-        res.json({ success: true, message: "Trade closed successfully via Render Bridge" });
+
+        // 3. Persistent Record (Institutional Analytics)
+        if (metrics) {
+            try {
+                await supabase.from('closed_trades').insert({
+                    user_id: userId,
+                    deal_id: dealId,
+                    epic: metrics.epic,
+                    direction: metrics.direction,
+                    size: metrics.size.toString(),
+                    pnl: metrics.profit.toString(),
+                    mode: isDemo ? 'demo' : 'live',
+                    created_at: new Date().toISOString()
+                });
+                console.log(`[Persistence] Recorded closed trade ${dealId} for User ${userId}`);
+            } catch (dbErr: any) {
+                console.warn("[Persistence] Failed to record trade but closure succeeded:", dbErr.message);
+            }
+        }
+
+        res.json({ success: true, message: "Trade closed successfully and recorded" });
     } catch (err: any) {
         console.error("Trade Bridge Failed:", err.message);
         res.status(500).json({ error: "Trade Execution Offline" });
+    }
+});
+
+// 10.5 Analytics Protocol (24h Metric Processor)
+app.get('/api/analytics', authGuard, async (req: any, res) => {
+    try {
+        const userId = req.userId;
+        const mode = req.query.mode || 'demo';
+        
+        const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+        
+        const { data: trades, error } = await supabase
+            .from('closed_trades')
+            .select('*')
+            .eq('user_id', userId)
+            .eq('mode', mode === 'demo' ? 'demo' : 'live')
+            .gte('created_at', twentyFourHoursAgo);
+
+        if (error) throw error;
+
+        const totalTrades = trades?.length || 0;
+        const totalPnL = (trades || []).reduce((acc, t) => acc + parseFloat(t.pnl || '0'), 0);
+        const winTrades = (trades || []).filter(t => parseFloat(t.pnl || '0') > 0).length;
+        const lossTrades = (trades || []).filter(t => parseFloat(t.pnl || '0') < 0).length;
+        const winRate = totalTrades > 0 ? (winTrades / totalTrades) * 100 : 0;
+
+        res.json({
+            summary: {
+                totalTrades,
+                totalPnL,
+                winTrades,
+                lossTrades,
+                winRate,
+                period: '24h'
+            },
+            trades: (trades || []).slice(0, 10) // Return latest 10 for activity feed
+        });
+
+    } catch (err: any) {
+        console.error("Analytics Protocol Failed:", err.message);
+        res.status(500).json({ error: "Institutional Analytics Offline" });
     }
 });
 
@@ -892,9 +965,9 @@ function startUserPoller(userId: string, io: Server) {
                         getPositions(real.cst, real.xSecurityToken, false, real.serverUrl)
                     ]) as [any, any];
                     
-                    const bal = accs.accounts?.find((a: any) => a.accountId === real.activeAccountId);
+                    const bal = (accs as any).accounts?.find((a: any) => a.accountId === real.activeAccountId);
                     if (bal) {
-                        const allUserPositions = positionsData?.positions || [];
+                        const allUserPositions = (positionsData as any).positions || [];
                         const totalPnl = allUserPositions.reduce((s: number, p: any) => s + (p?.position?.upl ?? p?.pnl ?? 0), 0);
                         io.to(`user:${userId}`).emit('balance', {
                             ...bal.balance, pnl: totalPnl, profitLoss: totalPnl,

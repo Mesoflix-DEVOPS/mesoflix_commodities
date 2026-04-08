@@ -55,7 +55,8 @@ function DashboardPageInner() {
     const [bulkClosing, setBulkClosing] = useState(false);
     const [showBulkMenu, setShowBulkMenu] = useState(false);
     const [selectedTrade, setSelectedTrade] = useState<any>(null);
-    const [closingTrade, setClosingTrade] = useState(false);
+    const [closingTrade, setClosingTrade] = useState<boolean>(false);
+    const [analytics, setAnalytics] = useState<any>(null);
     const bulkMenuRef = useRef<HTMLDivElement>(null);
 
     const fetchData = useCallback((isSilent = true) => {
@@ -72,6 +73,12 @@ function DashboardPageInner() {
             .finally(() => {
                 setLoading(false);
             });
+
+        // 24h Metrics Sync
+        authedFetch(`/api/analytics?mode=${mode}`, router)
+            .then(res => res?.json())
+            .then(setAnalytics)
+            .catch(console.error);
     }, [mode, router, data]);
 
     useEffect(() => {
@@ -143,6 +150,9 @@ function DashboardPageInner() {
                 // Refresh data immediately
                 fetchData(true);
                 setSelectedTrade(null);
+                
+                // Force analytics refresh
+                setTimeout(() => fetchData(true), 1500); 
             } else if (res) {
                 const err = await res.json();
                 alert(`Failed to close trade: ${err.error || 'Unknown error'}`);
@@ -293,16 +303,30 @@ function DashboardPageInner() {
     }, [liveHistory]);
     const lineColors = ['#00BFA6', '#3b82f6', '#f59e0b', '#ef4444', '#a78bfa', '#ec4899', '#8b5cf6', '#14b8a6'];
 
-    // -----------------------------------------------------------------------
-    // Recent Activity from history
-    // -----------------------------------------------------------------------
-    const recentActivity = rawHistory.slice(0, 5).map((h: any) => ({
-        type: h.type || 'EVENT',
-        desc: h.description || (h.details?.actions?.[0]?.actionType) || 'Account activity',
-        date: h.date ? new Date(h.date).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—',
-        profit: h.details?.actions?.reduce((s: number, a: any) =>
-            s + (a.affectedDeals || []).reduce((ss: number, d: any) => ss + (d.profit ?? 0), 0), 0) ?? null,
-    }));
+    // Recent Activity from analytics (preferred) or history
+    const recentActivity = analytics?.trades?.length > 0 
+        ? analytics.trades.map((t: any) => ({
+            type: 'CLOSE',
+            desc: `Closed ${t.direction} ${t.epic}`,
+            date: new Date(t.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            profit: parseFloat(t.pnl)
+        }))
+        : rawHistory.slice(0, 5).map((h: any) => ({
+            type: h.type || 'EVENT',
+            desc: h.details?.actions?.map((a: any) => a.actionType).join(', ') || 'System Action',
+            date: new Date(h.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            profit: h.details?.actions?.reduce((s: number, a: any) => s + (a.affectedDeals?.reduce((sd: number, d: any) => sd + (d.profit || 0), 0) || 0), 0) || 0
+        }));
+
+
+    // Analytics Metrics
+    const stats = {
+        openPositions: positions.length,
+        totalTrades24h: analytics?.summary?.totalTrades || 0,
+        winRate: analytics?.summary?.winRate || 0,
+        pnL24h: analytics?.summary?.totalPnL || 0
+    };
+
 
     // -----------------------------------------------------------------------
     // Stats
@@ -450,15 +474,15 @@ function DashboardPageInner() {
                 <div className="space-y-4 flex flex-col">
                     {/* Win/Loss/Open stats */}
                     <div className="bg-[#0E1B2A] p-6 rounded-3xl border border-white/5 shadow-lg">
-                        <h3 className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-5">Session Snapshot</h3>
+                        <h3 className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-5">24h Institutional Stats</h3>
                         <div className="space-y-3">
                             {[
-                                { label: 'Positions Open', value: positions.length, color: 'text-white' },
-                                { label: 'Profitable', value: winPositions, color: 'text-teal' },
-                                { label: 'At Loss', value: lossPositions, color: 'text-red-500' },
+                                { label: 'Open Positions', value: stats.openPositions, color: 'text-white' },
+                                { label: 'Total Trades (24h)', value: stats.totalTrades24h, color: 'text-white/70' },
+                                { label: '24h Total P/L', value: `${balance.currency} ${stats.pnL24h.toFixed(2)}`, color: stats.pnL24h >= 0 ? 'text-teal' : 'text-red-500' },
                                 {
-                                    label: 'Win Rate', color: positions.length > 0 ? 'text-teal' : 'text-gray-500',
-                                    value: positions.length > 0 ? `${((winPositions / positions.length) * 100).toFixed(0)}%` : '—'
+                                    label: 'Win Rate (24h)', color: stats.totalTrades24h > 0 ? 'text-teal' : 'text-gray-500',
+                                    value: `${stats.winRate.toFixed(0)}%`
                                 },
                                 { label: 'Deposit (Margin)', value: `${balance.currency} ${balance.deposit.toFixed(2)}`, color: 'text-amber-400' },
                             ].map(({ label, value, color }) => (
