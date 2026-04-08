@@ -54,10 +54,14 @@ export async function GET(request: Request) {
                 }
             }));
 
+            const filteredPositions = (positionsData?.positions || []).filter(
+                (p: any) => (p?.position?.accountId || p?.accountId) === session.activeAccountId
+            );
+
             return NextResponse.json({
                 ...accountsData,
                 accounts,
-                positions: positionsData?.positions || [],
+                positions: filteredPositions,
                 history: historyData?.activities || [],
                 user: userData
             });

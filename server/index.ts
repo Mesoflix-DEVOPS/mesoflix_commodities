@@ -308,11 +308,11 @@ app.get('/api/dashboard', authGuard, async (req: any, res) => {
             console.log(`[Diagnostic] Recalibrated Member ID: ${activeAccountId || 'NONE'}`);
 
             // 2. POSITION FILTERING (P/L Fix)
-            const filteredPositions = (positionsData?.positions || []).filter((p: any) => p.accountId === activeAccountId);
+            const filteredPositions = (positionsData?.positions || []).filter((p: any) => (p?.position?.accountId || p?.accountId) === activeAccountId);
 
             const formattedAccounts = accounts.map((a: any) => {
                 // Manually calculate P/L and Equity for the active account to ensure sync
-                const accountPnl = filteredPositions.reduce((sum: number, p: any) => sum + (p.pnl || 0), 0);
+                const accountPnl = filteredPositions.reduce((sum: number, p: any) => sum + (p?.position?.upl ?? p?.pnl ?? 0), 0);
                 return {
                     ...a,
                     isDemo, // Item 6 alignment: Explicitly flag mode from server
@@ -744,8 +744,8 @@ function startUserPoller(userId: string, io: Server) {
                     
                     const bal = accs.accounts?.find((a: any) => a.accountId === real.activeAccountId);
                     if (bal) {
-                        const filteredPoss = (positionsData?.positions || []).filter((p: any) => p.accountId === real.activeAccountId);
-                        const totalPnl = filteredPoss.reduce((s: number, p: any) => s + (p.pnl || 0), 0);
+                        const filteredPoss = (positionsData?.positions || []).filter((p: any) => (p?.position?.accountId || p?.accountId) === real.activeAccountId);
+                        const totalPnl = filteredPoss.reduce((s: number, p: any) => s + (p?.position?.upl ?? p?.pnl ?? 0), 0);
                         io.to(`user:${userId}`).emit('balance', {
                             ...bal.balance, pnl: totalPnl, profitLoss: totalPnl,
                             equity: (bal.balance?.balance || 0) + totalPnl,
@@ -765,8 +765,8 @@ function startUserPoller(userId: string, io: Server) {
                     
                     const bal = accs.accounts?.find((a: any) => a.accountId === demo.activeAccountId);
                     if (bal) {
-                        const filteredPoss = (positionsData?.positions || []).filter((p: any) => p.accountId === demo.activeAccountId);
-                        const totalPnl = filteredPoss.reduce((s: number, p: any) => s + (p.pnl || 0), 0);
+                        const filteredPoss = (positionsData?.positions || []).filter((p: any) => (p?.position?.accountId || p?.accountId) === demo.activeAccountId);
+                        const totalPnl = filteredPoss.reduce((s: number, p: any) => s + (p?.position?.upl ?? p?.pnl ?? 0), 0);
                         io.to(`user:${userId}`).emit('balance', {
                             ...bal.balance, pnl: totalPnl, profitLoss: totalPnl,
                             equity: (bal.balance?.balance || 0) + totalPnl,

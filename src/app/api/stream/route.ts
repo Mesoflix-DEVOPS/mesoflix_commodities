@@ -91,7 +91,10 @@ export async function GET(req: NextRequest) {
                     }
 
                     if (positionsData?.positions) {
-                        sendEvent('positions', positionsData.positions);
+                        const filteredPositions = positionsData.positions.filter(
+                            (p: any) => (p?.position?.accountId || p?.accountId) === currentSession.activeAccountId
+                        );
+                        sendEvent('positions', filteredPositions);
                     }
 
                 } catch (error) {

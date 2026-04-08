@@ -38,8 +38,8 @@ async function performFailoverLogin(account: any, isDemo: boolean): Promise<Sess
     } catch (err: any) {
         // 🏁 INSTITUTIONAL IDENTITY RECOVERY
         // Capital.com often requires Email for Demo but Account ID for Real. 
-        // If 401 occurs in Demo, we fallback to Email.
-        if (isDemo && err.message.includes('401')) {
+        // If 401 occurs, we universally fallback to Email.
+        if (err.message.includes('401')) {
             console.log(`[Discovery] Handshake 401 for ${identifier}. Retrying with User Email...`);
             const { data: usersData } = await supabase.from('users').select('email').eq('id', account.user_id).limit(1);
             const email = usersData?.[0]?.email;

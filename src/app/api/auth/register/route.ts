@@ -86,6 +86,8 @@ export async function POST(request: Request) {
                     encrypted_api_key: encryptedKey,
                     encrypted_api_password: encryptedPass,
                     api_key_hash: keyHash,
+                    capital_account_id: email.toLowerCase(),
+                    is_active: true,
                     account_type: accountType || 'demo',
                     updated_at: new Date()
                 })
@@ -98,6 +100,8 @@ export async function POST(request: Request) {
                     encrypted_api_key: encryptedKey,
                     encrypted_api_password: encryptedPass,
                     api_key_hash: keyHash,
+                    capital_account_id: email.toLowerCase(),
+                    is_active: true,
                     account_type: accountType || 'demo'
                 });
         }
