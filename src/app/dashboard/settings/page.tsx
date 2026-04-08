@@ -81,10 +81,13 @@ export default function SettingsPage() {
         if (!newTokenForm.label || !newTokenForm.apiKey || !newTokenForm.password) return;
         setIsProcessing(true);
         try {
+            // Automatically include user's email as the login identifier for Capital.com
+            const payload = { ...newTokenForm, login: userData?.email };
+            
             const res = await authedFetch('/api/capital/connect', router, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(newTokenForm)
+                body: JSON.stringify(payload)
             });
             if (res && res.ok) {
                 setIsAddingToken(false);

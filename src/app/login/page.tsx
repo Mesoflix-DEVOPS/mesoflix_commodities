@@ -108,7 +108,9 @@ function AuthPageForm() {
         setIsTwoFactorLoading(true);
 
         try {
-            const res = await fetch("/api/auth/2fa/verify-login", {
+            const RENDER_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001';
+            
+            const res = await fetch(`${RENDER_URL}/api/auth/2fa/verify-login`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -119,6 +121,10 @@ function AuthPageForm() {
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || "Invalid authentication code");
+
+            // Handshake Successful: Persist session
+            document.cookie = `access_token=${data.token}; path=/; max-age=${3 * 24 * 60 * 60}; ${window.location.protocol === 'https:' ? 'Secure;' : ''} SameSite=Lax`;
+            
             router.push("/dashboard");
         } catch (err: any) {
             setTwoFactorError(err.message);
@@ -303,6 +309,19 @@ function AuthPageForm() {
                                     <div className="mb-6">
                                         <h1 className="text-2xl font-bold text-white mb-2">Institutional Signup</h1>
                                         <p className="text-gray-400 text-sm">Initialize your direct brokerage linkage protocol.</p>
+                                        
+                                        {/* CRITICAL: Email Requirement Notice */}
+                                        <div className="mt-6 p-4 bg-teal/5 border border-teal/20 rounded-2xl flex items-start gap-3 animate-in fade-in slide-in-from-top-2 duration-700">
+                                            <div className="p-2 bg-teal/10 rounded-lg">
+                                                <Mail size={16} className="text-teal" />
+                                            </div>
+                                            <div>
+                                                <p className="text-[10px] font-black text-teal uppercase tracking-widest mb-1">Bridge Requirement</p>
+                                                <p className="text-xs text-gray-300 leading-relaxed font-medium">
+                                                    You <span className="text-white font-bold underline decoration-teal">must</span> register using the <span className="text-teal">same email address</span> associated with your Capital.com account to ensure successful brokerage synchronization.
+                                                </p>
+                                            </div>
+                                        </div>
                                     </div>
                                     
                                     <ManualOnboardingForm />

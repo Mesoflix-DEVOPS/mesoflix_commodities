@@ -2,6 +2,7 @@ import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import * as jose from 'jose';
+import crypto from 'crypto';
 import dotenv from 'dotenv';
 import cors from 'cors';
 import { getValidSession } from './capital-service';
@@ -169,6 +170,46 @@ app.post('/api/auth/register', async (req, res) => {
 
 // --- IDENTITY GUARD & SECURE ENGINES ---
 
+// --- SECURITY HELPERS ---
+
+function base32Decode(base32String: string): Buffer {
+    let base32 = base32String.replace(/-/g, '').toUpperCase();
+    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+    let bits = 0;
+    let value = 0;
+    const array = [];
+
+    for (let i = 0; i < base32.length; i++) {
+        const index = alphabet.indexOf(base32[i]);
+        if (index === -1) continue; 
+        value = (value << 5) | index;
+        bits += 5;
+        if (bits >= 8) {
+            array.push((value >>> (bits - 8)) & 255);
+            bits -= 8;
+        }
+    }
+    return Buffer.from(array);
+}
+
+function getTOTPForTime(secret: string, timeSeconds: number): string {
+    const key = base32Decode(secret);
+    const timeBuffer = Buffer.alloc(8);
+    let counter = Math.floor(timeSeconds / 30);
+    for (let i = 7; i >= 0; i--) {
+        timeBuffer[i] = counter & 255;
+        counter >>>= 8;
+    }
+    const hmac = crypto.createHmac('sha1', key).update(timeBuffer).digest();
+    const offset = hmac[hmac.length - 1] & 0x0f;
+    const code = ((hmac[offset] & 0x7f) << 24) |
+        ((hmac[offset + 1] & 0xff) << 16) |
+        ((hmac[offset + 2] & 0xff) << 8) |
+        (hmac[offset + 3] & 0xff);
+
+    return (code % 1000000).toString().padStart(6, '0');
+}
+
 const JWT_SECRET_STRING = process.env.JWT_SECRET;
 if (!JWT_SECRET_STRING && process.env.NODE_ENV === 'production') {
     throw new Error("FATAL: JWT_SECRET environment variable is required in production.");
@@ -199,6 +240,21 @@ app.post('/api/auth/login', async (req, res) => {
         const isPasswordValid = bcrypt.compareSync(password, user.password_hash);
         if (!isPasswordValid) return res.status(401).json({ message: 'Invalid email or password' });
 
+        // --- 2FA INTERCEPTION (Render Bridge Sync) ---
+        if (user.two_factor_enabled) {
+            const tempToken = await new jose.SignJWT({ userId: user.id })
+                .setProtectedHeader({ alg: 'HS256' })
+                .setIssuedAt()
+                .setExpirationTime('5m')
+                .sign(JWT_SECRET);
+
+            return res.json({
+                message: '2FA Verification Required',
+                requires2FA: true,
+                tempToken: tempToken
+            });
+        }
+
         const token = await new jose.SignJWT({ userId: user.id, email: user.email, role: user.role })
             .setProtectedHeader({ alg: 'HS256' })
             .setIssuedAt()
@@ -213,6 +269,89 @@ app.post('/api/auth/login', async (req, res) => {
     } catch (err: any) {
         console.error("Login Bridge Failed:", err.message);
         res.status(500).json({ error: "Institutional Login Offline" });
+    }
+});
+
+// 2FA Verification Engine (Render Bridge Sync)
+app.post('/api/auth/2fa/verify-login', async (req, res) => {
+    try {
+        const { tempToken, code, isRecoveryMode } = req.body;
+
+        if (!tempToken || !code) {
+            return res.status(400).json({ error: 'Missing token or verification code' });
+        }
+
+        let payload;
+        try {
+            const verified = await jose.jwtVerify(tempToken, JWT_SECRET);
+            payload = verified.payload;
+        } catch (e) {
+            return res.status(401).json({ error: 'Session expired. Please log in again.' });
+        }
+
+        const userId = payload.userId as string;
+
+        const { data: user, error: userError } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', userId)
+            .single();
+
+        if (userError || !user) {
+            return res.status(400).json({ error: 'Security Context Missing' });
+        }
+
+        let isVerified = false;
+
+        if (isRecoveryMode) {
+            const cleanCode = code.toUpperCase().trim();
+            const inputHash = crypto.createHash('sha256').update(cleanCode).digest('hex');
+
+            const { data: rc } = await supabase
+                .from('recovery_codes')
+                .select('*')
+                .eq('user_id', userId)
+                .eq('code_hash', inputHash)
+                .eq('used', false)
+                .single();
+
+            if (rc) {
+                isVerified = true;
+                await supabase.from('recovery_codes').update({ used: true }).eq('id', rc.id);
+            }
+        } else {
+            const cleanCode = code.replace(/\s/g, '');
+            const currentTime = Math.floor(Date.now() / 1000);
+
+            const validCodes = [
+                getTOTPForTime(user.two_factor_secret!, currentTime - 30),
+                getTOTPForTime(user.two_factor_secret!, currentTime),
+                getTOTPForTime(user.two_factor_secret!, currentTime + 30)
+            ];
+
+            isVerified = validCodes.includes(cleanCode);
+        }
+
+        if (!isVerified) {
+            return res.status(401).json({ error: 'Invalid authentication code' });
+        }
+
+        // Issue Final Access Token
+        const token = await new jose.SignJWT({ userId: user.id, email: user.email, role: user.role })
+            .setProtectedHeader({ alg: 'HS256' })
+            .setIssuedAt()
+            .setExpirationTime('3d')
+            .sign(JWT_SECRET);
+
+        res.json({
+            message: 'Login successful via 2FA',
+            token,
+            redirectUrl: '/dashboard',
+        });
+
+    } catch (error: any) {
+        console.error('Bridge 2FA Verify Error:', error.message);
+        res.status(500).json({ error: 'Security Bridge Offline' });
     }
 });
 
@@ -250,7 +389,8 @@ app.get('/api/user', authGuard, async (req: any, res) => {
                 email: user.email, 
                 fullName: user.full_name, 
                 full_name: user.full_name, // Dual-compat
-                role: user.role 
+                role: user.role,
+                two_factor_enabled: !!user.two_factor_enabled
             } 
         });
     } catch (err: any) {
