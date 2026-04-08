@@ -341,30 +341,26 @@ export default function SettingsPage() {
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                                         <InputGroup
                                             label="Identifier Label"
-                                            placeholder="e.g., Main EUR, SubAccount 2"
+                                            placeholder="e.g., Main Account, SubAccount 1"
                                             value={newTokenForm.label}
                                             onChange={(e: any) => setNewTokenForm({ ...newTokenForm, label: e.target.value })}
                                         />
                                         <InputGroup
-                                            label="Capital Login (Email) - Optional"
-                                            placeholder="investor@domain.com"
-                                            value={newTokenForm.login}
-                                            onChange={(e: any) => setNewTokenForm({ ...newTokenForm, login: e.target.value })}
-                                        />
-                                        <InputGroup
-                                            label="Capital API Key"
+                                            label="API Password"
                                             type="password"
-                                            placeholder="Paste API Key String"
-                                            value={newTokenForm.apiKey}
-                                            onChange={(e: any) => setNewTokenForm({ ...newTokenForm, apiKey: e.target.value })}
-                                        />
-                                        <InputGroup
-                                            label="Capital Password"
-                                            type="password"
-                                            placeholder="Account Password"
+                                            placeholder="Your Capital.com Password"
                                             value={newTokenForm.password}
                                             onChange={(e: any) => setNewTokenForm({ ...newTokenForm, password: e.target.value })}
                                         />
+                                        <div className="md:col-span-2">
+                                            <InputGroup
+                                                label="API Key"
+                                                type="password"
+                                                placeholder="Paste your API Key here"
+                                                value={newTokenForm.apiKey}
+                                                onChange={(e: any) => setNewTokenForm({ ...newTokenForm, apiKey: e.target.value })}
+                                            />
+                                        </div>
                                     </div>
 
                                     <div className="flex justify-end gap-3 pt-6 border-t border-white/5">

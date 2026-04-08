@@ -52,13 +52,13 @@ const MarketDataContext = createContext<MarketDataContextType>({
 export const useMarketData = () => useContext(MarketDataContext);
 
 function parseBalance(data: any): BalanceData | null {
-    if (!data) return null;
+    if (!data || data.balance === undefined || data.balance === null) return null;
     return {
-        balance: Number(data.balance ?? 0),
+        balance: Number(data.balance),
         deposit: Number(data.deposit ?? 0),
         profitLoss: Number(data.profitLoss ?? 0),
         availableToWithdraw: Number(data.available ?? data.availableToWithdraw ?? 0),
-        equity: Number(data.equity ?? ((data.balance ?? 0) + (data.profitLoss ?? 0))),
+        equity: Number(data.equity ?? (Number(data.balance) + Number(data.profitLoss ?? 0))),
         currency: data.currency || 'USD',
         accountId: data.accountId,
         accountName: data.accountName,

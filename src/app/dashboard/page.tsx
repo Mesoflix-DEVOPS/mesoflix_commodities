@@ -58,8 +58,8 @@ function DashboardPageInner() {
     const [closingTrade, setClosingTrade] = useState(false);
     const bulkMenuRef = useRef<HTMLDivElement>(null);
 
-    const fetchData = useCallback((isSilent = false) => {
-        if (!isSilent) setLoading(true);
+    const fetchData = useCallback((isSilent = true) => {
+        if (!isSilent && !data) setLoading(true); // Only show spinner if we have no data yet
         
         authedFetch(`/api/dashboard?mode=${mode}`, router)
             .then(async (res) => {
@@ -70,9 +70,9 @@ function DashboardPageInner() {
             })
             .catch((err: any) => console.error('[Dashboard Bridge] Fetch error:', err))
             .finally(() => {
-                if (!isSilent) setLoading(false);
+                setLoading(false);
             });
-    }, [mode, router]);
+    }, [mode, router, data]);
 
     useEffect(() => {
         fetchData();
@@ -80,25 +80,34 @@ function DashboardPageInner() {
 
     // Update liveHistory when positions change via Socket.io context
     useEffect(() => {
-        // If livePositions is null (not yet loaded), do nothing to avoid clearing fetched data
-        if (livePositions === null) return;
+        // Guard: Avoid clearing or ticking zero during loading/sync
+        if (!livePositions || livePositions.length === 0) return;
 
         setData((prev: any) => ({
             ...prev,
             positions: livePositions
         }));
 
-        if (livePositions.length === 0) return;
-
         const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
         const tickData: any = { name: now };
+        let hasPayload = false;
+
         livePositions.forEach((p: any) => {
             const epic = p.market?.instrumentName || p.position?.epic || 'Unknown';
-            const upl = p.position?.upl ?? 0;
-            tickData[epic] = parseFloat(Number(upl).toFixed(2));
+            const upl = p.position?.upl;
+            if (upl !== undefined && upl !== null) {
+                tickData[epic] = parseFloat(Number(upl).toFixed(2));
+                hasPayload = true;
+            }
         });
 
+        if (!hasPayload) return;
+
         setLiveHistory(prev => {
+            // Stability Check: Only tick if values have actually changed or timestamp is fresh
+            const lastEntry = prev[prev.length - 1];
+            if (lastEntry && lastEntry.name === now) return prev; 
+            
             const newHistory = [...prev, tickData];
             return newHistory.slice(-50); // Keep last 50 data points
         });

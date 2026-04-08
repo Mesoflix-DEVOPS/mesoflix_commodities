@@ -84,8 +84,15 @@ function AuthPageForm() {
                 throw new Error(data.message || "Institutional Authentication Failed");
             }
 
-            // Manually set initial session cookie for the bridge (Unlocked)
-            document.cookie = `access_token=${data.token}; path=/; max-age=${3 * 24 * 60 * 60}; ${window.location.protocol === 'https:' ? 'Secure;' : ''} SameSite=Lax`;
+            // --- 2FA Challenge Interception ---
+            if (data.requires2FA) {
+                setTempToken(data.tempToken);
+                setRequire2FA(true);
+                return;
+            }
+
+            // Standard Login Handshake
+            document.cookie = `access_token=${data.token || data.accessToken}; path=/; max-age=${3 * 24 * 60 * 60}; ${window.location.protocol === 'https:' ? 'Secure;' : ''} SameSite=Lax`;
 
             router.push("/dashboard");
         } catch (err: any) {
