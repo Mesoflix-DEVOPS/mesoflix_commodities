@@ -375,18 +375,46 @@ export default function AdminCampaignDashboard() {
                                 />
                             </div>
 
-                            {/* Resource Input Mocks */}
+                            {/* Resource Input Section */}
                             <div className="space-y-4 pt-4 border-t border-white/5">
-                                <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Global Marketing Assets</p>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <button className="flex flex-col items-center justify-center gap-3 p-8 border-2 border-dashed border-white/5 rounded-3xl hover:border-teal/30 hover:bg-teal/5 transition-all group">
-                                        <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-gray-500 group-hover:text-teal group-hover:bg-teal/10 transition-all"><ImageIcon size={20} /></div>
-                                        <span className="text-[10px] font-black text-gray-600 uppercase tracking-widest">Image Visuals</span>
-                                    </button>
-                                    <button className="flex flex-col items-center justify-center gap-3 p-8 border-2 border-dashed border-white/5 rounded-3xl hover:border-red-500/30 hover:bg-red-500/5 transition-all group">
-                                        <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-gray-500 group-hover:text-red-500 group-hover:bg-red-500/10 transition-all"><Video size={20} /></div>
-                                        <span className="text-[10px] font-black text-gray-600 uppercase tracking-widest">Video Creatives</span>
-                                    </button>
+                                <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Strategic Asset Distribution</p>
+                                
+                                <div className="space-y-4">
+                                    <div className="space-y-2">
+                                        <label className="text-[9px] font-black text-gray-600 uppercase tracking-widest px-1">Visual Asset URLs (Comma separated)</label>
+                                        <input 
+                                            type="text" 
+                                            placeholder="https://image1.jpg, https://image2.jpg"
+                                            onChange={(e) => setNewCampaign({
+                                                ...newCampaign, 
+                                                resources: { ...newCampaign.resources, images: e.target.value.split(',').map(s => s.trim()).filter(s => s) }
+                                            })}
+                                            className="w-full bg-[#162B40]/50 border border-white/5 rounded-xl p-3 text-sm text-white outline-none focus:border-teal/30 transition-all" 
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-[9px] font-black text-gray-600 uppercase tracking-widest px-1">Video Creative URLs (Comma separated)</label>
+                                        <input 
+                                            type="text" 
+                                            placeholder="https://video1.mp4"
+                                            onChange={(e) => setNewCampaign({
+                                                ...newCampaign, 
+                                                resources: { ...newCampaign.resources, videos: e.target.value.split(',').map(s => s.trim()).filter(s => s) }
+                                            })}
+                                            className="w-full bg-[#162B40]/50 border border-white/5 rounded-xl p-3 text-sm text-white outline-none focus:border-teal/30 transition-all" 
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-[9px] font-black text-gray-600 uppercase tracking-widest px-1">Ad Copy Templates (One per line)</label>
+                                        <textarea 
+                                            placeholder="Get started with Mesoflix today!&#10;Join the commodity revolution..."
+                                            onChange={(e) => setNewCampaign({
+                                                ...newCampaign, 
+                                                resources: { ...newCampaign.resources, copy: e.target.value.split('\n').map(s => s.trim()).filter(s => s) }
+                                            })}
+                                            className="w-full bg-[#162B40]/50 border border-white/5 rounded-xl p-3 text-sm text-white outline-none focus:border-teal/30 transition-all min-h-[100px]" 
+                                        />
+                                    </div>
                                 </div>
                             </div>
                         </div>
