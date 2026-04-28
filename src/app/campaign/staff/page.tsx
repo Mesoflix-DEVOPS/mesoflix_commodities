@@ -13,7 +13,9 @@ import {
     Zap,
     Loader2,
     CheckCircle2,
-    AlertCircle
+    AlertCircle,
+    Eye,
+    EyeOff
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
@@ -24,6 +26,7 @@ export default function StaffAuthPortal() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
     const router = useRouter();
 
     const [formData, setFormData] = useState({
@@ -190,13 +193,20 @@ export default function StaffAuthPortal() {
                                         <div className="relative group">
                                             <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-teal transition-colors" size={18} />
                                             <input 
-                                                type="password" 
+                                                type={showPassword ? "text" : "password"} 
                                                 required
                                                 value={formData.password}
                                                 onChange={e => setFormData({...formData, password: e.target.value})}
                                                 placeholder="Secret Key" 
-                                                className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-12 pr-4 text-white focus:outline-none focus:border-teal/50 transition-all focus:bg-white/[0.08]"
+                                                className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-12 pr-12 text-white focus:outline-none focus:border-teal/50 transition-all focus:bg-white/[0.08]"
                                             />
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowPassword(!showPassword)}
+                                                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors"
+                                            >
+                                                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                            </button>
                                         </div>
                                     </div>
 
