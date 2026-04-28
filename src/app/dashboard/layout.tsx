@@ -57,6 +57,7 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
                 isCollapsed={isCollapsed}
                 setCollapsed={setCollapsed}
                 isMobileOpen={isMobileOpen}
+                role={userData?.role}
                 onCloseMobile={() => setMobileOpen(false)}
             />
 

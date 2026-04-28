@@ -270,3 +270,44 @@ export const userNotes = pgTable('user_notes', {
     content: text('content').notNull(),
     updated_at: timestamp('updated_at').defaultNow(),
 });
+
+// Advertising Campaigns Table
+export const campaigns = pgTable('campaigns', {
+    id: uuid('id').defaultRandom().primaryKey(),
+    name: text('name').notNull(),
+    description: text('description').notNull(),
+    landing_page_url: text('landing_page_url').notNull().default('/register'),
+    resources: text('resources'), // JSON string: { images: string[], videos: string[], copy: string[] }
+    is_active: boolean('is_active').default(true),
+    created_at: timestamp('created_at').defaultNow(),
+    updated_at: timestamp('updated_at').defaultNow(),
+});
+
+// Campaign Staff Assignments
+export const campaignAssignments = pgTable('campaign_assignments', {
+    id: uuid('id').defaultRandom().primaryKey(),
+    campaign_id: uuid('campaign_id').references(() => campaigns.id, { onDelete: 'cascade' }).notNull(),
+    staff_id: uuid('staff_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+    unique_code: text('unique_code').unique().notNull(),
+    short_url: text('short_url'),
+    status: text('status').default('active'), // 'active', 'paused', 'terminated'
+    created_at: timestamp('created_at').defaultNow(),
+    updated_at: timestamp('updated_at').defaultNow(),
+}, (table) => ({
+    campaignIdIdx: index('campaign_assignments_campaign_id_idx').on(table.campaign_id),
+    staffIdIdx: index('campaign_assignments_staff_id_idx').on(table.staff_id),
+}));
+
+// Campaign Performance Analytics
+export const campaignAnalytics = pgTable('campaign_analytics', {
+    id: uuid('id').defaultRandom().primaryKey(),
+    assignment_id: uuid('assignment_id').references(() => campaignAssignments.id, { onDelete: 'cascade' }).notNull(),
+    event_type: text('event_type').notNull(), // 'CLICK', 'LEAD', 'CONVERSION'
+    user_id: uuid('user_id').references(() => users.id, { onDelete: 'set null' }), // If event is a registration/conversion
+    ip_address: text('ip_address'),
+    user_agent: text('user_agent'),
+    metadata: text('metadata'), // JSON string for extra data like device type, country, etc.
+    created_at: timestamp('created_at').defaultNow(),
+}, (table) => ({
+    assignmentIdIdx: index('campaign_analytics_assignment_id_idx').on(table.assignment_id),
+}));

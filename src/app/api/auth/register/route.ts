@@ -1,4 +1,7 @@
 import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
+import { db } from '@/lib/db';
+import { campaignAnalytics } from '@/lib/db/schema';
 import { createClient } from '@supabase/supabase-js';
 import { hashPassword, encrypt } from '@/lib/crypto';
 import { signAccessToken, generateRefreshToken, setAuthCookies } from '@/lib/auth';
@@ -130,6 +133,23 @@ export async function POST(request: Request) {
         });
 
         await setAuthCookies(accessToken, refreshToken);
+
+        // 5. Campaign Tracking: Record LEAD if assignment cookie exists
+        try {
+            const cookieStore = await cookies();
+            const assignmentId = cookieStore.get('campaign_assignment_id')?.value;
+            if (assignmentId) {
+                // Record the lead
+                await db.insert(campaignAnalytics).values({
+                    assignment_id: assignmentId,
+                    event_type: 'LEAD',
+                    user_id: user.id,
+                    metadata: JSON.stringify({ source: 'registration' })
+                });
+            }
+        } catch (e) {
+            console.error('[Registration] Failed to record lead analytics:', e);
+        }
 
         return NextResponse.json({
             message: 'Registration successful',

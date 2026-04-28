@@ -21,7 +21,9 @@ import {
     ExternalLink,
     Wallet,
     BookOpen,
-    Calendar as CalendarIcon
+    Calendar as CalendarIcon,
+    Megaphone,
+    ShieldAlert
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -49,11 +51,23 @@ interface SidebarProps {
     isCollapsed: boolean;
     setCollapsed: (val: boolean) => void;
     isMobileOpen: boolean;
+    role?: string;
     onCloseMobile?: () => void;
 }
 
-export default function Sidebar({ isCollapsed, setCollapsed, isMobileOpen, onCloseMobile }: SidebarProps) {
+export default function Sidebar({ isCollapsed, setCollapsed, isMobileOpen, role, onCloseMobile }: SidebarProps) {
     const pathname = usePathname();
+
+    const dynamicMenuGroups = [
+        ...menuGroups,
+        {
+            label: "Campaigns",
+            items: [
+                { name: "Campaign Hub", icon: Megaphone, href: "/dashboard/campaigns" },
+                ...(role === 'admin' ? [{ name: "Campaign Command", icon: ShieldAlert, href: "/dashboard/admin/campaigns" }] : []),
+            ]
+        }
+    ];
 
     return (
         <aside
@@ -77,7 +91,7 @@ export default function Sidebar({ isCollapsed, setCollapsed, isMobileOpen, onClo
 
             {/* Navigation */}
             <div className="flex-1 overflow-y-auto py-6 px-4 space-y-8 scrollbar-hide">
-                {menuGroups.map((group, idx) => (
+                {dynamicMenuGroups.map((group, idx) => (
                     <div key={idx} className="space-y-2">
                         {!isCollapsed && (
                             <p className="px-2 text-[10px] font-bold text-gray-500 uppercase tracking-[0.2em] mb-4">
