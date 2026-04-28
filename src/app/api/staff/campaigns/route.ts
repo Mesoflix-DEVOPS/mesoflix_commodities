@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { campaignAssignments, campaigns, campaignAnalytics } from '@/lib/db/schema';
 import { auth } from '@/lib/auth';
-import { eq, count, sql } from 'drizzle-orm';
+import { eq, count, and } from 'drizzle-orm';
 
 export async function GET(req: NextRequest) {
     try {
@@ -10,6 +10,8 @@ export async function GET(req: NextRequest) {
         if (!session) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
+
+        const userId = session.user.id;
 
         const myAssignments = await db.select({
             id: campaignAssignments.id,
@@ -24,22 +26,31 @@ export async function GET(req: NextRequest) {
         })
         .from(campaignAssignments)
         .innerJoin(campaigns, eq(campaignAssignments.campaign_id, campaigns.id))
-        .where(eq(campaignAssignments.staff_id, session.user.id));
+        .where(eq(campaignAssignments.staff_id, userId));
 
         // Let's also attach some quick stats to each assignment
         const stats = await Promise.all(myAssignments.map(async (asgn) => {
-            const [clicks] = await db.select({ value: count() })
+            const clicksRes = await db.select({ value: count() })
                 .from(campaignAnalytics)
-                .where(eq(campaignAnalytics.assignment_id, asgn.id));
+                .where(and(
+                    eq(campaignAnalytics.assignment_id, asgn.id), 
+                    eq(campaignAnalytics.event_type, 'CLICK')
+                ));
             
-            const [leads] = await db.select({ value: count() })
+            const leadsRes = await db.select({ value: count() })
                 .from(campaignAnalytics)
-                .where(sql`${campaignAnalytics.assignment_id} = ${asgn.id} AND ${campaignAnalytics.event_type} = 'LEAD'`);
+                .where(and(
+                    eq(campaignAnalytics.assignment_id, asgn.id), 
+                    eq(campaignAnalytics.event_type, 'LEAD')
+                ));
+
+            const clicksCount = clicksRes[0]?.value || 0;
+            const leadsCount = leadsRes[0]?.value || 0;
 
             return {
                 ...asgn,
-                clicks: clicks.value,
-                leads: leads.value,
+                clicks: Number(clicksCount),
+                leads: Number(leadsCount),
             };
         }));
 

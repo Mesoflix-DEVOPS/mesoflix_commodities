@@ -17,17 +17,32 @@ const JWT_SECRET = new TextEncoder().encode(
 export async function GET() {
     try {
         const cookieStore = await cookies();
-        const token = cookieStore.get('agent_session')?.value;
+        let userId: string | null = null;
+        let userRole: string | null = null;
 
-        if (!token) return NextResponse.json({ error: "Unauthorized access" }, { status: 401 });
-
-        try {
-            const { payload } = await jose.jwtVerify(token, JWT_SECRET);
-            if (!payload.sub || (payload.role !== 'admin' && payload.role !== 'staff' && payload.role !== 'agent')) {
-                 return NextResponse.json({ error: "Access Denied: Insufficient Role" }, { status: 403 });
+        // Try standard auth first
+        const { auth } = await import('@/lib/auth');
+        const session = await auth();
+        
+        if (session) {
+            userId = session.user.id;
+            userRole = session.user.role;
+        } else {
+            // Fallback to agent_session
+            const token = cookieStore.get('agent_session')?.value;
+            if (token) {
+                try {
+                    const { payload } = await jose.jwtVerify(token, JWT_SECRET);
+                    userId = payload.sub as string;
+                    userRole = payload.role as string;
+                } catch (e) {
+                    return NextResponse.json({ error: "Invalid agent session" }, { status: 401 });
+                }
             }
-        } catch (e) {
-            return NextResponse.json({ error: "Invalid or expired agent session" }, { status: 401 });
+        }
+
+        if (!userId || !['admin', 'staff', 'agent'].includes(userRole || '')) {
+            return NextResponse.json({ error: "Access Denied: Specialized Access Required" }, { status: 403 });
         }
         // Institutional Bridge: Fetch all users via stable SDK
         const { data: allUsers, error } = await supabase
