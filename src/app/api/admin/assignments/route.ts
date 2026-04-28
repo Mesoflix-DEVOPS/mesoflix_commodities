@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { campaignAssignments, users, campaigns } from '@/lib/db/schema';
+import { campaignAssignments, users, campaigns, campaignAnalytics } from '@/lib/db/schema';
 import { auth } from '@/lib/auth';
-import { eq, and, desc } from 'drizzle-orm';
+import { eq, and, desc, sql, count } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 
 export async function GET(req: NextRequest) {
@@ -23,6 +23,8 @@ export async function GET(req: NextRequest) {
             staff_email: users.email,
             staff_name: users.full_name,
             campaign_name: campaigns.name,
+            clicks: sql<number>`(SELECT count(*) FROM ${campaignAnalytics} WHERE ${campaignAnalytics.assignment_id} = ${campaignAssignments.id} AND ${campaignAnalytics.event_type} = 'CLICK')`,
+            leads: sql<number>`(SELECT count(*) FROM ${campaignAnalytics} WHERE ${campaignAnalytics.assignment_id} = ${campaignAssignments.id} AND ${campaignAnalytics.event_type} = 'LEAD')`,
         })
         .from(campaignAssignments)
         .leftJoin(users, eq(campaignAssignments.staff_id, users.id))
