@@ -23,16 +23,18 @@ export async function POST(request: Request) {
 
         const isDemo = accountType === 'demo';
 
-        if (!email || !apiKey || !apiPassword) {
+        if (!email || !password) {
             return NextResponse.json({ message: 'Missing required credentials' }, { status: 400 });
         }
 
-        // 1. Institutional Validation: Attempt to create a session before recording in DB
-        try {
-            await createSession(email, apiPassword, apiKey, isDemo);
-        } catch (err: any) {
-            console.error(`[Register] Capital.com Validation Failure:`, err.message);
-            return NextResponse.json({ message: `Brokerage validation failed: ${err.message}` }, { status: 401 });
+        // 1. Institutional Validation: ONLY if brokerage credentials are provided
+        if (apiKey && apiPassword) {
+            try {
+                await createSession(email, apiPassword, apiKey, isDemo);
+            } catch (err: any) {
+                console.error(`[Register] Capital.com Validation Failure:`, err.message);
+                return NextResponse.json({ message: `Brokerage validation failed: ${err.message}` }, { status: 401 });
+            }
         }
 
         // 2. Identity Sync via stable SDK
@@ -76,44 +78,46 @@ export async function POST(request: Request) {
         if (!user) throw new Error("Identity Persistence Failure");
 
         // 3. Credentials Encryption & account linking via stable SDK
-        const { hashApiKey } = await import('@/lib/crypto');
-        const keyHash = hashApiKey(apiKey);
-        const encryptedKey = encrypt(apiKey);
-        const encryptedPass = encrypt(apiPassword);
+        if (apiKey && apiPassword) {
+            const { hashApiKey } = await import('@/lib/crypto');
+            const keyHash = hashApiKey(apiKey);
+            const encryptedKey = encrypt(apiKey);
+            const encryptedPass = encrypt(apiPassword);
 
-        const { data: existingAccounts } = await supabase
-            .from('capital_accounts')
-            .select('id')
-            .eq('user_id', user.id)
-            .limit(1);
-        
-        const existingAccount = existingAccounts?.[0];
+            const { data: existingAccounts } = await supabase
+                .from('capital_accounts')
+                .select('id')
+                .eq('user_id', user.id)
+                .limit(1);
+            
+            const existingAccount = existingAccounts?.[0];
 
-        if (existingAccount) {
-            await supabase
-                .from('capital_accounts')
-                .update({
-                    encrypted_api_key: encryptedKey,
-                    encrypted_api_password: encryptedPass,
-                    api_key_hash: keyHash,
-                    capital_account_id: email.toLowerCase(),
-                    is_active: true,
-                    account_type: accountType || 'demo',
-                    updated_at: new Date()
-                })
-                .eq('id', existingAccount.id);
-        } else {
-            await supabase
-                .from('capital_accounts')
-                .insert({
-                    user_id: user.id,
-                    encrypted_api_key: encryptedKey,
-                    encrypted_api_password: encryptedPass,
-                    api_key_hash: keyHash,
-                    capital_account_id: email.toLowerCase(),
-                    is_active: true,
-                    account_type: accountType || 'demo'
-                });
+            if (existingAccount) {
+                await supabase
+                    .from('capital_accounts')
+                    .update({
+                        encrypted_api_key: encryptedKey,
+                        encrypted_api_password: encryptedPass,
+                        api_key_hash: keyHash,
+                        capital_account_id: email.toLowerCase(),
+                        is_active: true,
+                        account_type: accountType || 'demo',
+                        updated_at: new Date()
+                    })
+                    .eq('id', existingAccount.id);
+            } else {
+                await supabase
+                    .from('capital_accounts')
+                    .insert({
+                        user_id: user.id,
+                        encrypted_api_key: encryptedKey,
+                        encrypted_api_password: encryptedPass,
+                        api_key_hash: keyHash,
+                        capital_account_id: email.toLowerCase(),
+                        is_active: true,
+                        account_type: accountType || 'demo'
+                    });
+            }
         }
 
         // 4. Session & Cleanup
