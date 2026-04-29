@@ -14,8 +14,8 @@ export async function GET() {
         }
 
         // Failsafe Role Sync
-        const result = await db.execute(sql`SELECT role FROM users WHERE id = ${session.user.id} LIMIT 1`);
-        const user = result.rows[0] as any;
+        const result = await pool.query('SELECT role FROM users WHERE id = $1 LIMIT 1', [session.user.id]);
+        const user = result.rows[0];
 
         return NextResponse.json({
             user: {

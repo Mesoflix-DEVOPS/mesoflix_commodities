@@ -15,15 +15,14 @@ export async function POST(request: Request) {
             return NextResponse.json({ message: 'Email and password are required' }, { status: 400 });
         }
 
-        // 1. Find User (Direct SQL Failsafe)
-        const result = await db.execute(sql`
-            SELECT id, email, password_hash, role, token_version, full_name, two_factor_enabled 
-            FROM users 
-            WHERE email = ${email.toLowerCase()} 
-            LIMIT 1
-        `);
+        // 1. Find User (Native Driver Failsafe)
+        // Using direct driver to bypass ORM-level parameter issues
+        const result = await pool.query(
+            'SELECT id, email, password_hash, role, token_version, full_name, two_factor_enabled FROM users WHERE email = $1 LIMIT 1', 
+            [email.toLowerCase()]
+        );
         
-        const user = result.rows[0] as any;
+        const user = result.rows[0];
 
         if (!user || !user.password_hash) {
             return NextResponse.json({ message: 'Invalid email or password' }, { status: 401 });

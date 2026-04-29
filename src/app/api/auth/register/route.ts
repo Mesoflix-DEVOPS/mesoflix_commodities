@@ -33,15 +33,13 @@ export async function POST(request: Request) {
         }
 
         console.log(`[Register] Identity Sync for ${email}...`);
-        // 2. Identity Sync (Direct SQL Failsafe)
-        const checkResult = await db.execute(sql`
-            SELECT id, email, role 
-            FROM users 
-            WHERE email = ${email.toLowerCase()} 
-            LIMIT 1
-        `);
+        // 2. Identity Sync (Native Driver Failsafe)
+        const checkResult = await pool.query(
+            'SELECT id, email, role FROM users WHERE email = $1 LIMIT 1',
+            [email.toLowerCase()]
+        );
         
-        const existingUser = checkResult.rows[0] as any;
+        const existingUser = checkResult.rows[0];
 
         const passwordHash = await hashPassword(password);
         let user;
