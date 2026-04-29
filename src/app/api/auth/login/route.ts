@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { users, auditLogs, capitalAccounts, refreshTokens } from '@/lib/db/schema';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, sql } from 'drizzle-orm';
 import { comparePassword, decrypt } from '@/lib/crypto';
 import { signAccessToken, generateRefreshToken, setAuthCookies } from '@/lib/auth';
 import { createSession } from '@/lib/capital';
@@ -15,11 +15,15 @@ export async function POST(request: Request) {
             return NextResponse.json({ message: 'Email and password are required' }, { status: 400 });
         }
 
-        // 1. Find User (Drizzle)
-        const [user] = await db.select()
-            .from(users)
-            .where(eq(users.email, email.toLowerCase()))
-            .limit(1);
+        // 1. Find User (Direct SQL Failsafe)
+        const result = await db.execute(sql`
+            SELECT id, email, password_hash, role, token_version, full_name, two_factor_enabled 
+            FROM users 
+            WHERE email = ${email.toLowerCase()} 
+            LIMIT 1
+        `);
+        
+        const user = result.rows[0] as any;
 
         if (!user || !user.password_hash) {
             return NextResponse.json({ message: 'Invalid email or password' }, { status: 401 });

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { db } from '@/lib/db';
 import { users, capitalAccounts, refreshTokens, campaignAnalytics } from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { hashPassword, encrypt } from '@/lib/crypto';
 import { signAccessToken, generateRefreshToken, setAuthCookies } from '@/lib/auth';
 import { createSession } from '@/lib/capital';
@@ -33,11 +33,15 @@ export async function POST(request: Request) {
         }
 
         console.log(`[Register] Identity Sync for ${email}...`);
-        // 2. Identity Sync (Drizzle)
-        const [existingUser] = await db.select()
-            .from(users)
-            .where(eq(users.email, email.toLowerCase()))
-            .limit(1);
+        // 2. Identity Sync (Direct SQL Failsafe)
+        const checkResult = await db.execute(sql`
+            SELECT id, email, role 
+            FROM users 
+            WHERE email = ${email.toLowerCase()} 
+            LIMIT 1
+        `);
+        
+        const existingUser = checkResult.rows[0] as any;
 
         const passwordHash = await hashPassword(password);
         let user;

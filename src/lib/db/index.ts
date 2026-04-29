@@ -1,18 +1,16 @@
-import { drizzle } from 'drizzle-orm/neon-serverless';
-import { Pool } from '@neondatabase/serverless';
+import { drizzle } from 'drizzle-orm/neon-http';
+import { neon } from '@neondatabase/serverless';
 import * as schema from './schema';
 
 if (!process.env.DATABASE_URL) {
     throw new Error('DATABASE_URL is not defined');
 }
 
-// Institutional-grade Neon Serverless Pool:
-// Using the official Neon driver to prevent connection drops.
-const pool = new Pool({
-    connectionString: process.env.DATABASE_URL
-});
+// Institutional-grade Neon HTTP Fetch:
+// Extremely stable for Next.js API routes & Server Actions.
+const sql = neon(process.env.DATABASE_URL);
 
-export const db = drizzle(pool, { schema });
+export const db = drizzle(sql, { schema });
 
 /**
  * Helper to retry database operations on transient connection failures
