@@ -1,22 +1,15 @@
-import { drizzle } from 'drizzle-orm/node-postgres';
-import { Pool } from 'pg';
+import { drizzle } from 'drizzle-orm/neon-serverless';
+import { Pool } from '@neondatabase/serverless';
 import * as schema from './schema';
 
 if (!process.env.DATABASE_URL) {
     throw new Error('DATABASE_URL is not defined');
 }
 
-// Institutional-grade Connection Pool:
-// We use the Node-Postgres pool to handle concurrent dashboard queries.
-// For Supabase, ensure the DATABASE_URL uses Port 6543 (Transaction Pooler).
+// Institutional-grade Neon Serverless Pool:
+// Using the official Neon driver to prevent connection drops.
 const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    max: 20,
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 5000, // Increased timeout
-    ssl: {
-        rejectUnauthorized: false
-    }
+    connectionString: process.env.DATABASE_URL
 });
 
 export const db = drizzle(pool, { schema });
