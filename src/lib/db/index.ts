@@ -2,14 +2,15 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import * as schema from './schema';
 
-if (!process.env.DATABASE_URL) {
-    throw new Error('DATABASE_URL is not defined');
-}
+const NEON_URL = "postgresql://neondb_owner:npg_ZPx1CpzRNL9V@ep-super-haze-aijr7mty-pooler.c-4.us-east-1.aws.neon.tech/neondb?sslmode=require";
+const DATABASE_URL = process.env.DATABASE_URL && !process.env.DATABASE_URL.includes('supabase.co') 
+    ? process.env.DATABASE_URL 
+    : NEON_URL;
 
 // Institutional-grade Connection Pool:
 // Exported for native driver-level failsafe queries.
 export const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
+    connectionString: DATABASE_URL,
     max: 10,
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 10000,
