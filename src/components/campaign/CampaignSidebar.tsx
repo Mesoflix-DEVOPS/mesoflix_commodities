@@ -16,7 +16,7 @@ import {
     Activity,
     ShieldCheck
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 const campaignMenu = [
     { name: "Overview", icon: LayoutDashboard, href: "/campaign/dashboard" },
@@ -29,6 +29,22 @@ export default function CampaignSidebar() {
     const pathname = usePathname();
     const router = useRouter();
     const [isCollapsed, setIsCollapsed] = useState(false);
+    const [isAdmin, setIsAdmin] = useState(false);
+
+    useEffect(() => {
+        const checkAuth = async () => {
+            try {
+                const res = await fetch("/api/auth/me");
+                if (res.ok) {
+                    const data = await res.json();
+                    setIsAdmin(data.user.role === 'admin');
+                }
+            } catch (err) {
+                console.error("Auth check failed", err);
+            }
+        };
+        checkAuth();
+    }, []);
 
     const handleLogout = async () => {
         await fetch("/api/auth/logout", { method: "POST" });
@@ -74,6 +90,22 @@ export default function CampaignSidebar() {
                         </Link>
                     );
                 })}
+
+                {/* Admin Link for Authorized Personnel */}
+                {isAdmin && (
+                    <Link
+                        href="/campaign/staff/admin"
+                        className={cn(
+                            "flex items-center gap-3 px-4 py-3.5 rounded-2xl transition-all duration-300 group border border-teal/20 mt-8",
+                            pathname.includes("/admin") 
+                                ? "bg-teal text-dark-blue shadow-[0_0_20px_rgba(0,191,166,0.3)]" 
+                                : "text-teal hover:bg-teal/10"
+                        )}
+                    >
+                        <ShieldCheck size={20} className="shrink-0" />
+                        {!isCollapsed && <span className="font-black text-xs uppercase tracking-widest">Admin Command</span>}
+                    </Link>
+                )}
             </nav>
 
             {/* Footer Tools */}
