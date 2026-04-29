@@ -1,13 +1,13 @@
 import { db } from '../src/lib/db';
-import { users } from '../src/lib/db/schema';
+import { sql } from 'drizzle-orm';
 
 async function listUsers() {
     try {
         console.log("Listing users...");
-        const allUsers = await db.select().from(users);
-        console.log("Users:", allUsers.map(u => ({ id: u.id, email: u.email, role: u.role })));
+        const result = await db.execute(sql`SELECT id, email, role FROM users`);
+        console.log("Users:", result.rows);
     } catch (err: any) {
-        console.error("User List Failure:", err.message);
+        console.error("User List Failure:", err);
     }
 }
 

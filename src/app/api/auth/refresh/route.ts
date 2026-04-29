@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { db } from '@/lib/db';
+import { users, refreshTokens } from '@/lib/db/schema';
+import { eq, and } from 'drizzle-orm';
 import { signAccessToken, generateRefreshToken, setAuthCookies } from '@/lib/auth';
 import { cookies } from 'next/headers';
-
-import { supabase } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,15 +16,18 @@ export async function POST(request: Request) {
             return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
         }
 
-        // 1. Find Refresh Token in DB via stable SDK
-        const { data: storedToken, error: tokenError } = await supabase
-            .from('refresh_tokens')
-            .select('*')
-            .eq('token_hash', incomingRefreshToken)
-            .eq('revoked', false)
-            .single();
+        // 1. Find Refresh Token (Drizzle)
+        const [storedToken] = await db.select()
+            .from(refreshTokens)
+            .where(
+                and(
+                    eq(refreshTokens.token_hash, incomingRefreshToken),
+                    eq(refreshTokens.revoked, false)
+                )
+            )
+            .limit(1);
 
-        if (tokenError || !storedToken) {
+        if (!storedToken) {
             return NextResponse.json({ message: 'Invalid Refresh Token' }, { status: 403 });
         }
 
@@ -33,19 +36,20 @@ export async function POST(request: Request) {
             return NextResponse.json({ message: 'Refresh Token Expired' }, { status: 403 });
         }
 
-        // 3. Get User via stable SDK
-        const { data: user, error: userError } = await supabase
-            .from('users')
-            .select('*')
-            .eq('id', storedToken.user_id)
-            .single();
+        // 3. Get User (Drizzle)
+        const [user] = await db.select()
+            .from(users)
+            .where(eq(users.id, storedToken.user_id))
+            .limit(1);
 
-        if (userError || !user) {
+        if (!user) {
             return NextResponse.json({ message: 'Identity Sync Failure' }, { status: 404 });
         }
 
-        // 4. Rotation: Revoke old token, Issue new via stable SDK
-        await supabase.from('refresh_tokens').update({ revoked: true }).eq('id', storedToken.id);
+        // 4. Rotation: Revoke old token, Issue new
+        await db.update(refreshTokens)
+            .set({ revoked: true })
+            .where(eq(refreshTokens.id, storedToken.id));
 
         const newAccessToken = await signAccessToken({
             userId: user.id,
@@ -56,10 +60,10 @@ export async function POST(request: Request) {
 
         const newRefreshToken = generateRefreshToken();
 
-        await supabase.from('refresh_tokens').insert({
+        await db.insert(refreshTokens).values({
             user_id: user.id,
             token_hash: newRefreshToken,
-            expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+            expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
         });
 
         // 5. Set Cookies

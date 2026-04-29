@@ -1,13 +1,11 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { db } from '@/lib/db';
-import { campaignAnalytics } from '@/lib/db/schema';
-import { createClient } from '@supabase/supabase-js';
+import { users, capitalAccounts, refreshTokens, campaignAnalytics } from '@/lib/db/schema';
+import { eq } from 'drizzle-orm';
 import { hashPassword, encrypt } from '@/lib/crypto';
 import { signAccessToken, generateRefreshToken, setAuthCookies } from '@/lib/auth';
 import { createSession } from '@/lib/capital';
-
-import { supabase } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,66 +32,55 @@ export async function POST(request: Request) {
             }
         }
 
-        // 2. Identity Sync
-        const { data: existingUsers } = await supabase
-            .from('users')
-            .select('id')
-            .eq('email', email.toLowerCase())
+        // 2. Identity Sync (Drizzle)
+        const [existingUser] = await db.select()
+            .from(users)
+            .where(eq(users.email, email.toLowerCase()))
             .limit(1);
-            
-        const existingUser = existingUsers?.[0];
 
         const passwordHash = await hashPassword(password);
         let user;
 
         if (existingUser) {
-            const { data: updatedUser } = await supabase
-                .from('users')
-                .update({
+            const [updatedUser] = await db.update(users)
+                .set({
                     password_hash: passwordHash,
                     full_name: fullName || 'Trading User',
-                    role: role, // Update role if provided during re-registration/elevation
+                    role: role,
                     updated_at: new Date()
                 })
-                .eq('id', existingUser.id)
-                .select('*')
-                .limit(1);
-            user = updatedUser?.[0];
+                .where(eq(users.id, existingUser.id))
+                .returning();
+            user = updatedUser;
         } else {
-            const { data: newUser } = await supabase
-                .from('users')
-                .insert({
+            const [newUser] = await db.insert(users)
+                .values({
                     email: email.toLowerCase(),
                     password_hash: passwordHash,
                     full_name: fullName || 'Trading User',
                     role: role
                 })
-                .select('*')
-                .limit(1);
-            user = newUser?.[0];
+                .returning();
+            user = newUser;
         }
 
         if (!user) throw new Error("Identity Persistence Failure");
 
-        // 3. Credentials Encryption & account linking via stable SDK
+        // 3. Credentials Encryption & account linking (Drizzle)
         if (apiKey && apiPassword) {
             const { hashApiKey } = await import('@/lib/crypto');
             const keyHash = hashApiKey(apiKey);
             const encryptedKey = encrypt(apiKey);
             const encryptedPass = encrypt(apiPassword);
 
-            const { data: existingAccounts } = await supabase
-                .from('capital_accounts')
-                .select('id')
-                .eq('user_id', user.id)
+            const [existingAccount] = await db.select()
+                .from(capitalAccounts)
+                .where(eq(capitalAccounts.user_id, user.id))
                 .limit(1);
-            
-            const existingAccount = existingAccounts?.[0];
 
             if (existingAccount) {
-                await supabase
-                    .from('capital_accounts')
-                    .update({
+                await db.update(capitalAccounts)
+                    .set({
                         encrypted_api_key: encryptedKey,
                         encrypted_api_password: encryptedPass,
                         api_key_hash: keyHash,
@@ -102,11 +89,10 @@ export async function POST(request: Request) {
                         account_type: accountType || 'demo',
                         updated_at: new Date()
                     })
-                    .eq('id', existingAccount.id);
+                    .where(eq(capitalAccounts.id, existingAccount.id));
             } else {
-                await supabase
-                    .from('capital_accounts')
-                    .insert({
+                await db.insert(capitalAccounts)
+                    .values({
                         user_id: user.id,
                         encrypted_api_key: encryptedKey,
                         encrypted_api_password: encryptedPass,
@@ -118,7 +104,7 @@ export async function POST(request: Request) {
             }
         }
 
-        // 4. Session & Cleanup
+        // 4. Session & Handshake
         const accessToken = await signAccessToken({
             userId: user.id,
             email: user.email,
@@ -128,20 +114,19 @@ export async function POST(request: Request) {
 
         const refreshToken = generateRefreshToken();
 
-        await supabase.from('refresh_tokens').insert({
+        await db.insert(refreshTokens).values({
             user_id: user.id,
             token_hash: refreshToken,
-            expires_at: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+            expires_at: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
         });
 
         await setAuthCookies(accessToken, refreshToken);
 
-        // 5. Campaign Tracking: Record LEAD if assignment cookie exists
+        // 5. Campaign Tracking
         try {
             const cookieStore = await cookies();
             const assignmentId = cookieStore.get('campaign_assignment_id')?.value;
             if (assignmentId) {
-                // Record the lead
                 await db.insert(campaignAnalytics).values({
                     assignment_id: assignmentId,
                     event_type: 'LEAD',

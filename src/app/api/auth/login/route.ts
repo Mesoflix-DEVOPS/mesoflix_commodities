@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db';
+import { users, auditLogs, capitalAccounts, refreshTokens } from '@/lib/db/schema';
+import { eq, desc } from 'drizzle-orm';
 import { comparePassword, decrypt } from '@/lib/crypto';
 import { signAccessToken, generateRefreshToken, setAuthCookies } from '@/lib/auth';
 import { createSession } from '@/lib/capital';
@@ -13,24 +15,21 @@ export async function POST(request: Request) {
             return NextResponse.json({ message: 'Email and password are required' }, { status: 400 });
         }
 
-        // 1. Find User (Supabase SDK)
-        const { data: users, error: userError } = await supabase
-            .from('users')
-            .select('*')
-            .eq('email', email)
+        // 1. Find User (Drizzle)
+        const [user] = await db.select()
+            .from(users)
+            .where(eq(users.email, email.toLowerCase()))
             .limit(1);
-            
-        const user = users?.[0];
 
-        if (userError || !user || !user.password_hash) {
+        if (!user || !user.password_hash) {
             return NextResponse.json({ message: 'Invalid email or password' }, { status: 401 });
         }
 
-        // 2. Verify Password (Unified Login Setup)
+        // 2. Verify Password
         const isPasswordValid = await comparePassword(password, user.password_hash);
         if (!isPasswordValid) {
-            // Audit Log: Failed Login (Supabase SDK)
-            await supabase.from('audit_logs').insert({
+            // Audit Log: Failed Login
+            await db.insert(auditLogs).values({
                 user_id: user.id,
                 action: 'LOGIN_FAILED',
                 ip_address: request.headers.get('x-forwarded-for') || 'unknown',
@@ -38,44 +37,32 @@ export async function POST(request: Request) {
             return NextResponse.json({ message: 'Invalid email or password' }, { status: 401 });
         }
 
-        // 3. Retrieve Capital Account Credentials (optional - not required for login)
-        // 4. Attempt Capital.com Session (non-blocking - failure should not block login)
-        // 3. Optional Capital Account Retrieve (Supabase SDK)
-        let account = null;
+        // 3. Optional Capital Account Retrieve (Drizzle)
         try {
-            const { data: accs } = await supabase
-                .from('capital_accounts')
-                .select('*')
-                .eq('user_id', user.id)
-                .order('is_active', { ascending: false })
+            const [account] = await db.select()
+                .from(capitalAccounts)
+                .where(eq(capitalAccounts.user_id, user.id))
+                .orderBy(desc(capitalAccounts.is_active))
                 .limit(1);
-            account = accs?.[0];
 
             if (account) {
                 const apiKey = decrypt(account.encrypted_api_key);
                 const apiPassword = account.encrypted_api_password ? decrypt(account.encrypted_api_password) : password;
                 const isDemo = account.account_type === 'demo';
-                // Item H2 Fix: Use brokerage identifier (Account ID or specific Login) instead of user email
                 const identifier = account.capital_account_id || email;
                 await createSession(identifier, apiPassword, apiKey, isDemo);
-                console.log(`[Login] Capital.com session established for ${identifier}`);
-            } else {
-                console.log(`[Login] No Capital.com account linked for ${email} — will use master credentials for trading`);
             }
         } catch (err: any) {
-            // Non-blocking catch-all for database or session initialization errors
             console.error(`[Login] Non-blocking capital account failure for ${email}:`, err.message);
         }
 
-        // 5. Update last login (Supabase SDK)
-        await supabase
-            .from('users')
-            .update({ last_login_at: new Date() })
-            .eq('id', user.id);
+        // 5. Update last login
+        await db.update(users)
+            .set({ last_login_at: new Date() })
+            .where(eq(users.id, user.id));
 
-        // 5.5 2FA Interception Logic (Production Hardened)
+        // 5.5 2FA Interception Logic
         if (user.two_factor_enabled) {
-            // Generate a strictly short-lived 5-minute Temp Token containing only the userId
             const tempToken = await new SignJWT({ userId: user.id })
                 .setProtectedHeader({ alg: 'HS256' })
                 .setIssuedAt()
@@ -89,7 +76,7 @@ export async function POST(request: Request) {
             });
         }
 
-        // 6. Issue App Tokens (3-day persistence)
+        // 6. Issue App Tokens
         const accessToken = await signAccessToken({
             userId: user.id,
             email: user.email,
@@ -99,18 +86,19 @@ export async function POST(request: Request) {
 
         const refreshToken = generateRefreshToken();
 
-        // 7. Store Refresh Token (3-day handshake)
-        await supabase.from('refresh_tokens').insert({
+        // 7. Store Refresh Token
+        await db.insert(refreshTokens).values({
             user_id: user.id,
             token_hash: refreshToken,
-            expires_at: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+            expires_at: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
+            ip_address: request.headers.get('x-forwarded-for') || 'unknown',
         });
 
         // 8. Set Cookies
         await setAuthCookies(accessToken, refreshToken);
 
-        // 9. Audit Log: Success (Supabase SDK)
-        await supabase.from('audit_logs').insert({
+        // 9. Audit Log: Success
+        await db.insert(auditLogs).values({
             user_id: user.id,
             action: 'LOGIN',
             ip_address: request.headers.get('x-forwarded-for') || 'unknown',
