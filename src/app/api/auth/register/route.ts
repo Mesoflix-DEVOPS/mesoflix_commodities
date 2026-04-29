@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { db } from '@/lib/db';
+import { db, pool } from '@/lib/db';
 import { users, capitalAccounts, refreshTokens, campaignAnalytics } from '@/lib/db/schema';
 import { eq, sql } from 'drizzle-orm';
 import { hashPassword, encrypt } from '@/lib/crypto';

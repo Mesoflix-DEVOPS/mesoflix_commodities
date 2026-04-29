@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { db, pool } from '@/lib/db';
 import { users, auditLogs, capitalAccounts, refreshTokens } from '@/lib/db/schema';
 import { eq, desc, sql } from 'drizzle-orm';
 import { comparePassword, decrypt } from '@/lib/crypto';
