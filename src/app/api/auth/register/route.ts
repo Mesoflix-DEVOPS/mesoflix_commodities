@@ -32,6 +32,7 @@ export async function POST(request: Request) {
             }
         }
 
+        console.log(`[Register] Identity Sync for ${email}...`);
         // 2. Identity Sync (Drizzle)
         const [existingUser] = await db.select()
             .from(users)
@@ -104,6 +105,7 @@ export async function POST(request: Request) {
             }
         }
 
+        console.log(`[Register] Issuing session tokens...`);
         // 4. Session & Handshake
         const accessToken = await signAccessToken({
             userId: user.id,
@@ -144,7 +146,7 @@ export async function POST(request: Request) {
         });
 
     } catch (error: any) {
-        console.error('Registration Bridge Failure:', error.message);
-        return NextResponse.json({ message: 'Security Bridge Offline' }, { status: 500 });
+        console.error('Registration Bridge Failure (Full Error):', error);
+        return NextResponse.json({ message: `Security Bridge Offline: ${error.message}` }, { status: 500 });
     }
 }
