@@ -36,7 +36,7 @@ export default function CampaignAdminSidebar() {
 
     const handleLogout = async () => {
         await fetch("/api/auth/logout", { method: "POST" });
-        router.push("/campaign/staff");
+        router.push("/campaign/staff/admin/login");
     };
 
     // Auto-close mobile menu on path change

@@ -14,20 +14,17 @@ export const dynamic = 'force-dynamic';
 export async function POST(request: Request) {
     try {
         const body = await request.json();
-        const { email, fullName, apiKey, apiPassword, accountType } = body;
-        const password = body.password || apiPassword; // Item H1 Fix: Split application password from broker password
-        
-        if (!body.password) {
-            console.warn(`[Register] User ${email} registered without separate app password. Falling back to broker password.`);
-        }
-
+        const { email, apiKey, apiPassword, accountType } = body;
+        const password = body.password || apiPassword;
+        const fullName = body.fullName || body.full_name;
+        const role = body.role || 'user';
         const isDemo = accountType === 'demo';
 
         if (!email || !password) {
             return NextResponse.json({ message: 'Missing required credentials' }, { status: 400 });
         }
 
-        // 1. Institutional Validation: ONLY if brokerage credentials are provided
+        // 1. Institutional Validation
         if (apiKey && apiPassword) {
             try {
                 await createSession(email, apiPassword, apiKey, isDemo);
@@ -37,7 +34,7 @@ export async function POST(request: Request) {
             }
         }
 
-        // 2. Identity Sync via stable SDK
+        // 2. Identity Sync
         const { data: existingUsers } = await supabase
             .from('users')
             .select('id')
@@ -55,6 +52,7 @@ export async function POST(request: Request) {
                 .update({
                     password_hash: passwordHash,
                     full_name: fullName || 'Trading User',
+                    role: role, // Update role if provided during re-registration/elevation
                     updated_at: new Date()
                 })
                 .eq('id', existingUser.id)
@@ -68,7 +66,7 @@ export async function POST(request: Request) {
                     email: email.toLowerCase(),
                     password_hash: passwordHash,
                     full_name: fullName || 'Trading User',
-                    role: 'user'
+                    role: role
                 })
                 .select('*')
                 .limit(1);

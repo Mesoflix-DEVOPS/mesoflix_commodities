@@ -10,7 +10,7 @@ export default async function CampaignAdminLayout({ children }: { children: Reac
     
     // Strict Institutional Security
     if (!session || session.user.role !== 'admin') {
-        redirect("/campaign/dashboard");
+        redirect("/campaign/staff/admin/login");
     }
 
     return (
