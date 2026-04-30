@@ -74,8 +74,13 @@ export default function StaffCampaignsPage() {
         setIsAliasModalOpen(true);
     };
 
+    const handleAutoGenerateAlias = () => {
+        const random = Math.random().toString(36).substring(2, 8);
+        setNewAlias(random);
+    };
+
     const handleCopy = (url: string, id: string) => {
-        const fullUrl = `${window.location.origin}${url}`;
+        const fullUrl = `${window.location.protocol}//${window.location.host}${url}`;
         navigator.clipboard.writeText(fullUrl);
         setCopiedId(id);
         setTimeout(() => setCopiedId(null), 2000);
@@ -106,32 +111,40 @@ export default function StaffCampaignsPage() {
                     <div className="relative w-full max-w-md bg-[#0A1622] border border-white/10 rounded-[2.5rem] p-10 shadow-2xl animate-in zoom-in-95 duration-300">
                         <div className="flex justify-between items-center mb-8">
                             <div>
-                                <h3 className="text-2xl font-black text-white tracking-tight">Shorten Link</h3>
-                                <p className="text-gray-500 text-sm mt-1">Generate your institutional vanity alias.</p>
+                                <h3 className="text-2xl font-black text-white tracking-tight">Deployment Aliasing</h3>
+                                <p className="text-gray-500 text-sm mt-1">Shorten or customize your referral node.</p>
                             </div>
                             <button onClick={() => setIsAliasModalOpen(false)} className="text-gray-500 hover:text-white transition-colors"><X /></button>
                         </div>
 
                         <form onSubmit={handleUpdateAlias} className="space-y-6">
                             <div className="space-y-2">
-                                <label className="text-[10px] font-black text-teal uppercase tracking-widest ml-4">Custom Vanity Alias</label>
+                                <div className="flex justify-between items-center px-4">
+                                    <label className="text-[10px] font-black text-teal uppercase tracking-widest">Custom Identity</label>
+                                    <button 
+                                        type="button"
+                                        onClick={handleAutoGenerateAlias}
+                                        className="text-[9px] font-black text-white/40 hover:text-teal uppercase tracking-widest transition-colors flex items-center gap-1"
+                                    >
+                                        <Zap size={10} /> Auto-Generate
+                                    </button>
+                                </div>
                                 <div className="relative flex items-center">
                                     <span className="absolute left-6 text-gray-500 font-mono text-xs">/c/</span>
                                     <input 
                                         required
                                         value={newAlias}
                                         onChange={(e) => setNewAlias(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
-                                        placeholder="gold-surge"
+                                        placeholder="e.g. gold-surge"
                                         className="w-full bg-white/5 border border-white/10 rounded-2xl pl-12 pr-6 py-4 text-white focus:outline-none focus:border-teal/50 transition-all font-mono text-sm"
                                     />
                                 </div>
-                                <p className="text-[9px] text-gray-600 px-4">Only letters, numbers, and dashes allowed.</p>
                             </div>
                             <button 
                                 disabled={isUpdatingAlias}
-                                className="w-full py-5 bg-teal text-dark-blue font-black rounded-2xl uppercase tracking-[0.2em] text-xs shadow-xl"
+                                className="w-full py-5 bg-teal text-dark-blue font-black rounded-2xl uppercase tracking-[0.2em] text-xs shadow-xl shadow-teal/20"
                             >
-                                {isUpdatingAlias ? <Loader2 className="animate-spin mx-auto" /> : "Deploy Vanity Alias"}
+                                {isUpdatingAlias ? <Loader2 className="animate-spin mx-auto" /> : "Deploy Shortened URL"}
                             </button>
                         </form>
                     </div>
@@ -140,7 +153,9 @@ export default function StaffCampaignsPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                 {campaigns.map((item) => {
+                    const domain = typeof window !== 'undefined' ? window.location.host : 'capital.mesoflix.com';
                     const displayPath = item.custom_alias ? `/c/${item.custom_alias}` : item.short_url;
+                    
                     return (
                         <div key={item.id} className="bg-[#0E1B2A] rounded-[3rem] border border-white/5 p-8 shadow-2xl relative overflow-hidden group hover:border-teal/30 transition-all flex flex-col h-full">
                             <div className="relative z-10 flex flex-col h-full">
@@ -156,36 +171,40 @@ export default function StaffCampaignsPage() {
 
                                 <h3 className="text-2xl font-black text-white mb-3 tracking-tight">{item.campaign_name}</h3>
                                 <p className="text-gray-500 text-sm mb-8 leading-relaxed line-clamp-3 flex-grow">
-                                    {item.campaign_description || "No specific deployment brief provided for this marketing cluster."}
+                                    {item.campaign_description || "Institutional deployment briefing active."}
                                 </p>
 
                                 <div className="space-y-4 mt-auto">
-                                    <div className="p-4 bg-white/[0.03] border border-white/5 rounded-2xl flex items-center justify-between gap-4 group/link">
-                                        <code className="text-[10px] font-black text-teal uppercase tracking-widest truncate">
-                                            {displayPath}
-                                        </code>
-                                        <div className="flex items-center gap-1">
-                                            <button 
-                                                onClick={() => openAliasModal(item)}
-                                                className="p-2 hover:bg-white/5 rounded-lg transition-colors text-gray-500 hover:text-white"
-                                                title="Shorten / Custom Alias"
-                                            >
-                                                <Target size={16} />
-                                            </button>
+                                    <div className="p-5 bg-white/[0.03] border border-white/5 rounded-[2rem] space-y-4">
+                                        <div className="flex items-center justify-between gap-4">
+                                            <div className="truncate">
+                                                <span className="text-[10px] font-black text-gray-600 uppercase tracking-widest block mb-1">Production URL</span>
+                                                <code className="text-[11px] font-bold text-white/90">
+                                                    <span className="text-teal/40">{domain}</span>
+                                                    <span className="text-teal">{displayPath}</span>
+                                                </code>
+                                            </div>
                                             <button 
                                                 onClick={() => handleCopy(displayPath, item.id)}
-                                                className="p-2 hover:bg-white/5 rounded-lg transition-colors text-gray-500 hover:text-teal"
+                                                className="shrink-0 p-3 bg-white/5 hover:bg-white/10 rounded-xl transition-all text-gray-400 hover:text-teal"
                                             >
-                                                {copiedId === item.id ? <Check size={16} className="text-teal" /> : <Copy size={16} />}
+                                                {copiedId === item.id ? <Check size={18} className="text-teal" /> : <Copy size={18} />}
                                             </button>
                                         </div>
+                                        
+                                        <button 
+                                            onClick={() => openAliasModal(item)}
+                                            className="w-full py-3 bg-white/5 hover:bg-white/10 text-white rounded-xl text-[9px] font-black uppercase tracking-[0.2em] transition-all border border-white/5 flex items-center justify-center gap-2"
+                                        >
+                                            <Target size={14} /> Shorten URL
+                                        </button>
                                     </div>
                                     
                                     <button 
                                         onClick={() => handleCopy(displayPath, item.id)}
-                                        className="w-full py-4 bg-teal text-dark-blue font-black rounded-2xl uppercase tracking-widest text-[10px] hover:scale-[1.02] transition-all flex items-center justify-center gap-2 shadow-xl shadow-teal/20"
+                                        className="w-full py-5 bg-teal text-dark-blue font-black rounded-[1.5rem] uppercase tracking-[0.2em] text-[10px] hover:scale-[1.02] transition-all flex items-center justify-center gap-3 shadow-xl shadow-teal/20"
                                     >
-                                        <Zap size={16} /> Deploy Referral Link
+                                        <Zap size={18} /> Deploy Referral Link
                                     </button>
                                 </div>
                             </div>

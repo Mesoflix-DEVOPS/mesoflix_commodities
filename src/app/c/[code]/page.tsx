@@ -28,28 +28,27 @@ export default async function CampaignAssetLanding({ params }: { params: { code:
             return notFound();
         }
 
-        // 2. Attribution Locking
-        const cookieStore = await cookies();
-        cookieStore.set('campaign_assignment_id', campaign.assignment_id, {
-            maxAge: 30 * 24 * 60 * 60,
-            path: '/',
-            httpOnly: true,
-            secure: true,
-            sameSite: 'lax'
-        });
+        // 2. Attribution Locking (Non-Blocking)
+        try {
+            const cookieStore = await cookies();
+            cookieStore.set('campaign_assignment_id', campaign.assignment_id, {
+                maxAge: 30 * 24 * 60 * 60,
+                path: '/',
+                httpOnly: true,
+                secure: true,
+                sameSite: 'lax'
+            });
+        } catch (e) {
+            console.warn("[Campaign] Cookie Attribution Blocked:", e);
+        }
 
-        // 3. Analytics Tracking (Silent)
+        // 3. Analytics Tracking (Silent/Async)
         pool.query(
             "INSERT INTO campaign_analytics (assignment_id, event_type, created_at) VALUES ($1, 'CLICK', NOW())",
             [campaign.assignment_id]
         ).catch(err => console.error("[Campaign] Tracking Failure:", err));
 
-        // 4. Fallback if no embed
-        if (!campaign.embed_code) {
-            redirect(campaign.landing_page_url || '/register');
-        }
-
-        // 5. Elite Asset Rendering Protocol
+        // 4. Elite Asset Rendering Protocol
         return (
             <div className="min-h-screen bg-[#050B14] text-white selection:bg-teal selection:text-dark-blue font-sans overflow-x-hidden">
                 {/* Background Atmosphere */}
@@ -95,12 +94,25 @@ export default async function CampaignAssetLanding({ params }: { params: { code:
                                     <span className="text-[9px] font-black uppercase tracking-widest text-gray-600">Asset Verification System : 100% SECURE</span>
                                 </div>
 
-                                {/* Capital.com Content */}
-                                <div className="flex-1 w-full h-full flex items-center justify-center relative overflow-hidden p-10 md:p-20">
-                                    <div 
-                                        className="w-full max-w-4xl mx-auto transform hover:scale-[1.02] transition-transform duration-700"
-                                        dangerouslySetInnerHTML={{ __html: campaign.embed_code }}
-                                    />
+                                {/* Content Rendering */}
+                                <div className="flex-1 w-full h-full flex items-center justify-center relative overflow-hidden p-6 md:p-12">
+                                    {campaign.embed_code ? (
+                                        <div 
+                                            className="w-full h-full transform hover:scale-[1.01] transition-transform duration-700"
+                                            dangerouslySetInnerHTML={{ __html: campaign.embed_code }}
+                                        />
+                                    ) : (
+                                        <div className="text-center space-y-6">
+                                            <div className="w-16 h-16 bg-teal/10 rounded-full flex items-center justify-center mx-auto border border-teal/20">
+                                                <div className="w-4 h-4 bg-teal rounded-full animate-pulse" />
+                                            </div>
+                                            <div>
+                                                <p className="text-xl font-black text-white uppercase tracking-tight">Syncing Asset Content</p>
+                                                <p className="text-gray-500 text-xs mt-2 font-mono">STANDBY FOR REDIRECT</p>
+                                            </div>
+                                            <a href={campaign.landing_page_url || '/register'} className="inline-block px-8 py-4 bg-white/5 text-white rounded-xl text-[10px] font-black uppercase tracking-widest">Manual Access</a>
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Footer Bar */}
@@ -133,7 +145,15 @@ export default async function CampaignAssetLanding({ params }: { params: { code:
             </div>
         );
     } catch (error) {
-        console.error("[Campaign] Critical Failure:", error);
-        redirect('/');
+        console.error("[Campaign] Critical Recovery Protocol:", error);
+        return (
+            <div className="min-h-screen bg-[#050B14] flex items-center justify-center p-10">
+                <div className="text-center space-y-4">
+                    <p className="text-teal font-black text-[10px] uppercase tracking-[0.5em]">Link Stability Restored</p>
+                    <p className="text-white text-sm opacity-40">Syncing with capital.mesoflix.com...</p>
+                    <a href="/" className="inline-block mt-8 text-[10px] font-black text-white/20 uppercase tracking-widest">Return to Base</a>
+                </div>
+            </div>
+        );
     }
 }
