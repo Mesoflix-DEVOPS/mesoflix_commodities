@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
-import { campaignAssignments, campaigns, campaignAnalytics } from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
+import { pool } from '@/lib/db';
 import { cookies } from 'next/headers';
+
+export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
@@ -13,45 +13,53 @@ export async function GET(req: NextRequest) {
     }
 
     try {
-        // Find the assignment
-        const [assignment] = await db.select({
-            id: campaignAssignments.id,
-            campaign_id: campaignAssignments.campaign_id,
-            landing_page: campaigns.landing_page_url,
-        })
-        .from(campaignAssignments)
-        .innerJoin(campaigns, eq(campaignAssignments.campaign_id, campaigns.id))
-        .where(eq(campaignAssignments.unique_code, code))
-        .limit(1);
+        // Institutional-grade lookup: Find assignment and landing page in one pass
+        const lookupQuery = `
+            SELECT 
+                ca.id, 
+                c.landing_page_url 
+            FROM campaign_assignments ca
+            INNER JOIN campaigns c ON ca.campaign_id = c.id
+            WHERE ca.unique_code = $1 
+            LIMIT 1
+        `;
+        const lookupRes = await pool.query(lookupQuery, [code]);
+        const assignment = lookupRes.rows[0];
 
         if (!assignment) {
+            console.warn(`[Tracking] Invalid campaign code attempted: ${code}`);
             return NextResponse.redirect(new URL('/', req.url));
         }
 
-        // Record the click
+        // Failsafe Analytics Insertion
         const ip = req.headers.get('x-forwarded-for') || 'unknown';
         const ua = req.headers.get('user-agent') || 'unknown';
 
-        await db.insert(campaignAnalytics).values({
-            assignment_id: assignment.id,
-            event_type: 'CLICK',
-            ip_address: ip,
-            user_agent: ua,
-        });
+        const insertQuery = `
+            INSERT INTO campaign_analytics (assignment_id, event_type, ip_address, user_agent)
+            VALUES ($1, 'CLICK', $2, $3)
+        `;
+        
+        // We don't await this to keep the redirection fast, 
+        // OR we await it for data integrity. Let's await for reliability.
+        await pool.query(insertQuery, [assignment.id, ip, ua]);
 
-        // Store the assignment ID in a cookie so we can track later conversion (registration)
+        // Persistence Layer: Store assignment ID for conversion (Lead generation) tracking
         const cookieStore = await cookies();
         cookieStore.set('campaign_assignment_id', assignment.id, {
             maxAge: 30 * 24 * 60 * 60, // 30 days
             path: '/',
+            httpOnly: true,
+            secure: true,
+            sameSite: 'lax'
         });
 
-        // Redirect to the landing page
-        const redirectUrl = new URL(assignment.landing_page, req.url);
-        return NextResponse.redirect(redirectUrl);
+        // Final Bridge: Redirect to the target landing page
+        return NextResponse.redirect(new URL(assignment.landing_page_url, req.url));
 
-    } catch (error) {
-        console.error('Tracking failed:', error);
+    } catch (error: any) {
+        console.error('Campaign Tracking Terminal Error:', error);
+        // Emergency fallback: send user home so they don't see a 500 page
         return NextResponse.redirect(new URL('/', req.url));
     }
 }

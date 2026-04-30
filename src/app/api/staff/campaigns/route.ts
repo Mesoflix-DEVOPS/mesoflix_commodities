@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
-import { campaignAssignments, campaigns, campaignAnalytics } from '@/lib/db/schema';
+import { pool } from '@/lib/db';
 import { auth } from '@/lib/auth';
-import { eq, count, and } from 'drizzle-orm';
+
+export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
     try {
@@ -13,50 +13,41 @@ export async function GET(req: NextRequest) {
 
         const userId = session.user.id;
 
-        const myAssignments = await db.select({
-            id: campaignAssignments.id,
-            unique_code: campaignAssignments.unique_code,
-            short_url: campaignAssignments.short_url,
-            status: campaignAssignments.status,
-            campaign_id: campaigns.id,
-            campaign_name: campaigns.name,
-            campaign_description: campaigns.description,
-            landing_page: campaigns.landing_page_url,
-            resources: campaigns.resources,
-        })
-        .from(campaignAssignments)
-        .innerJoin(campaigns, eq(campaignAssignments.campaign_id, campaigns.id))
-        .where(eq(campaignAssignments.staff_id, userId));
+        // Optimized Institutional Query: Get assignments and stats in one bridge pass
+        const query = `
+            SELECT 
+                ca.id,
+                ca.unique_code,
+                ca.short_url,
+                ca.status,
+                c.id as campaign_id,
+                c.name as campaign_name,
+                c.description as campaign_description,
+                c.landing_page_url as landing_page,
+                c.resources,
+                COUNT(an.id) FILTER (WHERE an.event_type = 'CLICK') as clicks,
+                COUNT(an.id) FILTER (WHERE an.event_type = 'LEAD') as leads
+            FROM campaign_assignments ca
+            INNER JOIN campaigns c ON ca.campaign_id = c.id
+            LEFT JOIN campaign_analytics an ON an.assignment_id = ca.id
+            WHERE ca.staff_id = $1
+            GROUP BY ca.id, c.id
+        `;
+        
+        const result = await pool.query(query, [userId]);
 
-        // Let's also attach some quick stats to each assignment
-        const stats = await Promise.all(myAssignments.map(async (asgn) => {
-            const clicksRes = await db.select({ value: count() })
-                .from(campaignAnalytics)
-                .where(and(
-                    eq(campaignAnalytics.assignment_id, asgn.id), 
-                    eq(campaignAnalytics.event_type, 'CLICK')
-                ));
-            
-            const leadsRes = await db.select({ value: count() })
-                .from(campaignAnalytics)
-                .where(and(
-                    eq(campaignAnalytics.assignment_id, asgn.id), 
-                    eq(campaignAnalytics.event_type, 'LEAD')
-                ));
-
-            const clicksCount = clicksRes[0]?.value || 0;
-            const leadsCount = leadsRes[0]?.value || 0;
-
-            return {
-                ...asgn,
-                clicks: Number(clicksCount),
-                leads: Number(leadsCount),
-            };
+        const stats = result.rows.map(r => ({
+            ...r,
+            clicks: parseInt(r.clicks || '0'),
+            leads: parseInt(r.leads || '0'),
         }));
 
         return NextResponse.json({ campaigns: stats });
-    } catch (error) {
-        console.error('Failed to fetch staff campaigns:', error);
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    } catch (error: any) {
+        console.error('Staff Terminal Data Breach/Error:', error);
+        return NextResponse.json({ 
+            error: 'Database Synchronization Error', 
+            details: error.message 
+        }, { status: 500 });
     }
 }

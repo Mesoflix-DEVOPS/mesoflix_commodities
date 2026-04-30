@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
-import { campaignAnalytics, campaignAssignments, campaigns, users } from '@/lib/db/schema';
+import { pool } from '@/lib/db';
 import { auth } from '@/lib/auth';
-import { count, eq, sql, and, desc } from 'drizzle-orm';
+
+export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
     try {
@@ -11,60 +11,74 @@ export async function GET(req: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        // Global Stats
-        const [totalClicks] = await db.select({ value: count() })
-            .from(campaignAnalytics)
-            .where(eq(campaignAnalytics.event_type, 'CLICK'));
+        // 1. Fetch Global Aggregate Stats
+        const statsQuery = `
+            SELECT 
+                COUNT(*) FILTER (WHERE event_type = 'CLICK') as clicks,
+                COUNT(*) FILTER (WHERE event_type = 'LEAD') as leads
+            FROM campaign_analytics
+        `;
+        const statsRes = await pool.query(statsQuery);
+        const stats = statsRes.rows[0];
 
-        const [totalLeads] = await db.select({ value: count() })
-            .from(campaignAnalytics)
-            .where(eq(campaignAnalytics.event_type, 'LEAD'));
+        // 2. Fetch Staff Performance
+        const staffQuery = `
+            SELECT 
+                ca.staff_id,
+                u.full_name as staff_name,
+                u.email as staff_email,
+                ca.campaign_id,
+                c.name as campaign_name,
+                COUNT(an.id) FILTER (WHERE an.event_type = 'CLICK') as clicks,
+                COUNT(an.id) FILTER (WHERE an.event_type = 'LEAD') as leads
+            FROM campaign_assignments ca
+            LEFT JOIN users u ON ca.staff_id = u.id
+            LEFT JOIN campaigns c ON ca.campaign_id = c.id
+            LEFT JOIN campaign_analytics an ON an.assignment_id = ca.id
+            GROUP BY ca.staff_id, u.full_name, u.email, ca.campaign_id, c.name
+            ORDER BY leads DESC
+        `;
+        const staffRes = await pool.query(staffQuery);
 
-        // Staff Performance
-        const staffStats = await db.select({
-            staff_id: campaignAssignments.staff_id,
-            staff_name: users.full_name,
-            staff_email: users.email,
-            campaign_id: campaignAssignments.campaign_id,
-            campaign_name: campaigns.name,
-            clicks: sql<number>`count(case when ${campaignAnalytics.event_type} = 'CLICK' then 1 end)`,
-            leads: sql<number>`count(case when ${campaignAnalytics.event_type} = 'LEAD' then 1 end)`,
-        })
-        .from(campaignAssignments)
-        .leftJoin(users, eq(campaignAssignments.staff_id, users.id))
-        .leftJoin(campaigns, eq(campaignAssignments.campaign_id, campaigns.id))
-        .leftJoin(campaignAnalytics, eq(campaignAnalytics.assignment_id, campaignAssignments.id))
-        .groupBy(
-            campaignAssignments.staff_id, 
-            users.full_name, 
-            users.email, 
-            campaignAssignments.campaign_id, 
-            campaigns.name
-        )
-        .orderBy(desc(sql`leads`));
-
-        // Global Timeline (Last 14 days)
-        const timeline = await db.select({
-            date: sql<string>`DATE(${campaignAnalytics.created_at})`,
-            type: campaignAnalytics.event_type,
-            count: count(),
-        })
-        .from(campaignAnalytics)
-        .where(sql`${campaignAnalytics.created_at} > NOW() - INTERVAL '14 days'`)
-        .groupBy(sql`DATE(${campaignAnalytics.created_at})`, campaignAnalytics.event_type)
-        .orderBy(sql`DATE(${campaignAnalytics.created_at})`);
+        // 3. Fetch Timeline (Last 14 days)
+        const timelineQuery = `
+            SELECT 
+                DATE(created_at) as date,
+                event_type as type,
+                COUNT(*) as count
+            FROM campaign_analytics
+            WHERE created_at > NOW() - INTERVAL '14 days'
+            GROUP BY DATE(created_at), event_type
+            ORDER BY DATE(created_at) ASC
+        `;
+        const timelineRes = await pool.query(timelineQuery);
 
         return NextResponse.json({
             stats: {
-                clicks: Number(totalClicks?.value || 0),
-                leads: Number(totalLeads?.value || 0),
+                clicks: parseInt(stats.clicks || '0'),
+                leads: parseInt(stats.leads || '0'),
             },
-            staffPerformance: staffStats,
-            timeline: timeline
+            staffPerformance: staffRes.rows.map(r => ({
+                ...r,
+                clicks: parseInt(r.clicks || '0'),
+                leads: parseInt(r.leads || '0')
+            })),
+            timeline: timelineRes.rows.map(r => ({
+                ...r,
+                count: parseInt(r.count || '0')
+            }))
         });
 
     } catch (error: any) {
-        console.error('Failed to fetch global campaign analytics:', error);
-        return NextResponse.json({ error: 'Internal Server Error', details: error.message }, { status: 500 });
+        console.error('Institutional Analytics Terminal Error:', error);
+        
+        // Failsafe empty response to keep UI alive
+        return NextResponse.json({ 
+            error: 'Security Bridge Warning: Partial Data Sync', 
+            details: error.message,
+            stats: { clicks: 0, leads: 0 },
+            staffPerformance: [],
+            timeline: []
+        }, { status: 500 });
     }
 }
