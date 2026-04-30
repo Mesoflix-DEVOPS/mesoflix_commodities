@@ -23,9 +23,9 @@ import { useState, useEffect } from "react";
 
 const adminMenu = [
     { name: "Overview", icon: LayoutDashboard, href: "/campaign/staff/admin" },
-    { name: "Campaign Hub", icon: Megaphone, href: "/campaign/staff/admin#campaigns" },
-    { name: "Partner Roster", icon: Users, href: "/campaign/staff/admin#staff" },
-    { name: "Live Analytics", icon: TrendingUp, href: "/campaign/staff/admin#analytics" },
+    { name: "Live Analytics", icon: TrendingUp, href: "/campaign/staff/admin/analytics" },
+    { name: "Partner Roster", icon: Users, href: "/campaign/staff/admin/staff" },
+    { name: "Campaign Hub", icon: Megaphone, href: "/campaign/staff/admin/campaigns" },
 ];
 
 export default function CampaignAdminSidebar() {

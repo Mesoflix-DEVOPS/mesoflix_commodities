@@ -19,9 +19,9 @@ import { useState } from "react";
 
 const campaignMenu = [
     { name: "Overview", icon: LayoutDashboard, href: "/campaign/dashboard" },
-    { name: "My Campaigns", icon: Megaphone, href: "/campaign/dashboard#campaigns" },
-    { name: "Performance", icon: BarChart3, href: "/campaign/dashboard#stats" },
-    { name: "Marketing Hub", icon: FileText, href: "/campaign/dashboard#resources" },
+    { name: "My Campaigns", icon: Megaphone, href: "/campaign/dashboard/campaigns" },
+    { name: "Performance", icon: BarChart3, href: "/campaign/dashboard/analytics" },
+    { name: "Marketing Hub", icon: FileText, href: "/campaign/dashboard/resources" },
 ];
 
 export default function CampaignSidebar() {

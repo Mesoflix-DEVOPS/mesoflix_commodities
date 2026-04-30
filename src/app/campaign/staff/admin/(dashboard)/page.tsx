@@ -3,25 +3,15 @@
 import { useEffect, useState } from "react";
 import { 
     Plus, 
-    Users, 
     Award, 
-    Settings, 
-    Trash2, 
-    Edit2, 
-    Search,
-    ChevronRight,
     TrendingUp,
     Zap,
     Megaphone,
     Loader2,
-    X,
-    Filter,
     ArrowUpRight,
     MousePointer2,
     Target,
     ShieldAlert as ShieldIcon,
-    CheckCircle2,
-    Activity
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { authedFetch } from "@/lib/fetch-utils";
@@ -42,48 +32,19 @@ interface StaffPerf {
     leads: number;
 }
 
-interface Campaign {
-    id: string;
-    name: string;
-    description: string;
-    landing_page_url: string;
-    resources: string | null;
-    is_active: boolean;
-    created_at: string;
-}
-
 export default function CampaignMasterAdmin() {
     const router = useRouter();
-    
-    // -- State: Data Containers --
     const [stats, setStats] = useState<GlobalStats>({ clicks: 0, leads: 0 });
     const [staffPerformance, setStaffPerformance] = useState<StaffPerf[]>([]);
-    const [campaigns, setCampaigns] = useState<Campaign[]>([]);
-    const [assignments, setAssignments] = useState<any[]>([]);
-    const [allUsers, setAllUsers] = useState<any[]>([]);
-    
-    // -- State: UI Controllers --
+    const [campaigns, setCampaigns] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<'overview' | 'analytics' | 'staff' | 'campaigns'>('overview');
-    
-    // -- State: Modal Controllers --
-    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-    const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
-    
-    // -- State: Form Logic --
-    const [isCreating, setIsCreating] = useState(false);
-    const [isAssigning, setIsAssigning] = useState(false);
-    const [newCampaign, setNewCampaign] = useState({ name: '', description: '', landing_page_url: '/register' });
-    const [newAssignment, setNewAssignment] = useState({ campaign_id: '', staff_id: '' });
 
     const fetchData = async () => {
         setLoading(true);
         try {
-            const [analyticsRes, campRes, asgnRes, usersRes] = await Promise.all([
+            const [analyticsRes, campRes] = await Promise.all([
                 authedFetch("/api/admin/analytics/global", router),
-                authedFetch("/api/admin/campaigns", router),
-                authedFetch("/api/admin/assignments", router),
-                authedFetch("/api/admin/users", router)
+                authedFetch("/api/admin/campaigns", router)
             ]);
 
             if (analyticsRes?.ok) {
@@ -95,200 +56,29 @@ export default function CampaignMasterAdmin() {
                 const data = await campRes.json();
                 setCampaigns(data.campaigns);
             }
-            if (asgnRes?.ok) {
-                const data = await asgnRes.json();
-                setAssignments(data.assignments);
-            }
-            if (usersRes?.ok) {
-                const data = await usersRes.json();
-                setAllUsers(data.users);
-            }
         } catch (err) {
-            console.error("Failed to load campaign master data:", err);
+            console.error("Failed to load command center overview:", err);
         } finally {
             setLoading(false);
         }
     };
 
-    // Synchronize Tab with URL Hash
     useEffect(() => {
-        const handleHashChange = () => {
-            const hash = window.location.hash.replace('#', '');
-            if (['overview', 'analytics', 'staff', 'campaigns'].includes(hash)) {
-                setActiveTab(hash as any);
-            } else if (!hash) {
-                setActiveTab('overview');
-            }
-        };
-
-        handleHashChange();
-        window.addEventListener('hashchange', handleHashChange);
         fetchData();
-        return () => window.removeEventListener('hashchange', handleHashChange);
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [router]);
-
-    const handleCreateCampaign = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setIsCreating(true);
-        try {
-            const res = await authedFetch("/api/admin/campaigns", router, {
-                method: "POST",
-                body: JSON.stringify(newCampaign)
-            });
-            if (res?.ok) {
-                setIsCreateModalOpen(false);
-                setNewCampaign({ name: '', description: '', landing_page_url: '/register' });
-                await fetchData();
-            }
-        } catch (err) {
-            console.error("Campaign Creation Failure:", err);
-        } finally {
-            setIsCreating(false);
-        }
-    };
-
-    const handleAssignStaff = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!newAssignment.campaign_id || !newAssignment.staff_id) return;
-        setIsAssigning(true);
-        try {
-            const res = await authedFetch("/api/admin/assignments", router, {
-                method: "POST",
-                body: JSON.stringify(newAssignment)
-            });
-            if (res?.ok) {
-                setIsAssignModalOpen(false);
-                setNewAssignment({ campaign_id: '', staff_id: '' });
-                await fetchData();
-            }
-        } catch (err) {
-            console.error("Staff Assignment Failure:", err);
-        } finally {
-            setIsAssigning(false);
-        }
-    };
 
     if (loading) {
         return (
             <div className="flex flex-col items-center justify-center h-[60vh] space-y-4">
                 <Loader2 className="w-10 h-10 animate-spin text-teal" />
-                <p className="text-gray-500 font-black uppercase tracking-widest text-[10px]">Accessing Secure Campaign Registry</p>
+                <p className="text-gray-500 font-black uppercase tracking-widest text-[10px]">Accessing Command Center Overview</p>
             </div>
         );
     }
 
     return (
-        <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20">
-            {/* Modal: Create Campaign */}
-            {isCreateModalOpen && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
-                    <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => setIsCreateModalOpen(false)} />
-                    <div className="relative w-full max-w-xl bg-[#0A1622] border border-white/10 rounded-[2.5rem] p-10 shadow-2xl animate-in zoom-in-95 duration-300">
-                        <div className="flex justify-between items-center mb-8">
-                            <div>
-                                <h3 className="text-2xl font-black text-white tracking-tight">Initialize Protocol</h3>
-                                <p className="text-gray-500 text-sm mt-1">Deploy a new advertising cluster.</p>
-                            </div>
-                            <button onClick={() => setIsCreateModalOpen(false)} className="text-gray-500 hover:text-white transition-colors"><X /></button>
-                        </div>
-
-                        <form onSubmit={handleCreateCampaign} className="space-y-6">
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-teal uppercase tracking-widest ml-4">Campaign Name</label>
-                                <input 
-                                    required
-                                    value={newCampaign.name}
-                                    onChange={(e) => setNewCampaign({...newCampaign, name: e.target.value})}
-                                    placeholder="e.g. Q2 Commodities Surge"
-                                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white focus:outline-none focus:border-teal/50 transition-all"
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-teal uppercase tracking-widest ml-4">Deployment Objective</label>
-                                <textarea 
-                                    required
-                                    value={newCampaign.description}
-                                    onChange={(e) => setNewCampaign({...newCampaign, description: e.target.value})}
-                                    placeholder="Describe the target audience and value proposition..."
-                                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white focus:outline-none focus:border-teal/50 transition-all h-32 resize-none"
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-teal uppercase tracking-widest ml-4">Destination Link</label>
-                                <input 
-                                    required
-                                    value={newCampaign.landing_page_url}
-                                    onChange={(e) => setNewCampaign({...newCampaign, landing_page_url: e.target.value})}
-                                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white font-mono text-sm"
-                                />
-                            </div>
-                            <button 
-                                disabled={isCreating}
-                                className="w-full py-5 bg-teal text-dark-blue font-black rounded-2xl uppercase tracking-[0.2em] text-xs hover:scale-[0.98] transition-all flex items-center justify-center gap-3 shadow-xl shadow-teal/20"
-                            >
-                                {isCreating ? <Loader2 className="animate-spin" /> : <><Zap size={18} /> Activate Deployment</>}
-                            </button>
-                        </form>
-                    </div>
-                </div>
-            )}
-
-            {/* Modal: Assign Staff */}
-            {isAssignModalOpen && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
-                    <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => setIsAssignModalOpen(false)} />
-                    <div className="relative w-full max-w-xl bg-[#0A1622] border border-white/10 rounded-[2.5rem] p-10 shadow-2xl animate-in zoom-in-95 duration-300">
-                        <div className="flex justify-between items-center mb-8">
-                            <div>
-                                <h3 className="text-2xl font-black text-white tracking-tight">Assign Partner</h3>
-                                <p className="text-gray-500 text-sm mt-1">Link a staff member to an active cluster.</p>
-                            </div>
-                            <button onClick={() => setIsAssignModalOpen(false)} className="text-gray-500 hover:text-white transition-colors"><X /></button>
-                        </div>
-
-                        <form onSubmit={handleAssignStaff} className="space-y-6">
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-teal uppercase tracking-widest ml-4">Select Campaign</label>
-                                <select 
-                                    required
-                                    value={newAssignment.campaign_id}
-                                    onChange={(e) => setNewAssignment({...newAssignment, campaign_id: e.target.value})}
-                                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white focus:outline-none focus:border-teal/50 transition-all appearance-none"
-                                >
-                                    <option value="" className="bg-[#0A1622]">Choose active cluster...</option>
-                                    {campaigns.map(c => (
-                                        <option key={c.id} value={c.id} className="bg-[#0A1622]">{c.name}</option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-teal uppercase tracking-widest ml-4">Target Partner (Staff)</label>
-                                <select 
-                                    required
-                                    value={newAssignment.staff_id}
-                                    onChange={(e) => setNewAssignment({...newAssignment, staff_id: e.target.value})}
-                                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white focus:outline-none focus:border-teal/50 transition-all appearance-none"
-                                >
-                                    <option value="" className="bg-[#0A1622]">Select staff member...</option>
-                                    {allUsers.map(u => (
-                                        <option key={u.id} value={u.id} className="bg-[#0A1622]">{u.full_name} ({u.email})</option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            <button 
-                                disabled={isAssigning}
-                                className="w-full py-5 bg-white text-dark-blue font-black rounded-2xl uppercase tracking-[0.2em] text-xs hover:scale-[0.98] transition-all flex items-center justify-center gap-3 shadow-xl"
-                            >
-                                {isAssigning ? <Loader2 className="animate-spin" /> : <><Users size={18} /> Link Partner Identity</>}
-                            </button>
-                        </form>
-                    </div>
-                </div>
-            )}
-
+        <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
             {/* Header Area */}
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">
                 <div className="space-y-4">
@@ -306,17 +96,8 @@ export default function CampaignMasterAdmin() {
                 </div>
 
                 <div className="flex items-center gap-3">
-                    <button 
-                        onClick={() => setIsAssignModalOpen(true)}
-                        className="px-6 py-4 bg-white/5 hover:bg-white/10 text-white border border-white/10 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-3 transition-all"
-                    >
-                        <Users size={18} /> Assign Partner
-                    </button>
-                    <button 
-                        onClick={() => setIsCreateModalOpen(true)}
-                        className="px-6 py-4 bg-teal text-dark-blue rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-3 transition-all shadow-xl shadow-teal/20"
-                    >
-                        <Plus size={18} /> New Protocol
+                    <button onClick={() => router.push('/campaign/staff/admin/campaigns')} className="px-8 py-4 bg-teal text-dark-blue font-black rounded-2xl uppercase tracking-widest text-[10px] hover:scale-[1.02] transition-all flex items-center gap-2 shadow-xl shadow-teal/20">
+                        <Plus size={16} /> New Protocol
                     </button>
                 </div>
             </div>
@@ -329,252 +110,72 @@ export default function CampaignMasterAdmin() {
                 <MatrixCard icon={Award} label="System Reach" value="International" color="green" description="Across global clusters" />
             </div>
 
-            {/* Tabs Controller */}
-            <div className="flex items-center gap-1 bg-[#0A1622] p-1.5 rounded-2xl border border-white/5 w-fit">
-                {['overview', 'analytics', 'staff', 'campaigns'].map((tab) => (
-                    <button
-                        key={tab}
-                        onClick={() => setActiveTab(tab as any)}
-                        className={cn(
-                            "px-8 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
-                            activeTab === tab ? "bg-white/10 text-white shadow-xl" : "text-gray-500 hover:text-gray-300 hover:bg-white/5"
-                        )}
-                    >
-                        {tab}
-                    </button>
-                ))}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                {/* Performance Trends Summary */}
+                <div className="lg:col-span-8 bg-[#0E1B2A] rounded-[3rem] border border-white/5 p-8 shadow-2xl relative overflow-hidden group">
+                    <div className="relative z-10 space-y-8">
+                        <div className="flex justify-between items-center">
+                            <div>
+                                <h3 className="text-2xl font-black text-white tracking-tight">Staff Efficiency Matrix</h3>
+                                <p className="text-gray-500 text-sm mt-1">Real-time performance ranking across all active partners.</p>
+                            </div>
+                            <ArrowUpRight className="text-teal" size={32} />
+                        </div>
+                        
+                        <div className="space-y-4">
+                            {staffPerformance.slice(0, 5).map((perf, i) => (
+                                <div key={`${perf.staff_id}-${perf.campaign_id}`} className="group/item flex items-center justify-between p-6 bg-white/[0.02] hover:bg-white/[0.04] border border-white/5 rounded-3xl transition-all">
+                                    <div className="flex items-center gap-6">
+                                        <div className={cn(
+                                            "w-12 h-12 rounded-2xl flex items-center justify-center font-black text-xs border border-white/10",
+                                            i === 0 ? "bg-teal/20 text-teal border-teal/20" : "bg-white/5 text-gray-400"
+                                        )}>
+                                            0{i + 1}
+                                        </div>
+                                        <div>
+                                            <p className="text-lg font-black text-white">{perf.staff_name || 'System Operator'}</p>
+                                            <p className="text-xs text-gray-500 font-bold uppercase tracking-widest">{perf.campaign_name}</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-12 text-right">
+                                        <div>
+                                            <p className="text-[10px] font-black text-gray-600 uppercase tracking-widest">Leads</p>
+                                            <p className="text-xl font-black text-teal font-mono">{perf.leads}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] font-black text-gray-600 uppercase tracking-widest">Conv.</p>
+                                            <p className="text-xl font-black text-white font-mono">{((perf.leads / (perf.clicks || 1)) * 100).toFixed(1)}%</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                            {staffPerformance.length === 0 && <Placeholder text="No performance data available" />}
+                        </div>
+                    </div>
+                    <div className="absolute top-0 right-0 w-64 h-64 bg-teal/5 blur-[100px] rounded-full -mr-32 -mt-32 transition-all group-hover:bg-teal/10" />
+                </div>
+
+                {/* Quick Access Sidebar Area */}
+                <div className="lg:col-span-4 space-y-6">
+                    <div className="bg-[#0E1B2A] rounded-[3rem] border border-white/5 p-8 shadow-2xl relative overflow-hidden h-full">
+                        <h3 className="text-xl font-black text-white tracking-tight mb-8">Active Deployments</h3>
+                        <div className="space-y-4">
+                            {campaigns.slice(0, 4).map((camp) => (
+                                <div key={camp.id} className="p-5 bg-white/[0.02] border border-white/5 rounded-2xl hover:border-blue-500/30 transition-all flex items-center gap-4">
+                                    <div className="w-10 h-10 bg-blue-500/10 rounded-xl flex items-center justify-center text-blue-500 border border-blue-500/10 shrink-0">
+                                        <Megaphone size={18} />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-bold text-white truncate">{camp.name}</p>
+                                        <p className="text-[10px] text-gray-500 font-mono mt-1">ID: {camp.id.split('-')[0]}</p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                        <button onClick={() => router.push('/campaign/staff/admin/campaigns')} className="w-full mt-8 py-4 bg-white/5 hover:bg-white/10 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all">View All Protocols</button>
+                    </div>
+                </div>
             </div>
-
-            {activeTab === 'overview' && (
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                    {/* Performance Trends Summary */}
-                    <div className="lg:col-span-8 bg-[#0E1B2A] rounded-[3rem] border border-white/5 p-8 shadow-2xl relative overflow-hidden group">
-                        <div className="relative z-10 space-y-8">
-                            <div className="flex justify-between items-center">
-                                <div>
-                                    <h3 className="text-2xl font-black text-white tracking-tight">Staff Efficiency Matrix</h3>
-                                    <p className="text-gray-500 text-sm mt-1">Real-time performance ranking across all active partners.</p>
-                                </div>
-                                <ArrowUpRight className="text-teal" size={32} />
-                            </div>
-                            
-                            <div className="space-y-4">
-                                {staffPerformance.slice(0, 5).map((perf, i) => (
-                                    <div key={`${perf.staff_id}-${perf.campaign_id}`} className="group/item flex items-center justify-between p-6 bg-white/[0.02] hover:bg-white/[0.04] border border-white/5 rounded-3xl transition-all">
-                                        <div className="flex items-center gap-6">
-                                            <div className={cn(
-                                                "w-12 h-12 rounded-2xl flex items-center justify-center font-black text-xs border border-white/10",
-                                                i === 0 ? "bg-teal/20 text-teal border-teal/20" : "bg-white/5 text-gray-400"
-                                            )}>
-                                                0{i + 1}
-                                            </div>
-                                            <div>
-                                                <p className="text-lg font-black text-white">{perf.staff_name || 'System Operator'}</p>
-                                                <p className="text-xs text-gray-500 font-bold uppercase tracking-widest">{perf.campaign_name}</p>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center gap-12 text-right">
-                                            <div>
-                                                <p className="text-[10px] font-black text-gray-600 uppercase tracking-widest">Leads</p>
-                                                <p className="text-xl font-black text-teal font-mono">{perf.leads}</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-[10px] font-black text-gray-600 uppercase tracking-widest">Conv.</p>
-                                                <p className="text-xl font-black text-white font-mono">{((perf.leads / (perf.clicks || 1)) * 100).toFixed(1)}%</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))}
-                                {staffPerformance.length === 0 && <Placeholder text="No performance data available" />}
-                            </div>
-                        </div>
-                        <div className="absolute top-0 right-0 w-64 h-64 bg-teal/5 blur-[100px] rounded-full -mr-32 -mt-32 transition-all group-hover:bg-teal/10" />
-                    </div>
-
-                    {/* Quick Access Sidebar Area */}
-                    <div className="lg:col-span-4 space-y-6">
-                        <div className="bg-[#0E1B2A] rounded-[3rem] border border-white/5 p-8 shadow-2xl relative overflow-hidden h-full">
-                            <h3 className="text-xl font-black text-white tracking-tight mb-8">Active Deployments</h3>
-                            <div className="space-y-4">
-                                {campaigns.slice(0, 4).map((camp) => (
-                                    <div key={camp.id} className="p-5 bg-white/[0.02] border border-white/5 rounded-2xl hover:border-blue-500/30 transition-all flex items-center gap-4">
-                                        <div className="w-10 h-10 bg-blue-500/10 rounded-xl flex items-center justify-center text-blue-500 border border-blue-500/10 shrink-0">
-                                            <Megaphone size={18} />
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <p className="text-sm font-bold text-white truncate">{camp.name}</p>
-                                            <p className="text-[10px] text-gray-500 font-mono mt-1">ID: {camp.id.split('-')[0]}</p>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                            <button onClick={() => setActiveTab('campaigns')} className="w-full mt-8 py-4 bg-white/5 hover:bg-white/10 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all">View All Protocols</button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {activeTab === 'analytics' && (
-                <div className="bg-[#0E1B2A] rounded-[3.5rem] border border-white/5 overflow-hidden shadow-2xl">
-                    <div className="p-10 border-b border-white/5 bg-white/[0.01] flex flex-col md:flex-row md:items-center justify-between gap-6">
-                        <div>
-                            <h3 className="text-2xl font-black text-white tracking-tight">Active Referral Matrix</h3>
-                            <p className="text-gray-500 text-sm mt-1">Granular tracking of unique referral links and their attribution.</p>
-                        </div>
-                        <div className="flex items-center gap-3">
-                            <span className="text-[10px] font-black text-teal bg-teal/10 px-4 py-2 rounded-xl border border-teal/20 uppercase tracking-widest">
-                                {assignments.length} Active Nodes
-                            </span>
-                        </div>
-                    </div>
-                    <div className="overflow-x-auto custom-scrollbar">
-                        <div className="min-w-[900px]">
-                            <table className="w-full text-left">
-                            <thead className="bg-[#0A1622]/50 border-b border-white/5">
-                                <tr className="text-[10px] text-gray-600 font-black uppercase tracking-widest">
-                                    <th className="px-10 py-6">Unique Ref. Code</th>
-                                    <th className="px-10 py-6">Operator</th>
-                                    <th className="px-10 py-6">Campaign Destination</th>
-                                    <th className="px-10 py-6">Clicks</th>
-                                    <th className="px-10 py-6">Leads</th>
-                                    <th className="px-10 py-6 text-right">Status</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-white/5">
-                                {assignments.map((asgn) => (
-                                    <tr key={asgn.id} className="hover:bg-white/[0.02] transition-colors group">
-                                        <td className="px-10 py-6">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-8 h-8 rounded-lg bg-teal/10 border border-teal/20 flex items-center justify-center text-teal">
-                                                    <TrendingUp size={14} />
-                                                </div>
-                                                <span className="font-mono font-black text-teal text-base">{asgn.unique_code}</span>
-                                            </div>
-                                        </td>
-                                        <td className="px-10 py-6">
-                                            <p className="font-bold text-white text-sm">{asgn.staff_name || 'Anonymous'}</p>
-                                            <p className="text-[10px] text-gray-500 font-mono mt-0.5">{asgn.staff_email}</p>
-                                        </td>
-                                        <td className="px-10 py-6">
-                                            <p className="text-xs font-black text-white uppercase tracking-tight">{asgn.campaign_name}</p>
-                                        </td>
-                                        <td className="px-10 py-6 font-mono text-gray-400 font-bold">{asgn.clicks}</td>
-                                        <td className="px-10 py-6 font-mono text-white font-black">{asgn.leads}</td>
-                                        <td className="px-10 py-6 text-right">
-                                            <span className="px-3 py-1 bg-teal/10 text-teal rounded-full text-[9px] font-black uppercase tracking-widest border border-teal/20">Active</span>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                        </div>
-                    </div>
-                </div>
-            )}
-            
-            {activeTab === 'staff' && (
-                <div className="bg-[#0E1B2A] rounded-[3rem] border border-white/5 overflow-hidden shadow-2xl">
-                    <div className="p-8 border-b border-white/5 bg-white/[0.01]">
-                        <h3 className="text-2xl font-black text-white">Partner Performance Matrix</h3>
-                    </div>
-                    <div className="overflow-x-auto custom-scrollbar">
-                        <div className="min-w-[900px]">
-                            <table className="w-full text-left">
-                            <thead className="bg-[#0A1622] border-b border-white/5">
-                                <tr className="text-[10px] text-gray-600 font-black uppercase tracking-widest">
-                                    <th className="px-10 py-6">Operator</th>
-                                    <th className="px-10 py-6">Cluster/Campaign</th>
-                                    <th className="px-10 py-6">Reach</th>
-                                    <th className="px-10 py-6">Qualified Leads</th>
-                                    <th className="px-10 py-6 text-right">Ratio</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-white/5">
-                                {staffPerformance.map((perf) => (
-                                    <tr key={`${perf.staff_id}-${perf.campaign_id}`} className="hover:bg-white/[0.02] transition-colors group">
-                                        <td className="px-10 py-6">
-                                            <div className="flex items-center gap-4">
-                                                <div className="w-10 h-10 rounded-2xl bg-teal/10 border border-teal/20 flex items-center justify-center font-black text-teal text-xs">
-                                                    {perf.staff_name?.charAt(0).toUpperCase()}
-                                                </div>
-                                                <div>
-                                                    <p className="font-bold text-white leading-none">{perf.staff_name}</p>
-                                                    <p className="text-[10px] text-gray-500 mt-2">{perf.staff_email}</p>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="px-10 py-6">
-                                            <span className="text-xs font-black text-blue-400 bg-blue-500/10 px-3 py-1 rounded-full border border-blue-500/20 uppercase tracking-tighter">
-                                                {perf.campaign_name}
-                                            </span>
-                                        </td>
-                                        <td className="px-10 py-6 font-mono text-white text-lg font-black">{perf.clicks}</td>
-                                        <td className="px-10 py-6 font-mono text-teal text-lg font-black">{perf.leads}</td>
-                                        <td className="px-10 py-6 text-right font-mono text-xl font-black text-white">
-                                            {((perf.leads / (perf.clicks || 1)) * 100).toFixed(1)}%
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Campaign Management Tab (Expanded) */}
-            {activeTab === 'campaigns' && (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {campaigns.map(camp => (
-                        <div key={camp.id} className="bg-[#0E1B2A] rounded-[2.5rem] border border-white/5 p-8 shadow-xl hover:border-teal/30 transition-all group flex flex-col h-full">
-                            <div className="flex justify-between items-start mb-6">
-                                <div className="w-12 h-12 bg-blue-500/10 rounded-2xl flex items-center justify-center text-blue-500 border border-blue-500/20">
-                                    <Megaphone size={24} />
-                                </div>
-                                <span className={cn(
-                                    "text-[9px] font-black px-3 py-1 rounded-full uppercase tracking-widest border",
-                                    camp.is_active ? "text-teal border-teal/20 bg-teal/5" : "text-gray-500 border-white/10 bg-white/5"
-                                )}>
-                                    {camp.is_active ? 'Priority' : 'Archived'}
-                                </span>
-                            </div>
-                            <h3 className="text-xl font-black text-white mb-2 leading-tight">{camp.name}</h3>
-                            <p className="text-gray-500 text-sm mb-8 line-clamp-3 leading-relaxed flex-grow">{camp.description}</p>
-                            
-                            <div className="space-y-4 pt-6 border-t border-white/5">
-                                <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest">
-                                    <span className="text-gray-600">Performance</span>
-                                    <span className="text-white">Live Data Only</span>
-                                </div>
-                                <div className="flex items-center gap-4">
-                                    <button className="flex-1 py-3 bg-white/5 hover:bg-white/10 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">
-                                        Configure
-                                    </button>
-                                    <button 
-                                        onClick={() => {
-                                            setNewAssignment({...newAssignment, campaign_id: camp.id});
-                                            setIsAssignModalOpen(true);
-                                        }}
-                                        className="flex-1 py-3 bg-teal text-dark-blue rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
-                                    >
-                                        Assign
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    ))}
-                    
-                    <button 
-                        onClick={() => setIsCreateModalOpen(true)}
-                        className="bg-transparent border-2 border-dashed border-white/5 rounded-[2.5rem] p-8 flex flex-col items-center justify-center text-gray-600 hover:text-teal hover:border-teal/30 transition-all group min-h-[300px]"
-                    >
-                        <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mb-4 group-hover:bg-teal/10 transition-all">
-                            <Plus size={32} />
-                        </div>
-                        <p className="font-black text-sm uppercase tracking-widest">Initialize New Protocol</p>
-                    </button>
-                </div>
-            )}
         </div>
     );
 }
