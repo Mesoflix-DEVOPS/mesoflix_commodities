@@ -20,6 +20,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
                 u.full_name as staff_name,
                 u.email as staff_email,
                 ca.unique_code,
+                ca.custom_alias,
                 (SELECT COUNT(*) FROM campaign_analytics can 
                  WHERE can.assignment_id = ca.id AND can.event_type = 'CLICK') as clicks,
                 (SELECT COUNT(*) FROM campaign_analytics can 

@@ -50,9 +50,9 @@ export default function CampaignMissionControl({ params }: { params: { id: strin
         fetchData();
     }, [params.id, router]);
 
-    const handleCopyExample = () => {
-        const example = `${window.location.origin}/c/EXAMPLE_CODE`;
-        navigator.clipboard.writeText(example);
+    const handleCopyLink = (code: string) => {
+        const url = `${window.location.origin}/c/${code}`;
+        navigator.clipboard.writeText(url);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
     };
@@ -94,15 +94,13 @@ export default function CampaignMissionControl({ params }: { params: { id: strin
                     </div>
                 </div>
 
-                <div className="bg-white/5 border border-white/10 p-6 rounded-[2rem] flex flex-col items-center md:items-end gap-2">
-                    <span className="text-[9px] font-black uppercase tracking-widest text-gray-500">Global Campaign Link (Staff Use Codes)</span>
-                    <div className="flex items-center gap-3">
-                        <code className="text-teal font-mono text-sm bg-teal/10 px-4 py-2 rounded-xl border border-teal/20">
-                            {window.location.origin}/c/[STAFF_CODE]
-                        </code>
-                        <button onClick={handleCopyExample} className="p-2 text-gray-500 hover:text-white transition-colors">
-                            {copied ? <Check size={16} className="text-teal" /> : <Copy size={16} />}
-                        </button>
+                <div className="flex items-center gap-4">
+                    <div className="text-right">
+                        <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Protocol Status</p>
+                        <p className="text-teal font-black text-xs uppercase tracking-widest mt-1">Live Deployment</p>
+                    </div>
+                    <div className="w-12 h-12 bg-teal/10 border border-teal/20 rounded-2xl flex items-center justify-center text-teal">
+                        <Megaphone size={20} />
                     </div>
                 </div>
             </div>
@@ -127,7 +125,7 @@ export default function CampaignMissionControl({ params }: { params: { id: strin
                             <thead className="bg-[#0A1622]/50 border-b border-white/5">
                                 <tr className="text-[10px] text-gray-600 font-black uppercase tracking-widest">
                                     <th className="px-10 py-6">Operator</th>
-                                    <th className="px-10 py-6 text-center">Ref. Code</th>
+                                    <th className="px-10 py-6">Live Deployment Link</th>
                                     <th className="px-10 py-6 text-center">Impressions</th>
                                     <th className="px-10 py-6 text-center">Leads</th>
                                     <th className="px-10 py-6 text-right">Conversion</th>
@@ -147,10 +145,18 @@ export default function CampaignMissionControl({ params }: { params: { id: strin
                                                 </div>
                                             </div>
                                         </td>
-                                        <td className="px-10 py-6 text-center">
-                                            <span className="font-mono font-black text-teal text-sm bg-teal/5 px-3 py-1 rounded-lg border border-teal/10">
-                                                {perf.unique_code}
-                                            </span>
+                                        <td className="px-10 py-6">
+                                            <div className="flex items-center gap-3">
+                                                <code className="font-mono font-black text-teal text-[11px] bg-teal/5 px-3 py-1.5 rounded-lg border border-teal/10">
+                                                    /c/{perf.custom_alias || perf.unique_code}
+                                                </code>
+                                                <button 
+                                                    onClick={() => handleCopyLink(perf.custom_alias || perf.unique_code)}
+                                                    className="p-2 text-gray-600 hover:text-white transition-colors"
+                                                >
+                                                    <Copy size={14} />
+                                                </button>
+                                            </div>
                                         </td>
                                         <td className="px-10 py-6 text-center font-mono text-gray-400 font-bold">{perf.clicks}</td>
                                         <td className="px-10 py-6 text-center font-mono text-white font-black">{perf.leads}</td>
