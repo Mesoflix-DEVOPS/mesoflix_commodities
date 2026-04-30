@@ -27,22 +27,23 @@ export async function POST(req: NextRequest) {
         }
 
         const body = await req.json();
-        const { name, description, landing_page_url, resources } = body;
+        const { name, description, landing_page_url, resources, embed_code } = body;
 
         if (!name || !description) {
             return NextResponse.json({ error: 'Name and description are required' }, { status: 400 });
         }
 
         const query = `
-            INSERT INTO campaigns (name, description, landing_page_url, resources)
-            VALUES ($1, $2, $3, $4)
+            INSERT INTO campaigns (name, description, landing_page_url, resources, embed_code)
+            VALUES ($1, $2, $3, $4, $5)
             RETURNING *
         `;
         const result = await pool.query(query, [
             name, 
             description, 
             landing_page_url || '/register', 
-            resources ? JSON.stringify(resources) : null
+            resources ? JSON.stringify(resources) : null,
+            embed_code || null
         ]);
 
         return NextResponse.json({ campaign: result.rows[0] });

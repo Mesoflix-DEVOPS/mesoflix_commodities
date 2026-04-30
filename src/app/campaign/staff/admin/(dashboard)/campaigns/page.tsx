@@ -19,7 +19,7 @@ export default function AdminCampaignsPage() {
     const [loading, setLoading] = useState(true);
     
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-    const [newCampaign, setNewCampaign] = useState({ name: '', description: '', landing_page_url: '/register' });
+    const [newCampaign, setNewCampaign] = useState({ name: '', description: '', landing_page_url: '/register', embed_code: '' });
     const [isCreating, setIsCreating] = useState(false);
 
     const fetchData = async () => {
@@ -52,7 +52,7 @@ export default function AdminCampaignsPage() {
             });
             if (res?.ok) {
                 setIsCreateModalOpen(false);
-                setNewCampaign({ name: '', description: '', landing_page_url: '/register' });
+                setNewCampaign({ name: '', description: '', landing_page_url: '/register', embed_code: '' });
                 await fetchData();
             }
         } catch (err) {
@@ -121,7 +121,16 @@ export default function AdminCampaignsPage() {
                                 />
                             </div>
                             <div className="space-y-2">
-                                <label className="text-[10px] font-black text-teal uppercase tracking-widest ml-4">Destination Link</label>
+                                <label className="text-[10px] font-black text-teal uppercase tracking-widest ml-4">Institutional Embed Code (HTML)</label>
+                                <textarea 
+                                    value={newCampaign.embed_code}
+                                    onChange={(e) => setNewCampaign({...newCampaign, embed_code: e.target.value})}
+                                    placeholder="Paste Capital.com iframe or asset code here..."
+                                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white focus:outline-none focus:border-teal/50 transition-all h-24 font-mono text-[10px]"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-teal uppercase tracking-widest ml-4">Deployment Destination (Fallback)</label>
                                 <input 
                                     required
                                     value={newCampaign.landing_page_url}

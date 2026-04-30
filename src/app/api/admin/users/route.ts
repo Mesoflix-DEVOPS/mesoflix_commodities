@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        // Fetch all potential partners (role = 'user')
+        // Fetch all potential partners (No exclusions, as requested)
         const result = await pool.query('SELECT id, email, full_name, role FROM users ORDER BY created_at DESC');
         return NextResponse.json({ users: result.rows });
     } catch (error: any) {
