@@ -23,32 +23,68 @@ export default function CampaignMissionControl({ params }: { params: { id: strin
     const [performance, setPerformance] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [copied, setCopied] = useState(false);
+    
+    const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
+    const [allUsers, setAllUsers] = useState<any[]>([]);
+    const [selectedStaffId, setSelectedStaffId] = useState('');
+    const [isAssigning, setIsAssigning] = useState(false);
+
+    const fetchData = async () => {
+        setLoading(true);
+        try {
+            const [campRes, perfRes, usersRes] = await Promise.all([
+                authedFetch(`/api/admin/campaigns/${params.id}`, router),
+                authedFetch(`/api/admin/analytics/campaign/${params.id}`, router),
+                authedFetch("/api/admin/users", router)
+            ]);
+
+            if (campRes?.ok) {
+                const data = await campRes.json();
+                setCampaign(data.campaign);
+            }
+            if (perfRes?.ok) {
+                const data = await perfRes.json();
+                setPerformance(data.performance);
+            }
+            if (usersRes?.ok) {
+                const data = await usersRes.json();
+                setAllUsers(data.users);
+            }
+        } catch (err) {
+            console.error("Failed to load mission control data:", err);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     useEffect(() => {
-        const fetchData = async () => {
-            try {
-                // Fetch specific campaign details and its partner performance
-                const [campRes, perfRes] = await Promise.all([
-                    authedFetch(`/api/admin/campaigns/${params.id}`, router),
-                    authedFetch(`/api/admin/analytics/campaign/${params.id}`, router)
-                ]);
-
-                if (campRes?.ok) {
-                    const data = await campRes.json();
-                    setCampaign(data.campaign);
-                }
-                if (perfRes?.ok) {
-                    const data = await perfRes.json();
-                    setPerformance(data.performance);
-                }
-            } catch (err) {
-                console.error("Failed to load mission control data:", err);
-            } finally {
-                setLoading(false);
-            }
-        };
         fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [params.id, router]);
+
+    const handleAssignStaff = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!selectedStaffId) return;
+        setIsAssigning(true);
+        try {
+            const res = await authedFetch("/api/admin/assignments", router, {
+                method: "POST",
+                body: JSON.stringify({
+                    campaign_id: params.id,
+                    staff_id: selectedStaffId
+                })
+            });
+            if (res?.ok) {
+                setIsAssignModalOpen(false);
+                setSelectedStaffId('');
+                await fetchData();
+            }
+        } catch (err) {
+            console.error("Assignment Failure:", err);
+        } finally {
+            setIsAssigning(false);
+        }
+    };
 
     const handleCopyLink = (code: string) => {
         const url = `${window.location.origin}/c/${code}`;
@@ -99,11 +135,54 @@ export default function CampaignMissionControl({ params }: { params: { id: strin
                         <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Protocol Status</p>
                         <p className="text-teal font-black text-xs uppercase tracking-widest mt-1">Live Deployment</p>
                     </div>
-                    <div className="w-12 h-12 bg-teal/10 border border-teal/20 rounded-2xl flex items-center justify-center text-teal">
-                        <Megaphone size={20} />
-                    </div>
+                    <button 
+                        onClick={() => setIsAssignModalOpen(true)}
+                        className="w-12 h-12 bg-teal/10 border border-teal/20 rounded-2xl flex items-center justify-center text-teal hover:bg-teal hover:text-dark-blue transition-all"
+                    >
+                        <Users size={20} />
+                    </button>
                 </div>
             </div>
+
+            {/* Modal: Assign Staff Directly */}
+            {isAssignModalOpen && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+                    <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => setIsAssignModalOpen(false)} />
+                    <div className="relative w-full max-w-md bg-[#0A1622] border border-white/10 rounded-[2.5rem] p-10 shadow-2xl animate-in zoom-in-95 duration-300">
+                        <div className="flex justify-between items-center mb-8">
+                            <div>
+                                <h3 className="text-2xl font-black text-white tracking-tight">Link Partner</h3>
+                                <p className="text-gray-500 text-sm mt-1">Assign an operator to this protocol.</p>
+                            </div>
+                            <button onClick={() => setIsAssignModalOpen(false)} className="text-gray-500 hover:text-white transition-colors"><X /></button>
+                        </div>
+
+                        <form onSubmit={handleAssignStaff} className="space-y-6">
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-teal uppercase tracking-widest ml-4">Select Staff Identity</label>
+                                <select 
+                                    required
+                                    value={selectedStaffId}
+                                    onChange={(e) => setSelectedStaffId(e.target.value)}
+                                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white focus:outline-none focus:border-teal/50 transition-all appearance-none"
+                                >
+                                    <option value="" className="bg-[#0A1622]">Choose staff member...</option>
+                                    {allUsers.map(u => (
+                                        <option key={u.id} value={u.id} className="bg-[#0A1622]">{u.full_name} ({u.email})</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <button 
+                                disabled={isAssigning}
+                                className="w-full py-5 bg-teal text-dark-blue font-black rounded-2xl uppercase tracking-[0.2em] text-xs shadow-xl"
+                            >
+                                {isAssigning ? <Loader2 className="animate-spin mx-auto" /> : "Authorize Deployment Link"}
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            )}
 
             {/* Matrix Stats */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
