@@ -242,8 +242,17 @@ export default function AdminCampaignsPage() {
                                 {camp.is_active ? 'Priority' : 'Archived'}
                             </span>
                         </div>
-                        <h3 className="text-xl font-black text-white mb-2 leading-tight">{camp.name}</h3>
-                        <p className="text-gray-500 text-sm mb-8 line-clamp-3 leading-relaxed flex-grow">{camp.description}</p>
+                        <div 
+                            onClick={() => router.push(`/campaign/staff/admin/campaigns/${camp.id}`)}
+                            className="flex-grow cursor-pointer group/content"
+                        >
+                            <h3 className="text-xl font-black text-white mb-2 leading-tight group-hover/content:text-teal transition-colors">{camp.name}</h3>
+                            <p className="text-gray-500 text-sm mb-8 line-clamp-3 leading-relaxed flex-grow">{camp.description}</p>
+                            
+                            <div className="mb-6 px-4 py-2 bg-white/5 border border-white/10 rounded-xl inline-flex items-center gap-2 opacity-0 group-hover/content:opacity-100 transition-all">
+                                <span className="text-[9px] font-black uppercase tracking-widest text-teal">View Mission Control</span>
+                            </div>
+                        </div>
                         
                         <div className="space-y-4 pt-6 border-t border-white/5">
                             <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest">
