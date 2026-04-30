@@ -12,6 +12,13 @@ import {
     Megaphone,
     Copy,
     Check,
+    Globe,
+    FileText,
+    Image as ImageIcon,
+    Video,
+    Info,
+    Calendar,
+    X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { authedFetch } from "@/lib/fetch-utils";
@@ -192,6 +199,110 @@ export default function CampaignMissionControl({ params }: { params: { id: strin
                 <StatCard icon={Users} label="Active Partners" value={performance.length} color="green" />
             </div>
 
+            {/* Protocol Configuration & Resources */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                <div className="lg:col-span-4 space-y-8">
+                    <div className="bg-[#0E1B2A] rounded-[3rem] border border-white/5 p-10 shadow-2xl relative overflow-hidden h-full">
+                        <div className="relative z-10 space-y-8">
+                            <div className="flex items-center gap-4">
+                                <div className="w-12 h-12 bg-blue-500/10 rounded-2xl flex items-center justify-center text-blue-500 border border-blue-500/20">
+                                    <Globe size={24} />
+                                </div>
+                                <div>
+                                    <h3 className="text-xl font-black text-white tracking-tight">Deployment Target</h3>
+                                    <p className="text-gray-500 text-[10px] font-black uppercase tracking-widest mt-1">Primary Landing Zone</p>
+                                </div>
+                            </div>
+
+                            <div className="p-6 bg-white/[0.02] border border-white/5 rounded-3xl">
+                                <p className="text-gray-500 text-[10px] font-black uppercase tracking-widest mb-3">Target Domain</p>
+                                <div className="flex items-center justify-between gap-4">
+                                    <code className="text-xs font-bold text-teal truncate">
+                                        {campaign.landing_page_url}
+                                    </code>
+                                    <a 
+                                        href={campaign.landing_page_url} 
+                                        target="_blank" 
+                                        rel="noopener noreferrer"
+                                        className="p-2 bg-white/5 hover:bg-white/10 rounded-lg text-gray-400 hover:text-white transition-all"
+                                    >
+                                        <ArrowLeft size={14} className="rotate-180" />
+                                    </a>
+                                </div>
+                            </div>
+
+                            <div className="pt-4 border-t border-white/5 space-y-4">
+                                <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest">
+                                    <span className="text-gray-600">Established</span>
+                                    <span className="text-white">{new Date(campaign.created_at).toLocaleDateString()}</span>
+                                </div>
+                                <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest">
+                                    <span className="text-gray-600">Last Update</span>
+                                    <span className="text-white">{new Date(campaign.updated_at).toLocaleDateString()}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="lg:col-span-8 bg-[#0E1B2A] rounded-[3rem] border border-white/5 p-10 shadow-2xl relative overflow-hidden">
+                    <div className="relative z-10 space-y-8">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                                <div className="w-12 h-12 bg-purple-500/10 rounded-2xl flex items-center justify-center text-purple-500 border border-purple-500/20">
+                                    <FileText size={24} />
+                                </div>
+                                <div>
+                                    <h3 className="text-xl font-black text-white tracking-tight">Marketing Assets</h3>
+                                    <p className="text-gray-500 text-[10px] font-black uppercase tracking-widest mt-1">Institutional resources & creative</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {(() => {
+                            let resources = { copy: [], images: [], videos: [] };
+                            try {
+                                if (campaign.resources) {
+                                    resources = typeof campaign.resources === 'string' 
+                                        ? JSON.parse(campaign.resources) 
+                                        : campaign.resources;
+                                }
+                            } catch (e) {
+                                console.error("Failed to parse resources", e);
+                            }
+
+                            const hasResources = resources.copy?.length > 0 || resources.images?.length > 0 || resources.videos?.length > 0;
+
+                            if (!hasResources) {
+                                return (
+                                    <div className="py-20 flex flex-col items-center justify-center text-gray-700 bg-white/[0.01] rounded-[2rem] border border-dashed border-white/5">
+                                        <Info size={40} className="opacity-10 mb-4" />
+                                        <p className="font-black text-[10px] uppercase tracking-widest opacity-40">No creative assets assigned to this protocol</p>
+                                    </div>
+                                );
+                            }
+
+                            return (
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                    <ResourceMetric icon={FileText} label="Copy Blocks" value={resources.copy?.length || 0} />
+                                    <ResourceMetric icon={ImageIcon} label="Visual Assets" value={resources.images?.length || 0} />
+                                    <ResourceMetric icon={Video} label="Video Media" value={resources.videos?.length || 0} />
+                                    
+                                    <div className="md:col-span-3 mt-4">
+                                        <p className="text-[10px] font-black text-gray-600 uppercase tracking-widest mb-6">Brief Description</p>
+                                        <div className="p-8 bg-white/[0.02] border border-white/5 rounded-[2rem]">
+                                            <p className="text-gray-400 text-sm leading-relaxed line-clamp-4">
+                                                {campaign.description}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })()}
+                    </div>
+                </div>
+            </div>
+
             {/* Partner Performance Table */}
             <div className="bg-[#0E1B2A] rounded-[3rem] border border-white/5 overflow-hidden shadow-2xl">
                 <div className="p-10 border-b border-white/5 bg-white/[0.01]">
@@ -256,6 +367,20 @@ export default function CampaignMissionControl({ params }: { params: { id: strin
                         </table>
                     </div>
                 </div>
+            </div>
+        </div>
+    );
+}
+
+function ResourceMetric({ icon: Icon, label, value }: any) {
+    return (
+        <div className="p-6 bg-white/[0.02] border border-white/5 rounded-3xl flex items-center gap-4">
+            <div className="w-10 h-10 bg-white/5 rounded-xl flex items-center justify-center text-gray-400">
+                <Icon size={18} />
+            </div>
+            <div>
+                <p className="text-xl font-black text-white leading-none">{value}</p>
+                <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest mt-1">{label}</p>
             </div>
         </div>
     );

@@ -7,9 +7,16 @@ import {
     Copy,
     Check,
     ExternalLink,
+    Target,
+    Globe,
+    FileText,
+    Image as ImageIcon,
+    Video,
+    Info,
+    Eye,
+    ChevronRight,
     Zap,
     X,
-    Target,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { authedFetch } from "@/lib/fetch-utils";
@@ -25,6 +32,9 @@ export default function StaffCampaignsPage() {
     const [editingAssignment, setEditingAssignment] = useState<any>(null);
     const [newAlias, setNewAlias] = useState('');
     const [isUpdatingAlias, setIsUpdatingAlias] = useState(false);
+    
+    const [isBriefModalOpen, setIsBriefModalOpen] = useState(false);
+    const [selectedCampaign, setSelectedCampaign] = useState<any>(null);
 
     const fetchData = async () => {
         setLoading(true);
@@ -72,6 +82,11 @@ export default function StaffCampaignsPage() {
         setEditingAssignment(item);
         setNewAlias(item.custom_alias || '');
         setIsAliasModalOpen(true);
+    };
+
+    const openBriefModal = (item: any) => {
+        setSelectedCampaign(item);
+        setIsBriefModalOpen(true);
     };
 
     const handleAutoGenerateAlias = () => {
@@ -151,6 +166,99 @@ export default function StaffCampaignsPage() {
                 </div>
             )}
 
+            {/* Modal: View Campaign Brief */}
+            {isBriefModalOpen && selectedCampaign && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+                    <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => setIsBriefModalOpen(false)} />
+                    <div className="relative w-full max-w-2xl bg-[#0A1622] border border-white/10 rounded-[3rem] p-10 shadow-2xl animate-in zoom-in-95 duration-300 max-h-[90vh] overflow-y-auto custom-scrollbar">
+                        <div className="flex justify-between items-start mb-10">
+                            <div className="flex items-center gap-6">
+                                <div className="w-16 h-16 bg-teal/10 rounded-2xl flex items-center justify-center text-teal border border-teal/20">
+                                    <Megaphone size={32} />
+                                </div>
+                                <div>
+                                    <h3 className="text-3xl font-black text-white tracking-tighter">{selectedCampaign.campaign_name}</h3>
+                                    <p className="text-gray-500 text-[10px] font-black uppercase tracking-[0.2em] mt-2">Marketing Deployment Brief</p>
+                                </div>
+                            </div>
+                            <button onClick={() => setIsBriefModalOpen(false)} className="p-3 bg-white/5 hover:bg-white/10 rounded-xl text-gray-500 hover:text-white transition-all"><X /></button>
+                        </div>
+
+                        <div className="space-y-10">
+                            {/* Mission Description */}
+                            <div className="space-y-4">
+                                <p className="text-[10px] font-black text-teal uppercase tracking-widest flex items-center gap-2">
+                                    <Info size={12} /> Protocol Objectives
+                                </p>
+                                <div className="p-8 bg-white/[0.02] border border-white/5 rounded-[2rem]">
+                                    <p className="text-gray-400 text-sm leading-relaxed">
+                                        {selectedCampaign.campaign_description || "No description provided for this deployment."}
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Target Intel */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="p-6 bg-white/[0.02] border border-white/5 rounded-[2rem] space-y-3">
+                                    <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Target Domain</p>
+                                    <div className="flex items-center justify-between gap-4">
+                                        <code className="text-xs font-bold text-white truncate">{selectedCampaign.landing_page}</code>
+                                        <Globe size={16} className="text-teal/40" />
+                                    </div>
+                                </div>
+                                <div className="p-6 bg-white/[0.02] border border-white/5 rounded-[2rem] space-y-3">
+                                    <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Performance Tier</p>
+                                    <div className="flex items-center justify-between gap-4">
+                                        <p className="text-xs font-bold text-white">Institutional Grade</p>
+                                        <Target size={16} className="text-purple-500/40" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Resource Distribution */}
+                            <div className="space-y-6">
+                                <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Assigned Marketing Assets</p>
+                                {(() => {
+                                    let resources = { copy: [], images: [], videos: [] };
+                                    try {
+                                        if (selectedCampaign.resources) {
+                                            resources = typeof selectedCampaign.resources === 'string' 
+                                                ? JSON.parse(selectedCampaign.resources) 
+                                                : selectedCampaign.resources;
+                                        }
+                                    } catch (e) {}
+
+                                    const hasResources = resources.copy?.length > 0 || resources.images?.length > 0 || resources.videos?.length > 0;
+
+                                    if (!hasResources) {
+                                        return (
+                                            <div className="py-12 flex flex-col items-center justify-center text-gray-700 bg-white/[0.01] rounded-[2rem] border border-dashed border-white/5">
+                                                <p className="font-black text-[10px] uppercase tracking-widest opacity-40">No creative assets currently assigned</p>
+                                            </div>
+                                        );
+                                    }
+
+                                    return (
+                                        <div className="grid grid-cols-3 gap-4">
+                                            <BriefAsset icon={FileText} label="Copy" count={resources.copy?.length || 0} />
+                                            <BriefAsset icon={ImageIcon} label="Images" count={resources.images?.length || 0} />
+                                            <BriefAsset icon={Video} label="Video" count={resources.videos?.length || 0} />
+                                        </div>
+                                    );
+                                })()}
+                            </div>
+
+                            <button 
+                                onClick={() => setIsBriefModalOpen(false)}
+                                className="w-full py-5 bg-white/5 hover:bg-white/10 text-white font-black rounded-2xl uppercase tracking-[0.2em] text-xs transition-all border border-white/5"
+                            >
+                                Acknowledge Brief
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                 {campaigns.map((item) => {
                     const domain = typeof window !== 'undefined' ? window.location.host : 'capital.mesoflix.com';
@@ -198,6 +306,13 @@ export default function StaffCampaignsPage() {
                                         >
                                             <Target size={14} /> Shorten URL
                                         </button>
+
+                                        <button 
+                                            onClick={() => openBriefModal(item)}
+                                            className="w-full py-3 bg-teal/10 hover:bg-teal/20 text-teal rounded-xl text-[9px] font-black uppercase tracking-[0.2em] transition-all border border-teal/10 flex items-center justify-center gap-2"
+                                        >
+                                            <Eye size={14} /> View Brief
+                                        </button>
                                     </div>
                                     
                                     <button 
@@ -218,6 +333,18 @@ export default function StaffCampaignsPage() {
                         <p className="font-black text-xs uppercase tracking-widest opacity-40">No active assignments found</p>
                     </div>
                 )}
+            </div>
+        </div>
+    );
+}
+
+function BriefAsset({ icon: Icon, label, count }: any) {
+    return (
+        <div className="p-4 bg-white/[0.02] border border-white/5 rounded-2xl flex flex-col items-center justify-center gap-2 text-center">
+            <Icon size={20} className="text-teal/40" />
+            <div>
+                <p className="text-sm font-black text-white">{count}</p>
+                <p className="text-[8px] font-black text-gray-600 uppercase tracking-widest">{label}</p>
             </div>
         </div>
     );
