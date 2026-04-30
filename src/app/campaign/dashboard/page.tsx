@@ -99,7 +99,7 @@ export default function StaffCampaignDashboard() {
     const resources = selectedCampaign?.resources ? JSON.parse(selectedCampaign.resources) : { images: [], videos: [], copy: [] };
 
     return (
-        <div className="max-w-7xl mx-auto p-8 pt-12 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+        <div className="max-w-7xl mx-auto p-4 md:p-8 pt-12 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
             {error && (
                 <div className="bg-red-500/10 border border-red-500/20 p-6 rounded-[2rem] flex items-center gap-4 animate-shake">
                     <div className="w-12 h-12 bg-red-500/10 rounded-2xl flex items-center justify-center border border-red-500/20">
@@ -221,7 +221,7 @@ export default function StaffCampaignDashboard() {
                                     <Megaphone size={14} className="text-teal" /> Marketing Toolset
                                 </h3>
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 gap-8">
                                     {/* Visual Assets */}
                                     <div className="space-y-4">
                                         <h4 className="text-sm font-bold text-white flex items-center gap-2">

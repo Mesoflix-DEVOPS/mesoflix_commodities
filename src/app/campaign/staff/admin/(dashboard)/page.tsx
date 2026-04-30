@@ -237,8 +237,9 @@ export default function CampaignMasterAdmin() {
                             </span>
                         </div>
                     </div>
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left">
+                    <div className="overflow-x-auto custom-scrollbar">
+                        <div className="min-w-[900px]">
+                            <table className="w-full text-left">
                             <thead className="bg-[#0A1622]/50 border-b border-white/5">
                                 <tr className="text-[10px] text-gray-600 font-black uppercase tracking-widest">
                                     <th className="px-10 py-6">Unique Ref. Code</th>
@@ -276,6 +277,7 @@ export default function CampaignMasterAdmin() {
                                 ))}
                             </tbody>
                         </table>
+                        </div>
                     </div>
                 </div>
             )}
@@ -284,8 +286,9 @@ export default function CampaignMasterAdmin() {
                     <div className="p-8 border-b border-white/5 bg-white/[0.01]">
                         <h3 className="text-2xl font-black text-white">Partner Performance Matrix</h3>
                     </div>
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left">
+                    <div className="overflow-x-auto custom-scrollbar">
+                        <div className="min-w-[900px]">
+                            <table className="w-full text-left">
                             <thead className="bg-[#0A1622] border-b border-white/5">
                                 <tr className="text-[10px] text-gray-600 font-black uppercase tracking-widest">
                                     <th className="px-10 py-6">Operator</th>
@@ -323,6 +326,7 @@ export default function CampaignMasterAdmin() {
                                 ))}
                             </tbody>
                         </table>
+                        </div>
                     </div>
                 </div>
             )}
