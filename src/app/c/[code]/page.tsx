@@ -8,7 +8,7 @@ export default async function CampaignAssetLanding({ params }: { params: { code:
     const { code } = await params;
 
     try {
-        // 1. Institutional Lookup
+        // 1. Institutional Lookup: Retrieve Campaign Identity & Assets
         const query = `
             SELECT 
                 ca.id as assignment_id,
@@ -18,7 +18,7 @@ export default async function CampaignAssetLanding({ params }: { params: { code:
                 c.landing_page_url
             FROM campaign_assignments ca
             INNER JOIN campaigns c ON ca.campaign_id = c.id
-            WHERE ca.unique_code = $1
+            WHERE ca.unique_code = $1 OR ca.custom_alias = $1
             LIMIT 1
         `;
         const result = await pool.query(query, [code]);
