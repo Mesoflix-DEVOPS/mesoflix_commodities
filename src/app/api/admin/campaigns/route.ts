@@ -52,3 +52,48 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Internal Server Error', details: error.message }, { status: 500 });
     }
 }
+
+export async function PATCH(req: NextRequest) {
+    try {
+        const session = await auth();
+        if (!session || session.user.role !== 'admin') {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        const body = await req.json();
+        const { id, name, description, landing_page_url, resources, embed_code } = body;
+
+        if (!id) {
+            return NextResponse.json({ error: 'Campaign ID is required' }, { status: 400 });
+        }
+
+        const query = `
+            UPDATE campaigns 
+            SET name = COALESCE($1, name), 
+                description = COALESCE($2, description), 
+                landing_page_url = COALESCE($3, landing_page_url), 
+                resources = COALESCE($4, resources), 
+                embed_code = COALESCE($5, embed_code),
+                updated_at = NOW()
+            WHERE id = $6
+            RETURNING *
+        `;
+        const result = await pool.query(query, [
+            name, 
+            description, 
+            landing_page_url, 
+            resources ? JSON.stringify(resources) : null,
+            embed_code,
+            id
+        ]);
+
+        if (result.rows.length === 0) {
+            return NextResponse.json({ error: 'Campaign not found' }, { status: 404 });
+        }
+
+        return NextResponse.json({ campaign: result.rows[0] });
+    } catch (error: any) {
+        console.error('Failed to update campaign:', error);
+        return NextResponse.json({ error: 'Internal Server Error', details: error.message }, { status: 500 });
+    }
+}

@@ -19,8 +19,11 @@ export default function AdminCampaignsPage() {
     const [loading, setLoading] = useState(true);
     
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [editingCampaign, setEditingCampaign] = useState<any>(null);
     const [newCampaign, setNewCampaign] = useState({ name: '', description: '', landing_page_url: '/register', embed_code: '' });
     const [isCreating, setIsCreating] = useState(false);
+    const [isUpdating, setIsUpdating] = useState(false);
 
     const fetchData = async () => {
         setLoading(true);
@@ -62,6 +65,32 @@ export default function AdminCampaignsPage() {
         }
     };
 
+    const handleUpdateCampaign = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!editingCampaign) return;
+        setIsUpdating(true);
+        try {
+            const res = await authedFetch("/api/admin/campaigns", router, {
+                method: "PATCH",
+                body: JSON.stringify(editingCampaign)
+            });
+            if (res?.ok) {
+                setIsEditModalOpen(false);
+                setEditingCampaign(null);
+                await fetchData();
+            }
+        } catch (err) {
+            console.error("Campaign Update Failure:", err);
+        } finally {
+            setIsUpdating(false);
+        }
+    };
+
+    const openEditModal = (camp: any) => {
+        setEditingCampaign(camp);
+        setIsEditModalOpen(true);
+    };
+
     if (loading) {
         return (
             <div className="flex flex-col items-center justify-center h-[60vh] space-y-4">
@@ -86,6 +115,56 @@ export default function AdminCampaignsPage() {
                 </button>
             </div>
 
+            {/* Modal: Edit Campaign */}
+            {isEditModalOpen && editingCampaign && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+                    <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => setIsEditModalOpen(false)} />
+                    <div className="relative w-full max-w-xl bg-[#0A1622] border border-white/10 rounded-[2.5rem] p-10 shadow-2xl animate-in zoom-in-95 duration-300">
+                        <div className="flex justify-between items-center mb-8">
+                            <div>
+                                <h3 className="text-2xl font-black text-white tracking-tight">Reconfigure Protocol</h3>
+                                <p className="text-gray-500 text-sm mt-1">Modify active deployment parameters.</p>
+                            </div>
+                            <button onClick={() => setIsEditModalOpen(false)} className="text-gray-500 hover:text-white transition-colors"><X /></button>
+                        </div>
+
+                        <form onSubmit={handleUpdateCampaign} className="space-y-6">
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-teal uppercase tracking-widest ml-4">Campaign Name</label>
+                                <input 
+                                    required
+                                    value={editingCampaign.name}
+                                    onChange={(e) => setEditingCampaign({...editingCampaign, name: e.target.value})}
+                                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white focus:outline-none"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-teal uppercase tracking-widest ml-4">Deployment Objective</label>
+                                <textarea 
+                                    required
+                                    value={editingCampaign.description}
+                                    onChange={(e) => setEditingCampaign({...editingCampaign, description: e.target.value})}
+                                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white focus:outline-none h-24 resize-none"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-teal uppercase tracking-widest ml-4">Institutional Embed Code</label>
+                                <textarea 
+                                    value={editingCampaign.embed_code || ''}
+                                    onChange={(e) => setEditingCampaign({...editingCampaign, embed_code: e.target.value})}
+                                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white font-mono text-[10px] h-24"
+                                />
+                            </div>
+                            <button 
+                                disabled={isUpdating}
+                                className="w-full py-5 bg-teal text-dark-blue font-black rounded-2xl uppercase tracking-[0.2em] text-xs shadow-xl"
+                            >
+                                {isUpdating ? <Loader2 className="animate-spin" /> : <><Zap size={18} /> Update Protocol</>}
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            )}
             {/* Modal: Create Campaign */}
             {isCreateModalOpen && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
@@ -172,7 +251,10 @@ export default function AdminCampaignsPage() {
                                 <span className="text-white">Live Deployment</span>
                             </div>
                             <div className="flex items-center gap-4">
-                                <button className="flex-1 py-3 bg-white/5 hover:bg-white/10 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">
+                                <button 
+                                    onClick={() => openEditModal(camp)}
+                                    className="flex-1 py-3 bg-white/5 hover:bg-white/10 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+                                >
                                     Configure
                                 </button>
                                 <button 
