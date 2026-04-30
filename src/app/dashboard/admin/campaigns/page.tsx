@@ -30,6 +30,7 @@ interface Campaign {
     name: string;
     description: string;
     landing_page_url: string;
+    embed_code: string | null;
     resources: string | null;
     is_active: boolean;
     created_at: string;
@@ -68,6 +69,7 @@ export default function AdminCampaignDashboard() {
         name: '',
         description: '',
         landing_page_url: '/register',
+        embed_code: '',
         resources: { images: [], videos: [], copy: [] }
     });
 
@@ -365,13 +367,22 @@ export default function AdminCampaignDashboard() {
                                 />
                             </div>
                             <div className="space-y-2">
-                                <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest px-1">Landing Destination</label>
+                                <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest px-1">Landing Destination (Redirect URL)</label>
                                 <input 
                                     type="text" 
                                     value={newCampaign.landing_page_url}
                                     onChange={e => setNewCampaign({...newCampaign, landing_page_url: e.target.value})}
-                                    placeholder="/register" 
+                                    placeholder="e.g. /register or https://external-link.com" 
                                     className="w-full bg-[#162B40] border border-white/5 rounded-2xl p-4 text-white placeholder:text-gray-600 focus:border-teal/50 transition-all outline-none" 
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest px-1">Embed Content (HTML / Script)</label>
+                                <textarea 
+                                    value={newCampaign.embed_code}
+                                    onChange={e => setNewCampaign({...newCampaign, embed_code: e.target.value})}
+                                    placeholder="Paste HTML or tracking codes here. This will be rendered on the landing page." 
+                                    className="w-full bg-[#162B40] border border-white/5 rounded-2xl p-4 text-white placeholder:text-gray-600 focus:border-teal/50 transition-all outline-none min-h-[120px] font-mono text-xs" 
                                 />
                             </div>
 

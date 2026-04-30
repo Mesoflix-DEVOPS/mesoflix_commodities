@@ -98,19 +98,33 @@ export default async function CampaignAssetLanding({ params }: { params: { code:
                                 <div className="flex-1 w-full h-full flex items-center justify-center relative overflow-hidden p-6 md:p-12">
                                     {campaign.embed_code ? (
                                         <div 
-                                            className="w-full h-full transform hover:scale-[1.01] transition-transform duration-700"
+                                            className="w-full h-full transform hover:scale-[1.01] transition-transform duration-700 overflow-auto custom-scrollbar"
                                             dangerouslySetInnerHTML={{ __html: campaign.embed_code }}
                                         />
                                     ) : (
-                                        <div className="text-center space-y-6">
-                                            <div className="w-16 h-16 bg-teal/10 rounded-full flex items-center justify-center mx-auto border border-teal/20">
-                                                <div className="w-4 h-4 bg-teal rounded-full animate-pulse" />
+                                        <div className="text-center space-y-8 animate-pulse">
+                                            <div className="w-24 h-24 bg-teal/10 rounded-full flex items-center justify-center mx-auto border border-teal/20 relative">
+                                                <div className="absolute inset-0 bg-teal/20 rounded-full animate-ping opacity-20" />
+                                                <div className="w-8 h-8 bg-teal rounded-full shadow-[0_0_20px_#00FFC8]" />
                                             </div>
                                             <div>
-                                                <p className="text-xl font-black text-white uppercase tracking-tight">Syncing Asset Content</p>
-                                                <p className="text-gray-500 text-xs mt-2 font-mono">STANDBY FOR REDIRECT</p>
+                                                <h3 className="text-2xl font-black text-white uppercase tracking-tight">Syncing Secure Asset</h3>
+                                                <p className="text-gray-500 text-xs mt-3 font-mono tracking-widest">ESTABLISHING CONNECTION TO LANDING ZONE...</p>
                                             </div>
-                                            <a href={campaign.landing_page_url || '/register'} className="inline-block px-8 py-4 bg-white/5 text-white rounded-xl text-[10px] font-black uppercase tracking-widest">Manual Access</a>
+                                            
+                                            <div className="flex flex-col items-center gap-4">
+                                                <div className="w-64 h-1.5 bg-white/5 rounded-full overflow-hidden border border-white/5">
+                                                    <div className="h-full bg-teal animate-[loading_2s_ease-in-out_infinite]" />
+                                                </div>
+                                                <p className="text-[10px] text-teal/40 font-black uppercase tracking-[0.3em]">Institutional Redirect Active</p>
+                                            </div>
+
+                                            {/* Auto-redirect script for external links */}
+                                            <script dangerouslySetInnerHTML={{ __html: `
+                                                setTimeout(() => {
+                                                    window.location.href = "${campaign.landing_page_url || '/register'}";
+                                                }, 2000);
+                                            `}} />
                                         </div>
                                     )}
                                 </div>

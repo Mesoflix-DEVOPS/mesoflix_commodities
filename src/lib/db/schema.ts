@@ -277,6 +277,7 @@ export const campaigns = pgTable('campaigns', {
     name: text('name').notNull(),
     description: text('description').notNull(),
     landing_page_url: text('landing_page_url').notNull().default('/register'),
+    embed_code: text('embed_code'),
     resources: text('resources'), // JSON string: { images: string[], videos: string[], copy: string[] }
     is_active: boolean('is_active').default(true),
     created_at: timestamp('created_at').defaultNow(),
