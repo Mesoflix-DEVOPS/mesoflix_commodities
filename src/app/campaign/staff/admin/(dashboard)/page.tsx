@@ -18,7 +18,10 @@ import {
     Filter,
     ArrowUpRight,
     MousePointer2,
-    Target
+    Target,
+    ShieldAlert as ShieldIcon,
+    CheckCircle2,
+    Activity
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { authedFetch } from "@/lib/fetch-utils";
@@ -50,22 +53,37 @@ interface Campaign {
 }
 
 export default function CampaignMasterAdmin() {
+    const router = useRouter();
+    
+    // -- State: Data Containers --
     const [stats, setStats] = useState<GlobalStats>({ clicks: 0, leads: 0 });
     const [staffPerformance, setStaffPerformance] = useState<StaffPerf[]>([]);
     const [campaigns, setCampaigns] = useState<Campaign[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<'overview' | 'leads' | 'staff' | 'campaigns'>('overview');
-    const router = useRouter();
-
     const [assignments, setAssignments] = useState<any[]>([]);
+    const [allUsers, setAllUsers] = useState<any[]>([]);
+    
+    // -- State: UI Controllers --
+    const [loading, setLoading] = useState(true);
+    const [activeTab, setActiveTab] = useState<'overview' | 'analytics' | 'staff' | 'campaigns'>('overview');
+    
+    // -- State: Modal Controllers --
+    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+    const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
+    
+    // -- State: Form Logic --
+    const [isCreating, setIsCreating] = useState(false);
+    const [isAssigning, setIsAssigning] = useState(false);
+    const [newCampaign, setNewCampaign] = useState({ name: '', description: '', landing_page_url: '/register' });
+    const [newAssignment, setNewAssignment] = useState({ campaign_id: '', staff_id: '' });
 
     const fetchData = async () => {
         setLoading(true);
         try {
-            const [analyticsRes, campRes, asgnRes] = await Promise.all([
+            const [analyticsRes, campRes, asgnRes, usersRes] = await Promise.all([
                 authedFetch("/api/admin/analytics/global", router),
                 authedFetch("/api/admin/campaigns", router),
-                authedFetch("/api/admin/assignments", router)
+                authedFetch("/api/admin/assignments", router),
+                authedFetch("/api/admin/users", router)
             ]);
 
             if (analyticsRes?.ok) {
@@ -81,6 +99,10 @@ export default function CampaignMasterAdmin() {
                 const data = await asgnRes.json();
                 setAssignments(data.assignments);
             }
+            if (usersRes?.ok) {
+                const data = await usersRes.json();
+                setAllUsers(data.users);
+            }
         } catch (err) {
             console.error("Failed to load campaign master data:", err);
         } finally {
@@ -88,10 +110,64 @@ export default function CampaignMasterAdmin() {
         }
     };
 
+    // Synchronize Tab with URL Hash
     useEffect(() => {
+        const handleHashChange = () => {
+            const hash = window.location.hash.replace('#', '');
+            if (['overview', 'analytics', 'staff', 'campaigns'].includes(hash)) {
+                setActiveTab(hash as any);
+            } else if (!hash) {
+                setActiveTab('overview');
+            }
+        };
+
+        handleHashChange();
+        window.addEventListener('hashchange', handleHashChange);
         fetchData();
+        return () => window.removeEventListener('hashchange', handleHashChange);
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [router]);
+
+    const handleCreateCampaign = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setIsCreating(true);
+        try {
+            const res = await authedFetch("/api/admin/campaigns", router, {
+                method: "POST",
+                body: JSON.stringify(newCampaign)
+            });
+            if (res?.ok) {
+                setIsCreateModalOpen(false);
+                setNewCampaign({ name: '', description: '', landing_page_url: '/register' });
+                await fetchData();
+            }
+        } catch (err) {
+            console.error("Campaign Creation Failure:", err);
+        } finally {
+            setIsCreating(false);
+        }
+    };
+
+    const handleAssignStaff = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!newAssignment.campaign_id || !newAssignment.staff_id) return;
+        setIsAssigning(true);
+        try {
+            const res = await authedFetch("/api/admin/assignments", router, {
+                method: "POST",
+                body: JSON.stringify(newAssignment)
+            });
+            if (res?.ok) {
+                setIsAssignModalOpen(false);
+                setNewAssignment({ campaign_id: '', staff_id: '' });
+                await fetchData();
+            }
+        } catch (err) {
+            console.error("Staff Assignment Failure:", err);
+        } finally {
+            setIsAssigning(false);
+        }
+    };
 
     if (loading) {
         return (
@@ -104,29 +180,143 @@ export default function CampaignMasterAdmin() {
 
     return (
         <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20">
+            {/* Modal: Create Campaign */}
+            {isCreateModalOpen && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+                    <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => setIsCreateModalOpen(false)} />
+                    <div className="relative w-full max-w-xl bg-[#0A1622] border border-white/10 rounded-[2.5rem] p-10 shadow-2xl animate-in zoom-in-95 duration-300">
+                        <div className="flex justify-between items-center mb-8">
+                            <div>
+                                <h3 className="text-2xl font-black text-white tracking-tight">Initialize Protocol</h3>
+                                <p className="text-gray-500 text-sm mt-1">Deploy a new advertising cluster.</p>
+                            </div>
+                            <button onClick={() => setIsCreateModalOpen(false)} className="text-gray-500 hover:text-white transition-colors"><X /></button>
+                        </div>
+
+                        <form onSubmit={handleCreateCampaign} className="space-y-6">
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-teal uppercase tracking-widest ml-4">Campaign Name</label>
+                                <input 
+                                    required
+                                    value={newCampaign.name}
+                                    onChange={(e) => setNewCampaign({...newCampaign, name: e.target.value})}
+                                    placeholder="e.g. Q2 Commodities Surge"
+                                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white focus:outline-none focus:border-teal/50 transition-all"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-teal uppercase tracking-widest ml-4">Deployment Objective</label>
+                                <textarea 
+                                    required
+                                    value={newCampaign.description}
+                                    onChange={(e) => setNewCampaign({...newCampaign, description: e.target.value})}
+                                    placeholder="Describe the target audience and value proposition..."
+                                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white focus:outline-none focus:border-teal/50 transition-all h-32 resize-none"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-teal uppercase tracking-widest ml-4">Destination Link</label>
+                                <input 
+                                    required
+                                    value={newCampaign.landing_page_url}
+                                    onChange={(e) => setNewCampaign({...newCampaign, landing_page_url: e.target.value})}
+                                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white font-mono text-sm"
+                                />
+                            </div>
+                            <button 
+                                disabled={isCreating}
+                                className="w-full py-5 bg-teal text-dark-blue font-black rounded-2xl uppercase tracking-[0.2em] text-xs hover:scale-[0.98] transition-all flex items-center justify-center gap-3 shadow-xl shadow-teal/20"
+                            >
+                                {isCreating ? <Loader2 className="animate-spin" /> : <><Zap size={18} /> Activate Deployment</>}
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal: Assign Staff */}
+            {isAssignModalOpen && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+                    <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => setIsAssignModalOpen(false)} />
+                    <div className="relative w-full max-w-xl bg-[#0A1622] border border-white/10 rounded-[2.5rem] p-10 shadow-2xl animate-in zoom-in-95 duration-300">
+                        <div className="flex justify-between items-center mb-8">
+                            <div>
+                                <h3 className="text-2xl font-black text-white tracking-tight">Assign Partner</h3>
+                                <p className="text-gray-500 text-sm mt-1">Link a staff member to an active cluster.</p>
+                            </div>
+                            <button onClick={() => setIsAssignModalOpen(false)} className="text-gray-500 hover:text-white transition-colors"><X /></button>
+                        </div>
+
+                        <form onSubmit={handleAssignStaff} className="space-y-6">
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-teal uppercase tracking-widest ml-4">Select Campaign</label>
+                                <select 
+                                    required
+                                    value={newAssignment.campaign_id}
+                                    onChange={(e) => setNewAssignment({...newAssignment, campaign_id: e.target.value})}
+                                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white focus:outline-none focus:border-teal/50 transition-all appearance-none"
+                                >
+                                    <option value="" className="bg-[#0A1622]">Choose active cluster...</option>
+                                    {campaigns.map(c => (
+                                        <option key={c.id} value={c.id} className="bg-[#0A1622]">{c.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-teal uppercase tracking-widest ml-4">Target Partner (Staff)</label>
+                                <select 
+                                    required
+                                    value={newAssignment.staff_id}
+                                    onChange={(e) => setNewAssignment({...newAssignment, staff_id: e.target.value})}
+                                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white focus:outline-none focus:border-teal/50 transition-all appearance-none"
+                                >
+                                    <option value="" className="bg-[#0A1622]">Select staff member...</option>
+                                    {allUsers.map(u => (
+                                        <option key={u.id} value={u.id} className="bg-[#0A1622]">{u.full_name} ({u.email})</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <button 
+                                disabled={isAssigning}
+                                className="w-full py-5 bg-white text-dark-blue font-black rounded-2xl uppercase tracking-[0.2em] text-xs hover:scale-[0.98] transition-all flex items-center justify-center gap-3 shadow-xl"
+                            >
+                                {isAssigning ? <Loader2 className="animate-spin" /> : <><Users size={18} /> Link Partner Identity</>}
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            )}
+
             {/* Header Area */}
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">
                 <div className="space-y-4">
                     <div className="flex items-center gap-3">
-                        <div className="p-2 bg-teal/10 rounded-xl border border-teal/20">
-                            <ShieldAlert className="text-teal" size={20} />
+                        <div className="w-12 h-12 bg-teal/10 rounded-2xl flex items-center justify-center border border-teal/20">
+                            <ShieldIcon size={24} className="text-teal" />
                         </div>
-                        <h2 className="text-teal font-black text-[10px] uppercase tracking-widest">Global Marketing Authority</h2>
-                    </div>
-                    <div>
-                        <h1 className="text-4xl md:text-5xl font-black text-white tracking-tight leading-none">Campaign Command</h1>
-                        <p className="text-gray-500 text-sm mt-3 max-w-xl leading-relaxed font-medium">
-                            Centralized oversight of institutional distribution, partner performance, and real-time lead attribution.
-                        </p>
+                        <div>
+                            <h1 className="text-4xl md:text-5xl font-black text-white tracking-tight leading-none">Campaign Command</h1>
+                            <p className="text-gray-500 text-sm mt-3 max-w-xl leading-relaxed font-medium">
+                                Centralized oversight of institutional distribution, partner performance, and real-time lead attribution.
+                            </p>
+                        </div>
                     </div>
                 </div>
 
                 <div className="flex items-center gap-3">
-                    <button className="px-6 py-4 bg-white/5 hover:bg-white/10 text-white border border-white/10 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-3 transition-all">
-                        <Filter size={18} /> Advanced Filters
+                    <button 
+                        onClick={() => setIsAssignModalOpen(true)}
+                        className="px-6 py-4 bg-white/5 hover:bg-white/10 text-white border border-white/10 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-3 transition-all"
+                    >
+                        <Users size={18} /> Assign Partner
                     </button>
-                    <button onClick={fetchData} className="px-6 py-4 bg-teal text-dark-blue rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-3 transition-all shadow-xl shadow-teal/20">
-                        <TrendingUp size={18} /> Refresh Insight
+                    <button 
+                        onClick={() => setIsCreateModalOpen(true)}
+                        className="px-6 py-4 bg-teal text-dark-blue rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-3 transition-all shadow-xl shadow-teal/20"
+                    >
+                        <Plus size={18} /> New Protocol
                     </button>
                 </div>
             </div>
@@ -141,7 +331,7 @@ export default function CampaignMasterAdmin() {
 
             {/* Tabs Controller */}
             <div className="flex items-center gap-1 bg-[#0A1622] p-1.5 rounded-2xl border border-white/5 w-fit">
-                {['overview', 'leads', 'staff', 'campaigns'].map((tab) => (
+                {['overview', 'analytics', 'staff', 'campaigns'].map((tab) => (
                     <button
                         key={tab}
                         onClick={() => setActiveTab(tab as any)}
@@ -218,13 +408,13 @@ export default function CampaignMasterAdmin() {
                                     </div>
                                 ))}
                             </div>
-                            <button className="w-full mt-8 py-4 bg-white/5 hover:bg-white/10 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all">View All Protocols</button>
+                            <button onClick={() => setActiveTab('campaigns')} className="w-full mt-8 py-4 bg-white/5 hover:bg-white/10 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all">View All Protocols</button>
                         </div>
                     </div>
                 </div>
             )}
 
-            {activeTab === 'leads' && (
+            {activeTab === 'analytics' && (
                 <div className="bg-[#0E1B2A] rounded-[3.5rem] border border-white/5 overflow-hidden shadow-2xl">
                     <div className="p-10 border-b border-white/5 bg-white/[0.01] flex flex-col md:flex-row md:items-center justify-between gap-6">
                         <div>
@@ -281,6 +471,7 @@ export default function CampaignMasterAdmin() {
                     </div>
                 </div>
             )}
+            
             {activeTab === 'staff' && (
                 <div className="bg-[#0E1B2A] rounded-[3rem] border border-white/5 overflow-hidden shadow-2xl">
                     <div className="p-8 border-b border-white/5 bg-white/[0.01]">
@@ -359,7 +550,13 @@ export default function CampaignMasterAdmin() {
                                     <button className="flex-1 py-3 bg-white/5 hover:bg-white/10 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">
                                         Configure
                                     </button>
-                                    <button className="flex-1 py-3 bg-teal text-dark-blue rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">
+                                    <button 
+                                        onClick={() => {
+                                            setNewAssignment({...newAssignment, campaign_id: camp.id});
+                                            setIsAssignModalOpen(true);
+                                        }}
+                                        className="flex-1 py-3 bg-teal text-dark-blue rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+                                    >
                                         Assign
                                     </button>
                                 </div>
@@ -367,7 +564,10 @@ export default function CampaignMasterAdmin() {
                         </div>
                     ))}
                     
-                    <button className="bg-transparent border-2 border-dashed border-white/5 rounded-[2.5rem] p-8 flex flex-col items-center justify-center text-gray-600 hover:text-teal hover:border-teal/30 transition-all group min-h-[300px]">
+                    <button 
+                        onClick={() => setIsCreateModalOpen(true)}
+                        className="bg-transparent border-2 border-dashed border-white/5 rounded-[2.5rem] p-8 flex flex-col items-center justify-center text-gray-600 hover:text-teal hover:border-teal/30 transition-all group min-h-[300px]"
+                    >
                         <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mb-4 group-hover:bg-teal/10 transition-all">
                             <Plus size={32} />
                         </div>
@@ -400,19 +600,9 @@ function MatrixCard({ icon: Icon, label, value, color, description }: any) {
     );
 }
 
-function ShieldAlert(props: any) {
-    return (
-        <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10" />
-            <path d="M12 8v4" />
-            <path d="M12 16h.01" />
-        </svg>
-    );
-}
-
 function Placeholder({ text }: { text: string }) {
     return (
-        <div className="py-20 flex flex-col items-center justify-center text-gray-700 bg-white/[0.01] rounded-[2rem] border border-dashed border-white/5">
+        <div className="py-20 flex flex-col items-center justify-center text-gray-700 bg-white/[0.01] rounded-[2rem] border border-dashed border-white/5 w-full">
             <TrendingUp size={48} className="opacity-10 mb-4" />
             <p className="font-black text-xs uppercase tracking-widest opacity-40">{text}</p>
         </div>
