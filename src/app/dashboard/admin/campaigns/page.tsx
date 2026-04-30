@@ -65,7 +65,13 @@ export default function AdminCampaignDashboard() {
     const [activeTab, setActiveTab] = useState<'overview' | 'campaigns' | 'assignments'>('overview');
     
     // Create Campaign Form
-    const [newCampaign, setNewCampaign] = useState({
+    const [newCampaign, setNewCampaign] = useState<{
+        name: string;
+        description: string;
+        landing_page_url: string;
+        embed_code: string;
+        resources: { images: string[]; videos: string[]; copy: string[] };
+    }>({
         name: '',
         description: '',
         landing_page_url: '/register',
