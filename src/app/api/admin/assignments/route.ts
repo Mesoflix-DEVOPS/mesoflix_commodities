@@ -18,6 +18,7 @@ export async function GET(req: NextRequest) {
                 ca.campaign_id,
                 ca.staff_id,
                 ca.unique_code,
+                ca.custom_alias,
                 ca.short_url,
                 ca.status,
                 ca.created_at,
@@ -25,7 +26,8 @@ export async function GET(req: NextRequest) {
                 u.full_name as staff_name,
                 c.name as campaign_name,
                 (SELECT COUNT(*) FROM campaign_analytics WHERE assignment_id = ca.id AND event_type = 'CLICK') as clicks,
-                (SELECT COUNT(*) FROM campaign_analytics WHERE assignment_id = ca.id AND event_type = 'LEAD') as leads
+                (SELECT COUNT(*) FROM campaign_analytics WHERE assignment_id = ca.id AND event_type = 'LEAD') as leads,
+                (SELECT COUNT(*) FROM campaign_analytics WHERE assignment_id = ca.id AND event_type = 'CONVERSION') as conversions
             FROM campaign_assignments ca
             LEFT JOIN users u ON ca.staff_id = u.id
             LEFT JOIN campaigns c ON ca.campaign_id = c.id
@@ -37,7 +39,8 @@ export async function GET(req: NextRequest) {
         const assignments = result.rows.map(r => ({
             ...r,
             clicks: parseInt(r.clicks || '0'),
-            leads: parseInt(r.leads || '0')
+            leads: parseInt(r.leads || '0'),
+            conversions: parseInt(r.conversions || '0')
         }));
 
         return NextResponse.json({ assignments });

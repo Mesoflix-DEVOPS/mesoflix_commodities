@@ -290,6 +290,7 @@ export const campaignAssignments = pgTable('campaign_assignments', {
     campaign_id: uuid('campaign_id').references(() => campaigns.id, { onDelete: 'cascade' }).notNull(),
     staff_id: uuid('staff_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
     unique_code: text('unique_code').unique().notNull(),
+    custom_alias: text('custom_alias').unique(),
     short_url: text('short_url'),
     status: text('status').default('active'), // 'active', 'paused', 'terminated'
     created_at: timestamp('created_at').defaultNow(),

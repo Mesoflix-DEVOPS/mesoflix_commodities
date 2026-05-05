@@ -15,7 +15,8 @@ export async function GET(req: NextRequest) {
         const statsQuery = `
             SELECT 
                 COUNT(*) FILTER (WHERE event_type = 'CLICK') as clicks,
-                COUNT(*) FILTER (WHERE event_type = 'LEAD') as leads
+                COUNT(*) FILTER (WHERE event_type = 'LEAD') as leads,
+                COUNT(*) FILTER (WHERE event_type = 'CONVERSION') as conversions
             FROM campaign_analytics
         `;
         const statsRes = await pool.query(statsQuery);
@@ -30,7 +31,8 @@ export async function GET(req: NextRequest) {
                 ca.campaign_id,
                 c.name as campaign_name,
                 COUNT(an.id) FILTER (WHERE an.event_type = 'CLICK') as clicks,
-                COUNT(an.id) FILTER (WHERE an.event_type = 'LEAD') as leads
+                COUNT(an.id) FILTER (WHERE an.event_type = 'LEAD') as leads,
+                COUNT(an.id) FILTER (WHERE an.event_type = 'CONVERSION') as conversions
             FROM campaign_assignments ca
             LEFT JOIN users u ON ca.staff_id = u.id
             LEFT JOIN campaigns c ON ca.campaign_id = c.id
@@ -57,11 +59,13 @@ export async function GET(req: NextRequest) {
             stats: {
                 clicks: parseInt(stats.clicks || '0'),
                 leads: parseInt(stats.leads || '0'),
+                conversions: parseInt(stats.conversions || '0'),
             },
             staffPerformance: staffRes.rows.map(r => ({
                 ...r,
                 clicks: parseInt(r.clicks || '0'),
-                leads: parseInt(r.leads || '0')
+                leads: parseInt(r.leads || '0'),
+                conversions: parseInt(r.conversions || '0')
             })),
             timeline: timelineRes.rows.map(r => ({
                 ...r,

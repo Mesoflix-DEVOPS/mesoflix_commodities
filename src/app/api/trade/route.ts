@@ -120,6 +120,38 @@ export async function POST(request: Request) {
             // 🏁 INSTANT SYNC TRIGGER: Pulse the dashboard (Item 11 Fix)
             triggerSync(userId);
 
+            // 📈 Institutional Campaign Attribution: Record CONVERSION on first live trade
+            if (!isDemo) {
+                try {
+                    const { pool } = await import('@/lib/db');
+                    // Check if this user was referred and hasn't converted yet
+                    const leadCheck = await pool.query(
+                        `SELECT assignment_id FROM campaign_analytics 
+                         WHERE user_id = $1 AND event_type = 'LEAD' LIMIT 1`,
+                        [userId]
+                    );
+                    
+                    if (leadCheck.rows.length > 0) {
+                        const assignmentId = leadCheck.rows[0].assignment_id;
+                        const convCheck = await pool.query(
+                            `SELECT id FROM campaign_analytics 
+                             WHERE user_id = $1 AND event_type = 'CONVERSION' LIMIT 1`,
+                            [userId]
+                        );
+                        
+                        if (convCheck.rows.length === 0) {
+                            await pool.query(
+                                `INSERT INTO campaign_analytics (assignment_id, event_type, user_id, metadata) 
+                                 VALUES ($1, 'CONVERSION', $2, $3)`,
+                                [assignmentId, userId, JSON.stringify({ source: 'trade', epic })]
+                            );
+                        }
+                    }
+                } catch (e) {
+                    console.error('[Trade API] Campaign conversion tracking failed:', e);
+                }
+            }
+
             return NextResponse.json({ success: true, ...result });
 
         } catch (err: any) {

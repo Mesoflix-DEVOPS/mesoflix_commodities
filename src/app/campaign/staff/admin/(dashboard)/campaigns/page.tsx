@@ -13,15 +13,37 @@ import { cn } from "@/lib/utils";
 import { authedFetch } from "@/lib/fetch-utils";
 import { useRouter } from "next/navigation";
 
+interface CampaignResources {
+    copy: string[];
+    images: string[];
+    videos: string[];
+}
+
+interface Campaign {
+    id: string;
+    name: string;
+    description: string;
+    landing_page_url: string;
+    embed_code: string;
+    resources: CampaignResources;
+    is_active: boolean;
+}
+
 export default function AdminCampaignsPage() {
     const router = useRouter();
-    const [campaigns, setCampaigns] = useState<any[]>([]);
+    const [campaigns, setCampaigns] = useState<Campaign[]>([]);
     const [loading, setLoading] = useState(true);
     
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-    const [editingCampaign, setEditingCampaign] = useState<any>(null);
-    const [newCampaign, setNewCampaign] = useState({ name: '', description: '', landing_page_url: '/register', embed_code: '' });
+    const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null);
+    const [newCampaign, setNewCampaign] = useState({ 
+        name: '', 
+        description: '', 
+        landing_page_url: '/register', 
+        embed_code: '', 
+        resources: { copy: [] as string[], images: [] as string[], videos: [] as string[] } 
+    });
     const [isCreating, setIsCreating] = useState(false);
     const [isUpdating, setIsUpdating] = useState(false);
 
@@ -55,7 +77,7 @@ export default function AdminCampaignsPage() {
             });
             if (res?.ok) {
                 setIsCreateModalOpen(false);
-                setNewCampaign({ name: '', description: '', landing_page_url: '/register', embed_code: '' });
+                setNewCampaign({ name: '', description: '', landing_page_url: '/register', embed_code: '', resources: { copy: [], images: [], videos: [] } });
                 await fetchData();
             }
         } catch (err) {
@@ -87,7 +109,13 @@ export default function AdminCampaignsPage() {
     };
 
     const openEditModal = (camp: any) => {
-        setEditingCampaign(camp);
+        let resources = { copy: [], images: [], videos: [] };
+        try {
+            if (camp.resources) {
+                resources = typeof camp.resources === 'string' ? JSON.parse(camp.resources) : camp.resources;
+            }
+        } catch (e) {}
+        setEditingCampaign({ ...camp, resources });
         setIsEditModalOpen(true);
     };
 
@@ -155,6 +183,39 @@ export default function AdminCampaignsPage() {
                                     className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white font-mono text-[10px] h-24"
                                 />
                             </div>
+
+                            {/* Creative Assets Section */}
+                            <div className="space-y-4 p-6 bg-white/[0.02] border border-white/5 rounded-[2rem]">
+                                <h4 className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Creative Asset Matrix</h4>
+                                
+                                <div className="space-y-4">
+                                    <AssetList 
+                                        label="Marketing Copy" 
+                                        items={editingCampaign?.resources?.copy || []} 
+                                        onAdd={(val: string) => editingCampaign && setEditingCampaign({
+                                            ...editingCampaign, 
+                                            resources: { ...editingCampaign.resources, copy: [...(editingCampaign.resources?.copy || []), val] }
+                                        })}
+                                        onRemove={(idx: number) => editingCampaign && setEditingCampaign({
+                                            ...editingCampaign, 
+                                            resources: { ...editingCampaign.resources, copy: (editingCampaign.resources?.copy || []).filter((_: any, i: number) => i !== idx) }
+                                        })}
+                                    />
+                                    <AssetList 
+                                        label="Image URLs" 
+                                        items={editingCampaign?.resources?.images || []} 
+                                        onAdd={(val: string) => editingCampaign && setEditingCampaign({
+                                            ...editingCampaign, 
+                                            resources: { ...editingCampaign.resources, images: [...(editingCampaign.resources?.images || []), val] }
+                                        })}
+                                        onRemove={(idx: number) => editingCampaign && setEditingCampaign({
+                                            ...editingCampaign, 
+                                            resources: { ...editingCampaign.resources, images: (editingCampaign.resources?.images || []).filter((_: any, i: number) => i !== idx) }
+                                        })}
+                                    />
+                                </div>
+                            </div>
+
                             <button 
                                 disabled={isUpdating}
                                 className="w-full py-5 bg-teal text-dark-blue font-black rounded-2xl uppercase tracking-[0.2em] text-xs shadow-xl"
@@ -217,6 +278,39 @@ export default function AdminCampaignsPage() {
                                     className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white font-mono text-sm"
                                 />
                             </div>
+
+                            {/* Creative Assets Section */}
+                            <div className="space-y-4 p-6 bg-white/[0.02] border border-white/5 rounded-[2rem]">
+                                <h4 className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Creative Asset Matrix</h4>
+                                
+                                <div className="space-y-4">
+                                    <AssetList 
+                                        label="Marketing Copy" 
+                                        items={newCampaign.resources.copy} 
+                                        onAdd={(val: string) => setNewCampaign({
+                                            ...newCampaign, 
+                                            resources: { ...newCampaign.resources, copy: [...newCampaign.resources.copy, val] }
+                                        })}
+                                        onRemove={(idx: number) => setNewCampaign({
+                                            ...newCampaign, 
+                                            resources: { ...newCampaign.resources, copy: newCampaign.resources.copy.filter((_: any, i: number) => i !== idx) }
+                                        })}
+                                    />
+                                    <AssetList 
+                                        label="Image URLs" 
+                                        items={newCampaign.resources.images} 
+                                        onAdd={(val: string) => setNewCampaign({
+                                            ...newCampaign, 
+                                            resources: { ...newCampaign.resources, images: [...newCampaign.resources.images, val] }
+                                        })}
+                                        onRemove={(idx: number) => setNewCampaign({
+                                            ...newCampaign, 
+                                            resources: { ...newCampaign.resources, images: newCampaign.resources.images.filter((_: any, i: number) => i !== idx) }
+                                        })}
+                                    />
+                                </div>
+                            </div>
+
                             <button 
                                 disabled={isCreating}
                                 className="w-full py-5 bg-teal text-dark-blue font-black rounded-2xl uppercase tracking-[0.2em] text-xs hover:scale-[0.98] transition-all flex items-center justify-center gap-3 shadow-xl shadow-teal/20"
@@ -276,6 +370,71 @@ export default function AdminCampaignsPage() {
                         </div>
                     </div>
                 ))}
+            </div>
+        </div>
+    );
+}
+
+interface AssetListProps {
+    label: string;
+    items: string[];
+    onAdd: (val: string) => void;
+    onRemove: (idx: number) => void;
+}
+
+function AssetList({ label, items, onAdd, onRemove }: AssetListProps) {
+    const [inputValue, setInputValue] = useState('');
+
+    return (
+        <div className="space-y-2">
+            <div className="flex justify-between items-center">
+                <label className="text-[9px] font-black text-gray-500 uppercase tracking-widest">{label}</label>
+                <span className="text-[9px] font-bold text-teal/40">{items?.length || 0} Assets</span>
+            </div>
+            <div className="space-y-2">
+                {items?.map((item: string, idx: number) => (
+                    <div key={idx} className="flex items-center gap-2 group">
+                        <div className="flex-1 px-4 py-2 bg-white/5 border border-white/5 rounded-lg text-[10px] text-gray-400 truncate">
+                            {item}
+                        </div>
+                        <button 
+                            type="button"
+                            onClick={() => onRemove(idx)}
+                            className="p-2 text-gray-600 hover:text-red-500 transition-colors"
+                        >
+                            <X size={14} />
+                        </button>
+                    </div>
+                ))}
+                <div className="flex gap-2">
+                    <input 
+                        value={inputValue}
+                        onChange={(e) => setInputValue(e.target.value)}
+                        placeholder={`Add ${label.toLowerCase()}...`}
+                        className="flex-1 bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-[10px] text-white focus:outline-none focus:border-teal/30"
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                                e.preventDefault();
+                                if (inputValue.trim()) {
+                                    onAdd(inputValue.trim());
+                                    setInputValue('');
+                                }
+                            }
+                        }}
+                    />
+                    <button 
+                        type="button"
+                        onClick={() => {
+                            if (inputValue.trim()) {
+                                onAdd(inputValue.trim());
+                                setInputValue('');
+                            }
+                        }}
+                        className="p-2 bg-teal/10 text-teal rounded-lg hover:bg-teal/20 transition-all"
+                    >
+                        <Plus size={14} />
+                    </button>
+                </div>
             </div>
         </div>
     );

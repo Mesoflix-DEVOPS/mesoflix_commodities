@@ -18,6 +18,7 @@ export async function GET(req: NextRequest) {
             SELECT 
                 ca.id,
                 ca.unique_code,
+                ca.custom_alias,
                 ca.short_url,
                 ca.status,
                 c.id as campaign_id,
@@ -26,12 +27,13 @@ export async function GET(req: NextRequest) {
                 c.landing_page_url as landing_page,
                 c.resources,
                 COUNT(an.id) FILTER (WHERE an.event_type = 'CLICK') as clicks,
-                COUNT(an.id) FILTER (WHERE an.event_type = 'LEAD') as leads
+                COUNT(an.id) FILTER (WHERE an.event_type = 'LEAD') as leads,
+                COUNT(an.id) FILTER (WHERE an.event_type = 'CONVERSION') as conversions
             FROM campaign_assignments ca
             INNER JOIN campaigns c ON ca.campaign_id = c.id
             LEFT JOIN campaign_analytics an ON an.assignment_id = ca.id
             WHERE ca.staff_id = $1
-            GROUP BY ca.id, c.id
+            GROUP BY ca.id, c.id, ca.custom_alias
         `;
         
         const result = await pool.query(query, [userId]);
@@ -40,6 +42,7 @@ export async function GET(req: NextRequest) {
             ...r,
             clicks: parseInt(r.clicks || '0'),
             leads: parseInt(r.leads || '0'),
+            conversions: parseInt(r.conversions || '0'),
         }));
 
         return NextResponse.json({ campaigns: stats });

@@ -271,9 +271,15 @@ export default function StaffCampaignsPage() {
                                     <div className="w-14 h-14 bg-teal/10 rounded-2xl flex items-center justify-center text-teal border border-teal/20">
                                         <Megaphone size={28} />
                                     </div>
-                                    <div className="text-right">
-                                        <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Performance</p>
-                                        <p className="text-xl font-black text-white font-mono">{item.leads} <span className="text-gray-600 text-xs uppercase ml-1">Leads</span></p>
+                                    <div className="text-right flex gap-4">
+                                        <div>
+                                            <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Leads</p>
+                                            <p className="text-xl font-black text-white font-mono">{item.leads}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Conv.</p>
+                                            <p className="text-xl font-black text-teal font-mono">{item.conversions || 0}</p>
+                                        </div>
                                     </div>
                                 </div>
 

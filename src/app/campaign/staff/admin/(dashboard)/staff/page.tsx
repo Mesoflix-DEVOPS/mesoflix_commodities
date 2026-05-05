@@ -169,7 +169,8 @@ export default function AdminStaffPage() {
                                 <th className="px-10 py-6">Cluster/Campaign</th>
                                 <th className="px-10 py-6">Reach</th>
                                 <th className="px-10 py-6">Qualified Leads</th>
-                                <th className="px-10 py-6 text-right">Ratio</th>
+                                <th className="px-10 py-6">Conversions</th>
+                                <th className="px-10 py-6 text-right">Ratio (L/C)</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-white/5">
@@ -193,8 +194,9 @@ export default function AdminStaffPage() {
                                     </td>
                                     <td className="px-10 py-6 font-mono text-white text-lg font-black">{perf.clicks}</td>
                                     <td className="px-10 py-6 font-mono text-teal text-lg font-black">{perf.leads}</td>
+                                    <td className="px-10 py-6 font-mono text-purple-400 text-lg font-black">{perf.conversions || 0}</td>
                                     <td className="px-10 py-6 text-right font-mono text-xl font-black text-white">
-                                        {((perf.leads / (perf.clicks || 1)) * 100).toFixed(1)}%
+                                        {((perf.conversions / (perf.leads || 1)) * 100).toFixed(1)}%
                                     </td>
                                 </tr>
                             ))}
