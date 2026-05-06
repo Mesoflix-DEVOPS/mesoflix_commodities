@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
 
         const userId = session.user.id;
 
-        // Optimized Institutional Query: Get assignments and stats in one bridge pass
+        // Optimized Institutional Query: Get assignments and stats without GROUP BY errors
         const query = `
             SELECT 
                 ca.id,
@@ -26,14 +26,13 @@ export async function GET(req: NextRequest) {
                 c.description as campaign_description,
                 c.landing_page_url as landing_page,
                 c.resources,
-                COUNT(an.id) FILTER (WHERE an.event_type = 'CLICK') as clicks,
-                COUNT(an.id) FILTER (WHERE an.event_type = 'LEAD') as leads,
-                COUNT(an.id) FILTER (WHERE an.event_type = 'CONVERSION') as conversions
+                (SELECT COUNT(*) FROM campaign_analytics WHERE assignment_id = ca.id AND event_type = 'CLICK') as clicks,
+                (SELECT COUNT(*) FROM campaign_analytics WHERE assignment_id = ca.id AND event_type = 'LEAD') as leads,
+                (SELECT COUNT(*) FROM campaign_analytics WHERE assignment_id = ca.id AND event_type = 'CONVERSION') as conversions
             FROM campaign_assignments ca
             INNER JOIN campaigns c ON ca.campaign_id = c.id
-            LEFT JOIN campaign_analytics an ON an.assignment_id = ca.id
             WHERE ca.staff_id = $1
-            GROUP BY ca.id, c.id, ca.custom_alias
+            ORDER BY ca.created_at DESC
         `;
         
         const result = await pool.query(query, [userId]);
